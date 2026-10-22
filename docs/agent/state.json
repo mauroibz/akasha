@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 47,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "project_status": "ready",
+  "active_sprint": "107",
+  "active_sprint_file": "docs/sprints/107-progress-marks-underneath.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "106",
   "completed_sprints": [
     "001",
@@ -115,5 +115,5 @@
     "106"
   ],
   "started_at": "",
-  "updated_at": "2026-10-22T03:36:40+00:00"
+  "updated_at": "2026-10-22T11:04:25-03:00"
 }

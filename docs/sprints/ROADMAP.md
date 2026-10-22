@@ -1,8 +1,9 @@
 # Implementation Roadmap
 
-**Plan revision:** 47
+**Plan revision:** 48
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
+**Active sprint:** 107 (ready). Sprints 107–108, the owner's 2026-10-22 request for an optional
+episode and chapter tracker (DEC-171), are planned; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
@@ -226,6 +227,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [104](104-goals-on-the-diary.md) | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | completed |
 | [105](105-shelves-with-opinions.md) | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | completed |
 | [106](106-inbox-one-at-a-time.md) | The inbox one at a time: a full-screen deck of cards to file or pass | 105 | completed |
+| [107](107-progress-marks-underneath.md) | Episodes and chapters underneath: outlines, marks on the entry, the API | 106 | ready |
+| [108](108-progress-marks-on-the-detail-page.md) | Episodes and chapters on the detail page: the tracker of lights | 107 | planned |
 
 ## Sprint contracts
 
@@ -1816,6 +1819,20 @@ title was cut to three letters, and accepted as **DEC-170**.
   deck, one card per inbox entry with a large cover and the whole title, the status, score and
   shelves on the same screen, *File* and *Later* (swipe right and left), undo, a card that turns
   over to its back, and an end with what was filed and what was passed.
+
+## Episodes and chapters — the 2.7 line
+
+Asked for by the owner on 2026-10-22 after v2.6.0 and accepted as **DEC-171**: an optional
+tracker of how far into a season or a book the owner got, checked per episode or per season, in
+the goal calendar's style. No ratings per part.
+
+- **[107 — Episodes and chapters, underneath](107-progress-marks-underneath.md)** (**ready**).
+  `ProgressSpec.parts_field`; a series' seasons from TVmaze; a book's `chapters` from the owner
+  or Open Library; `entries.progress_marks` (migration 0027) driving the progress count; an
+  explicit outline fetch for series added before 2.7.
+- **[108 — Episodes and chapters on the detail page](108-progress-marks-on-the-detail-page.md)**
+  (planned). One collapsed line that opens to rows of lights; a tap per episode, a tap per
+  season; *Load the episode list* and *Add chapters* where there is no outline yet.
 
 ## Not scheduled
 

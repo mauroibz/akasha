@@ -2,6 +2,10 @@
 
 ## Where the project stands
 
+**2026-10-22, later:** the owner asked for an optional episode and chapter tracker for a 2.7
+release (DEC-171). The plan reopens as Sprints 107 (model and API) and 108 (the tracker on the
+detail page); **107 is active (ready)**. Release, push and deploy wait for the owner to ask.
+
 **2026-10-22:** the owner asked for a way through a large inbox one entry at a time on a phone
 (DEC-170). Sprint 106 delivered `/inbox/deck` and shipped as **v2.6.0** (tagged, pushed, GitHub
 Release). The project state is `complete`; no sprint is planned.
@@ -46,7 +50,7 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. The ZimaBoard (192.168.100.240, port 4441, auth on) refuses this machine's
+Run Sprint 107, then 108. The ZimaBoard (192.168.100.240, port 4441, auth on) refuses this machine's
 SSH key (`ibz@comma`) for `ibz` and `root`; the board upgrade to 2.6.0 is the owner's unless
 access is given: `AKASHA_VERSION=2.6.0` in the board's `.env`, `./render-compose.sh`, then
 `docker compose pull && docker compose up -d`. Walkthroughs can use a copy of the owner's library

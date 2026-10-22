@@ -6864,3 +6864,47 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   as the card leans, a fanned pile of what was filed at the end), all of it off under reduced
   motion; there are no streaks or scores of the owner's speed, in keeping with DEC-169's
   "encouraging, not pushy".
+
+## DEC-171 — Episodes and chapters as optional marks on the entry: Sprints 107–108
+
+- Date: 2026-10-22
+- Status: accepted
+- Context: after v2.6.0 the owner asked for a minor release with *"an optional subtracker within
+  each item that has partitions (shows have episodes, books have chapters) with aesthetics
+  similar to the goals in the diary. It is not a core feature, but useful as a tracker for how
+  far you got into a season or book before dropping off. Ideally i can check boxes per episode
+  or an entire season. It should be optional/non binding and not intrusive. we are NOT adding
+  ratings per episode, just a progress tracker."* Measured the same day:
+  - **Series.** TVmaze `GET /shows/<id>?embed=episodes` returns every episode with its season
+    and number in the one request the adapter already makes. Five shows looked up by IMDb id
+    (Breaking Bad, Brooklyn Nine-Nine, The Sopranos, Stranger Things, Only Murders in the
+    Building): 62, 91, 86, 32 and 18 episodes, every one numbered, seasons of 7 to 21.
+  - **Anime.** One entry is usually one season; `episodes` is already on the item.
+  - **Books.** Open Library's edition `table_of_contents` was present for 2 of 8 books sampled
+    (*Thinking, Fast and Slow* 50 rows, *Don Quijote* 8); the other six had none.
+- Decision: two sprints, 107 (model and API) and 108 (the tracker on the detail page),
+  `FINAL_SPRINT` 106 → 108, revision 48, released as 2.7.0.
+  1. **Marks on the flat entry, not child entities.** DEC-077 rejected children with their own
+     state; this does not reopen it. A mark has no status, score, date or row anywhere but its
+     entry: one JSON column `entries.progress_marks` holding which parts are checked. No shared
+     surface (cursor, triage, bulk, facets, undo, library row) learns about it.
+  2. **The outline is declared, not branched on.** `ProgressSpec` gains `parts_field`: a `rows`
+     metadata field on the item giving each part and its size (a series' `season_episodes`). A
+     domain without one, or an item whose field is empty, falls back to one part of
+     `total_field`. The shared layers read the declaration; nothing tests the item type.
+  3. **The boxes drive the count** (owner's choice). Writing marks sets `progress` to the number
+     checked. An entry with a count and no marks (every Trakt and MyAnimeList import) is drawn as
+     the first N in order, and stored as marks only when the owner first touches a box. A count
+     typed by hand clears the marks. Marks outside the current outline are kept and counted, as
+     the total was never a bound (DEC-092).
+  4. **Books gain a count** (owner's choice): `chapters` on the item and `ProgressSpec("Chapters
+     read", "chapter", total_field="chapters")`. The owner types the count; Open Library's table
+     of contents fills it when present. The lights are numbered; chapters are not named.
+  5. **Fetched only on request.** The season list arrives with add, enrichment and explicit
+     refresh, and from a *Load the episode list* action in the tracker for series added before
+     2.7. Never while drawing a page, and `season_episodes` is not a completeness field, so no
+     backfill re-queues every series.
+  6. **Not intrusive.** On the detail page only: one collapsed line ("Episodes · 23 of 62"), which
+     opens to rows of lights in the goal calendar's style. No ratings, notes or dates per part.
+- Consequences: one migration (0027), so a minor version. Albums keep their tracklist as
+  metadata and get no marks; films have no progress.
