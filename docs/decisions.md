@@ -6833,3 +6833,34 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      front cover swings open; reduced motion keeps it closed.
 - Consequences: one migration (goals), so the release is a minor version. The mock is the
   canvas https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
+
+## DEC-170 — The inbox, one at a time: a deck of cards (Sprint 106)
+
+- Date: 2026-10-22
+- Status: accepted
+- Context: the owner, after a large import, sent a screenshot of the inbox at phone width: 123
+  rows, each title cut to three letters ("A Fe…", "Geor…") because the status select, the score
+  select and the apply check take the row. *"Design and implement an interactive way of going
+  though them one at a time. I imagine a full screen or large cover with the required data being
+  able to be inputted on the same screen without scrolling, either by having everything available
+  or going though stages … it should include a way for me to 'pass', move to the next one and
+  leave them for later. It should work on both desktop and mobile and feel fun to use."*
+- Decision: Sprint 106, `FINAL_SPRINT` 105 → 106, revision 47.
+  1. **A deck, not a wizard.** Everything a decision needs — status, score, shelves — is on the
+     one screen, under a large cover, so filing an obvious card is one tap. The owner's
+     "stages" idea survives as the card's *back*: tapping the cover turns it over to the details
+     that do not fit on the front (subtitle, formats, the importer's suggestion).
+  2. `/inbox/deck`, a full-screen layer over the shell, carries the inbox's filter. The list stays
+     the inbox's default surface; the deck is reached from its header.
+  3. *File* is the list's row Apply: the same target status rule (draft, else suggestion, else
+     domain default), one `PATCH` per card. A score is sent only when the owner touched it, so an
+     untouched provisional score stays provisional, as in the list. Shelves are written with the
+     same request.
+  4. *Later* writes nothing: the entry stays `unsorted` (the spec's "deferring is fine") and goes
+     to the back of this sitting's deck. Swipe right files, left passes, as the familiar card
+     gesture. Undo reverses the last card, filed or passed.
+  5. Discard is not on the card: the spec keeps it a deliberate, selection-only action.
+- Consequences: no backend or schema change. The fun is motion and a little ceremony (a stamp
+  as the card leans, a fanned pile of what was filed at the end), all of it off under reduced
+  motion; there are no streaks or scores of the owner's speed, in keeping with DEC-169's
+  "encouraging, not pushy".

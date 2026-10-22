@@ -937,6 +937,19 @@ is explicit, and keyboard-first throughout.
 - **Deferring is fine and explicit.** No "you must finish" pressure. The badge
   count on `/` is the only nag. Books can sit `unsorted` indefinitely and still
   be searchable.
+- **One at a time — the deck** (`/inbox/deck`, DEC-170). For a phone, where the dense
+  table leaves no room for a title, and for anyone clearing a large import. Opened
+  from the inbox header with the inbox's filter, a full-screen layer shows one card:
+  the cover large, the whole title, creator and year; tapping the cover turns it
+  over to subtitle, formats and the importer's suggestion. The domain's choosable
+  statuses, a 1–10 score and the shelves sit on the same screen with no scrolling.
+  *File* commits the card like the row Apply (the same target rule; a score is sent
+  only when touched, shelves only when changed) and *Later* writes nothing: the card
+  stays `unsorted` and comes back after the rest of the deck. Swipe right files and
+  left passes; keys are the domain's status hotkeys, digits for score, `→`/`Enter`
+  file, `←`/`Space` later, `Backspace` undo, `i` turn over, `Esc` leave. Undo reverses
+  the last card. The end of a round shows what was filed and offers the passed cards
+  again. Discard is not on the card.
 
 **`/shelves` — Shelf management.** List, rename, delete, counts.
 

@@ -52,6 +52,9 @@ const InsightsPage = lazy(async () => ({
 const TriagePage = lazy(async () => ({
   default: (await import("@/pages/TriagePage")).TriagePage,
 }));
+const TriageDeckPage = lazy(async () => ({
+  default: (await import("@/pages/TriageDeckPage")).TriageDeckPage,
+}));
 const DiaryPage = lazy(async () => ({
   default: (await import("@/pages/DiaryPage")).DiaryPage,
 }));
@@ -147,6 +150,7 @@ function PrivateRoutes({
             {/* The Inbox is its own page since Sprint 096 (proposal I3), no longer
                 a tab of the import screen. */}
             <Route path="/inbox" element={<TriagePage />} />
+            <Route path="/inbox/deck" element={<TriageDeckPage />} />
             {/* The phone's share sheet (Sprint 097): opens the command bar. */}
             <Route path="/share" element={<SharePage />} />
             <Route path="/diary" element={<DiaryPage />} />

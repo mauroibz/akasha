@@ -462,6 +462,19 @@ test("triage has no serious accessibility violations", async ({ page }) => {
   await expectNoSeriousViolations(page, "triage");
 });
 
+test("the inbox deck has no serious accessibility violations", async ({
+  page,
+}) => {
+  await stubItemTypes(page);
+  await stubTriage(page);
+  await stubShelves(page);
+  await page.goto("/inbox/deck");
+  await expect(page.getByRole("button", { name: /^file as/i })).toBeVisible();
+  await expectNoSeriousViolations(page, "inbox deck");
+  await page.getByRole("button", { name: /turn over for details/i }).click();
+  await expectNoSeriousViolations(page, "inbox deck (card turned over)");
+});
+
 test("triage row status action with bulk selection has no serious accessibility violations", async ({
   page,
 }) => {

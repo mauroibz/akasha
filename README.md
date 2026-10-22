@@ -80,6 +80,10 @@ Score edits in Triage save immediately. Each row's status control shows the impo
 suggestion, or that domain's default when the source has none — Inbox is already implied
 by the screen. Change the target if needed, then apply that row from its check button.
 Draft targets survive navigation and refresh within the browser tab until you apply them.
+After a large import, **One at a time** goes through the same inbox as a deck of cards: a
+large cover and the whole title, status, score and shelves on one screen, *File* or *Later*
+(swipe right or left on a phone), and undo. A card passed with *Later* stays in the inbox
+and comes back after the rest.
 
 Calibre needs no mount: point it at your library folder and the browser reads it
 directly. Only the database and covers upload by default, which keeps the transfer

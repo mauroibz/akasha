@@ -2,6 +2,10 @@
 
 ## Where the project stands
 
+**2026-10-22:** the owner asked for a way through a large inbox one entry at a time on a phone
+(DEC-170). Sprint 106 delivered `/inbox/deck` and is completed; it sits on top of 2.5.0,
+unreleased. Nothing else changed.
+
 v2.4.0 shipped on 2026-10-21 (Sprints 087–101) and runs on the owner's ZimaBoard. The owner then
 asked for a 2.5 release: Insights redrawn, gentle goals on the Diary, and Shelves redrawn. A design
 canvas was reviewed and accepted as **DEC-169**: https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
@@ -45,7 +49,7 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. 2.5.0 is ready: the gate passed (backend 1699, Vitest 425, Playwright 152 +
+Sprint 106 (the deck) is done and unreleased; it touches only the frontend. No sprint is planned. 2.5.0 is ready: the gate passed (backend 1699, Vitest 425, Playwright 152 +
 2 skipped, container smoke), the version surfaces say 2.5.0 and the notes are written. Pushing,
 tagging, the GitHub Release and the board upgrade wait for the owner (migration 0026 runs on the
 board with its pre-migration backup). Walkthroughs can use the copy of the owner's
