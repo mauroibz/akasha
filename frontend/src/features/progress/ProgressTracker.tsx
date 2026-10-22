@@ -153,8 +153,8 @@ export function ProgressTracker({
           {outline.length > 0 && (
             <p className="mt-3 text-xs text-muted-foreground">
               {partLabel && outline.length > 1
-                ? `Tap a ${unit}, or a ${partLabel.toLowerCase()} for all of it.`
-                : `Tap a ${unit} to mark it.`}
+                ? `Tap one to mark it, or a ${partLabel.toLowerCase()} for all of it.`
+                : "Tap one to mark it."}
             </p>
           )}
         </div>
