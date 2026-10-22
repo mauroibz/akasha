@@ -286,7 +286,13 @@ class TestThreeWaySeriesMerge:
 
     async def test_wikidata_tvmaze_and_cinemeta_merge_to_one_row(self) -> None:
         tvmaze_client = create_provider_client(
-            replay({"/shows/169": (200, recording("tvmaze_show_169_breaking_bad.json"))})  # type: ignore[arg-type]
+            replay(  # type: ignore[arg-type]
+                {
+                    "/shows/169": (200, recording("tvmaze_show_169_breaking_bad.json")),
+                    # A fetch asks for the season list too (Sprint 107).
+                    "/shows/169/episodes": (200, recording("tvmaze_show_169_episodes.json")),
+                }
+            )
         )
         tvmaze_provider = TvmazeSeriesProvider(
             tvmaze_client, "test@example.invalid", sleep=_no_sleep(0)

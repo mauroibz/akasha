@@ -293,6 +293,12 @@
    ]
   ],
   [
+   "/api/items/{item_id}/outline",
+   [
+    "POST"
+   ]
+  ],
+  [
    "/api/items/{item_id}/cover/fetch",
    [
     "POST"

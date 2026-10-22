@@ -122,10 +122,15 @@ def test_the_index_is_built_for_existing_rows_and_the_migration_reverses(tmp_pat
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     assert configured.database_url is not None
     config = alembic_config(configured.database_url)
-    command.upgrade(config, "0022_import_proposals")
+    # Seeded at head and taken down to the revision before the index, because the
+    # repository writes through the current models: a column a later revision adds
+    # (0027's `progress_marks`) does not exist at 0022. The rows survive the downgrade,
+    # so the upgrade still has to build the index for rows already there.
+    command.upgrade(config, "head")
     engine = create_engine(configured)
     try:
         _book(engine, "Good Omens", ("Terry Pratchett", "Neil Gaiman"))
+        command.downgrade(config, "0022_import_proposals")
         command.upgrade(config, "head")
         assert _found(engine, "gaiman") == {"Good Omens"}
         command.downgrade(config, "0022_import_proposals")
