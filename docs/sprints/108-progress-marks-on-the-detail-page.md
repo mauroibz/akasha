@@ -1,7 +1,7 @@
 # Sprint 108 — Episodes and chapters on the detail page
 
 **Sprint:** 108
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 48
 **Depends on:** 107
 **Owner:** Mauro

@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
+import { stubSeries } from "./progress-fixture";
 
 import {
   albumItemType,
@@ -1064,5 +1065,32 @@ for (const scheme of ["light", "dark"] as const) {
       .poll(() => page.evaluate(() => document.getAnimations().length))
       .toBe(0);
     await expectNoSeriousViolations(page, `goal dialog (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`episode marks and the dropped question have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubSeries(page, []);
+    await page.goto("/books/7");
+    await page.getByRole("button", { name: /Episodes 3 of 7/ }).click();
+    await expect(
+      page.getByRole("button", { name: "Season 2, episode 4" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `episode marks (${scheme})`);
+
+    await page.getByRole("button", { name: /edit opinion/i }).click();
+    await page.getByRole("combobox", { name: "Status" }).click();
+    await page.getByRole("option", { name: "Dropped", exact: true }).click();
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "How far did you get?" }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `how far did you get (${scheme})`);
   });
 }

@@ -14,6 +14,7 @@ import {
   type ItemType,
   type EntryFormat,
   type EntryStatus,
+  type LibraryEntry,
   type LibraryFilters,
   type LibraryPage,
   type SortKey,
@@ -58,6 +59,8 @@ import {
 } from "@/components/ui/dialog";
 import type { SearchCandidate } from "@/api/add";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { HowFarDialog } from "@/features/progress/HowFarDialog";
+import { isAbandoned } from "@/features/progress/outline";
 import {
   defaultLibraryFilters,
   domainPreferenceKey,
@@ -131,6 +134,8 @@ export function HomePage() {
   useEffect(() => rememberLibraryFilters(filters), [filters]);
   const [search, setSearch] = useState(filters.query);
   const [view, setView] = useState<LibraryView>(readViewPreference);
+  // The entry just dropped from its row, while the page asks how far (DEC-172).
+  const [asking, setAsking] = useState<LibraryEntry | null>(null);
   // A shelf pinned from its own page (Sprint 074 deliverable 6) -- read once,
   // the same shape as the remembered domain, so a pin made elsewhere shows up
   // on the next visit without a second store between the two pages.
@@ -360,6 +365,11 @@ export function HomePage() {
     // failure is still announced exactly once (DEC-028).
     onRollback: (entry) => setRollbackId(entry.id),
     onSaved: (saved, changes) => {
+      if (
+        changes.status !== undefined &&
+        isAbandoned(saved.item.type, saved.status, itemTypes.data)
+      )
+        setAsking(saved);
       const activeKeyChanged =
         (changes.score !== undefined && filters.sort === "score") ||
         (changes.status !== undefined && filters.statuses.length > 0);
@@ -1131,6 +1141,11 @@ export function HomePage() {
           )}
         </DialogContent>
       </Dialog>
+      <HowFarDialog
+        entry={asking}
+        types={itemTypes.data}
+        onClose={() => setAsking(null)}
+      />
     </main>
   );
 }

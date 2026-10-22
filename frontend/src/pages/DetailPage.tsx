@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import type { FieldSpec } from "@/api/library";
+import type { FieldSpec, LibraryEntry } from "@/api/library";
 import {
   deleteEntry,
   getEntry,
@@ -46,6 +46,9 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
+import { HowFarDialog } from "@/features/progress/HowFarDialog";
+import { isAbandoned } from "@/features/progress/outline";
+import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
@@ -240,6 +243,8 @@ export function DetailPage() {
   >(null);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  // The entry just dropped, while the page asks how far it got (DEC-172).
+  const [asking, setAsking] = useState<LibraryEntry | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
     queryKey: queryKeys.entry(entryId),
@@ -300,8 +305,12 @@ export function DetailPage() {
   );
   const blockFields = fields.filter((field) => field.type === "long_text");
   // An ordered list of structured rows is neither a fact nor a paragraph, so it
-  // gets its own region rather than being joined into one line (a tracklist).
-  const rowFields = fields.filter((field) => field.type === "rows");
+  // gets its own region rather than being joined into one line (a tracklist). The
+  // field the progress tracker draws its parts from is drawn there instead.
+  const partsField = progressFor(item.type, itemTypes.data)?.parts_field;
+  const rowFields = fields.filter(
+    (field) => field.type === "rows" && field.name !== partsField,
+  );
   const editableFields = fields.filter((field) => field.type !== "rows");
   const has = (field: EntryFieldName) =>
     hasEntryField(item.type, itemTypes.data, field);
@@ -548,6 +557,7 @@ export function DetailPage() {
                 />
               </PropertyRow>
             </dl>
+            <ProgressTracker entry={entry} types={itemTypes.data} />
             {entry.notes && (
               // The note as a callout, marked with the arch (Sprint 092).
               <div className="mt-4 flex gap-3 rounded-lg bg-muted/60 p-4">
@@ -685,8 +695,13 @@ export function DetailPage() {
         open={dialog === "opinion"}
         onOpenChange={(open) => setDialog(open ? "opinion" : null)}
         entry={entry}
-        onSave={(values) =>
-          update
+        onSave={(values) => {
+          // Sent only when edited: a typed count clears the ticked episodes, so
+          // saving a score must not resend the count and wipe them (DEC-171).
+          const progressEdited =
+            values.progress !==
+            (entry.progress == null ? "" : String(entry.progress));
+          return update
             .mutateAsync(() =>
               patchEntry(entry.id, {
                 status: values.status,
@@ -707,7 +722,7 @@ export function DetailPage() {
                 // `""` is "not recorded" and must reach the server as null, while
                 // `"0"` is a recorded zero. `Number("")` is `0`, so the empty check
                 // comes first — the reread line above cannot be copied here.
-                ...(progress
+                ...(progress && progressEdited
                   ? {
                       progress:
                         values.progress === "" ? null : Number(values.progress),
@@ -715,8 +730,20 @@ export function DetailPage() {
                   : {}),
               }),
             )
-            .then(() => undefined)
-        }
+            .then((saved) => {
+              // Dropped just now, and nothing typed about how far: ask (DEC-172).
+              const dropped =
+                values.status !== entry.status &&
+                isAbandoned(item.type, values.status, itemTypes.data);
+              if (dropped && !progressEdited) setAsking(saved as LibraryEntry);
+            });
+        }}
+      />
+
+      <HowFarDialog
+        entry={asking}
+        types={itemTypes.data}
+        onClose={() => setAsking(null)}
       />
 
       <CoverDialog

@@ -75,6 +75,8 @@ export interface StatusSpec {
   in_progress?: boolean;
   /** Waiting to be started: where a goal's picks come from (Sprint 103). */
   planned?: boolean;
+  /** Stopped partway: setting it asks how far it got (DEC-172). */
+  abandoned?: boolean;
 }
 
 /** How a domain counts progress, when that means something to it (DEC-077). */
@@ -87,7 +89,21 @@ export interface ProgressSpec {
    * series has none at all.
    */
   total_field: string | null;
+  /**
+   * A `rows` field of parts and their sizes — a series' seasons — when the domain has
+   * one (DEC-171). Absent or empty on an item, the outline is one part of the total.
+   */
+  parts_field?: string | null;
 }
+
+/** One part of what progress marks are drawn against: a season and its episodes. */
+export interface OutlinePart {
+  part: number;
+  size: number;
+}
+
+/** Which episodes or chapters are done, by part: `{"1": [1, 2, 3]}`. */
+export type ProgressMarks = Record<string, number[]>;
 
 export interface FormatSpec {
   value: EntryFormat;
@@ -158,6 +174,8 @@ export interface LibraryItem {
   cover_url?: string | null;
   /** Opaque: what is in here is the domain's business, not this type's. */
   metadata: Record<string, unknown>;
+  /** What progress marks are drawn against; absent where nothing says how many. */
+  outline?: OutlinePart[] | null;
   identifiers: Record<string, string>;
   sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
 }
@@ -174,6 +192,8 @@ export interface LibraryEntry {
   reread_count: number;
   /** `null` is *not recorded*, which is a different fact from a recorded `0`. */
   progress: number | null;
+  /** Which episodes or chapters were ticked; when present, `progress` is their count. */
+  progress_marks?: ProgressMarks | null;
   score_provisional: boolean;
   suggested_status: EntryStatus | null;
   item: LibraryItem;
@@ -403,6 +423,7 @@ export async function patchEntry(
       | "date_finished"
       | "reread_count"
       | "progress"
+      | "progress_marks"
     >
   > & { shelf_ids?: number[]; formats?: EntryFormat[] },
 ): Promise<LibraryEntry> {
@@ -414,6 +435,20 @@ export async function patchEntry(
   if (!response.ok)
     throw await apiFailure(response, "Your change could not be saved");
   return (await response.json()) as LibraryEntry;
+}
+
+/**
+ * Fetch a season list or chapter count the item has none of (DEC-171). An explicit
+ * action: never called while drawing a page.
+ */
+export async function fetchOutline(itemId: number): Promise<LibraryItem> {
+  const response = await request(`/api/items/${itemId}/outline`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The list could not be found");
+  return (await response.json()) as LibraryItem;
 }
 
 /** Entries under way across every domain: the Now strip (Sprint 098). */
