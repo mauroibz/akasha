@@ -2,18 +2,10 @@
 
 ## Where the project stands
 
-**2026-10-22, later:** the owner asked for an optional episode and chapter tracker for a 2.7
-release (DEC-171). Sprints 107 (model and API) and 108 (the tracker on the detail page, and the
-question asked when an entry is dropped, DEC-172) are **completed**; the project state is
-`complete`. They are unreleased on top of 2.6.0: a 2.7.0 release needs the version surfaces,
-release notes and the full gate (`make test`, the full Playwright run, `make smoke-container`). Release, push and deploy wait for the owner to ask.
-
-**2026-10-22:** the owner asked for a way through a large inbox one entry at a time on a phone
-(DEC-170). Sprint 106 delivered `/inbox/deck` and shipped as **v2.6.0** (tagged, pushed, GitHub
-Release). The project state is `complete`; no sprint is planned.
-
-v2.5.0 (Sprints 102–105, DEC-169: Insights redrawn, gentle goals, Shelves redrawn) shipped on
-2026-10-22. The 2.5 canvas is https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
+**2026-10-22:** Sprints 107–108 (DEC-171–175: episode and chapter marks, the progress row as
+the tracker, the drop question, Started and Finished filled by the first and last light)
+shipped as **v2.7.0** (tagged, pushed, GitHub Release). The project state is `complete`; no
+sprint is planned. Migration 0027 adds `entries.progress_marks`.
 
 Waiting on the owner:
 
@@ -52,8 +44,8 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. When the owner asks for 2.7.0: move the version surfaces, write
-`docs/operations/release-notes-v2.7.md` (migration 0027 adds `entries.progress_marks`; books
-now count chapters read), and run the full release gate. Known and left from 108: at 390px
-one book's detail page scrolls 19px sideways from its cover column, independent of the
-tracker.
+No sprint is planned. The board upgrade to 2.7.0 is the owner's unless SSH access is given:
+`AKASHA_VERSION=2.7.0` in the board's `.env`, `./render-compose.sh`, then
+`docker compose pull && docker compose up -d` (migration 0027 runs with its pre-migration
+backup). Known and left: at 390px one book's detail page scrolls 19px sideways from its
+cover column, independent of the tracker.

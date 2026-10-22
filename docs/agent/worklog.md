@@ -6520,3 +6520,22 @@ gate that had begun on the earlier tree was stopped and is rerun after this.
 **Verified and how.** `outline.test.ts` (7), the progress unit tests (27), `make check`,
 `progress-marks.spec.ts` (5, the season test now also reads today's date in the *Finished*
 row).
+
+## 2026-10-22 — Release 2.7.0
+
+**Done.**
+
+- The full release gate on `main`, then version surfaces at 2.7.0 and
+  `docs/operations/release-notes-v2.7.md`.
+- The first full run found three suites outside the sprints' per-change set behind:
+  `test_app_shape.py` (the outline route), `test_cinemeta_provider.py` (TVmaze's episode
+  list) and `test_library_search.py` (seeded through the current models at 0022, which
+  lacks 0027's column; now seeded at head and taken down). Fixed in a `[TEST]` commit.
+
+**Verified and how.**
+
+- `make test`: backend 1736 passed (90% coverage), Vitest 464 passed.
+- Playwright, full run: 165 passed, 2 skipped (live metadata, by design).
+- `make check` and `make smoke-container` passed.
+
+**Next.** Tag, push, GitHub Release; the board upgrade needs the owner or SSH access.
