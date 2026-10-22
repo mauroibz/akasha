@@ -3,14 +3,11 @@
 ## Where the project stands
 
 **2026-10-22:** the owner asked for a way through a large inbox one entry at a time on a phone
-(DEC-170). Sprint 106 delivered `/inbox/deck` and is completed; it sits on top of 2.5.0,
-unreleased. Nothing else changed.
+(DEC-170). Sprint 106 delivered `/inbox/deck` and shipped as **v2.6.0** (tagged, pushed, GitHub
+Release). The project state is `complete`; no sprint is planned.
 
-v2.4.0 shipped on 2026-10-21 (Sprints 087–101) and runs on the owner's ZimaBoard. The owner then
-asked for a 2.5 release: Insights redrawn, gentle goals on the Diary, and Shelves redrawn. A design
-canvas was reviewed and accepted as **DEC-169**: https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
-The plan reopens as Sprints 102–105. **All four are completed and the project state is `complete`.** 2.5.0 passed the full release gate and the version is bumped locally; nothing is pushed, tagged or deployed. The owner asked for the work
-to be built; release, push and deploy wait for them to ask.
+v2.5.0 (Sprints 102–105, DEC-169: Insights redrawn, gentle goals, Shelves redrawn) shipped on
+2026-10-22. The 2.5 canvas is https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
 
 Waiting on the owner:
 
@@ -30,10 +27,10 @@ Waiting on the owner:
   - Searches are cached for 24 hours.
   - `AKASHA_METRICS=on` serves `/metrics`.
 
-## Verified (v2.4.0)
+## Verified (v2.6.0)
 
-- `make test`: backend 1686 passed, Vitest 423 passed.
-- Playwright: 147 passed, 2 skipped (the live-metadata specs, by design).
+- `make test`: backend 1699 passed (90% coverage), Vitest 437 passed.
+- Playwright: 158 passed, 2 skipped (the live-metadata specs, by design).
 - `make check` and `make smoke-container` pass.
 
 ## Known and left
@@ -49,10 +46,8 @@ Waiting on the owner:
 
 ## Next session
 
-Sprint 106 (the deck) is done and unreleased; it touches only the frontend. No sprint is planned. 2.5.0 is ready: the gate passed (backend 1699, Vitest 425, Playwright 152 +
-2 skipped, container smoke), the version surfaces say 2.5.0 and the notes are written. Pushing,
-tagging, the GitHub Release and the board upgrade wait for the owner (migration 0026 runs on the
-board with its pre-migration backup). Walkthroughs can use the copy of the owner's
-library in the session scratchpad (`data102/`), taken from the board's 2026-10-21 nightly backup;
-it is never committed. The 2.5 canvas is https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c; the
-2.4 mock was https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa.
+No sprint is planned. The ZimaBoard (192.168.100.240, port 4441, auth on) refuses this machine's
+SSH key (`ibz@comma`) for `ibz` and `root`; the board upgrade to 2.6.0 is the owner's unless
+access is given: `AKASHA_VERSION=2.6.0` in the board's `.env`, `./render-compose.sh`, then
+`docker compose pull && docker compose up -d`. Walkthroughs can use a copy of the owner's library
+from the board's nightly backup, kept in the session scratchpad and never committed.

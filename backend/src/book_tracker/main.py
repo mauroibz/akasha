@@ -33,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # `request_validation_failed` returns, instead of FastAPI's own body.
     app = FastAPI(
         title="Akasha",
-        version="2.5.0",
+        version="2.6.0",
         lifespan=make_lifespan(configured),
         responses={422: {"model": ErrorResponse}},
     )

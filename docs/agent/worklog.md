@@ -6405,3 +6405,22 @@ owner's word to push, tag and deploy.
   the deck is the answer offered, the list is unchanged.
 
 **Next.** No sprint is planned. 106 is unreleased on top of 2.5.0.
+
+## 2026-10-22 — Release 2.6.0
+
+**Done.**
+
+- Sprint 106's branch squashed into one commit under the owner's name and merged to `main`.
+- The full release gate on the merged tree.
+- Version surfaces at 2.6.0; release notes in `docs/operations/release-notes-v2.6.md`.
+
+**Verified and how.**
+
+- `make test`: backend 1699 passed (90% coverage), Vitest 437 passed.
+- Playwright, full run: 158 passed, 2 skipped (live metadata, by design).
+- `make check` and `make smoke-container` passed.
+
+**Found.** The ZimaBoard refuses this machine's SSH key for `ibz` and `root`, as in the 2.3.0
+session; other usernames were reset by the board after two attempts.
+
+**Next.** Tag, push, GitHub Release; the board upgrade needs the owner or SSH access.
