@@ -28,6 +28,7 @@ import {
 } from "@/features/progress/marks";
 import {
   outlineContext,
+  passageDates,
   type OutlineContext,
 } from "@/features/progress/outline";
 
@@ -62,11 +63,13 @@ export function HowFarDialog(props: {
 function Asked({
   entry,
   context,
+  types,
   onClose,
   onSaved,
 }: {
   entry: LibraryEntry;
   context: OutlineContext;
+  types: ItemType[] | undefined;
   onClose: () => void;
   onSaved?: (saved: LibraryEntry) => void;
 }) {
@@ -81,7 +84,8 @@ function Asked({
 
   const save = useMutation({
     mutationFn: (
-      changes: { progress_marks: ProgressMarks } | { progress: number },
+      changes: ({ progress_marks: ProgressMarks } | { progress: number }) &
+        ReturnType<typeof passageDates>,
     ) => patchEntry(entry.id, changes),
     onSuccess: (saved) => {
       queryClient.setQueryData(queryKeys.entry(saved.id), saved);
@@ -101,8 +105,15 @@ function Asked({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (outline.length) save.mutate({ progress_marks: marks });
-    else if (validCount) save.mutate({ progress: typed });
+    // The first one lit starts the entry and the last finishes it, where those
+    // dates are empty (DEC-175).
+    const before = outline.length
+      ? countMarks(drawnMarks(entry.progress_marks, entry.progress, outline))
+      : (entry.progress ?? 0);
+    const after = outline.length ? done : typed;
+    const dates = passageDates(entry, types, before, after, total, new Date());
+    if (outline.length) save.mutate({ progress_marks: marks, ...dates });
+    else if (validCount) save.mutate({ progress: typed, ...dates });
   }
 
   return (

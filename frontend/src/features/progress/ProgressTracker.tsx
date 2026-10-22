@@ -22,7 +22,11 @@ import {
   togglePart,
   toggleMark,
 } from "@/features/progress/marks";
-import { outlineContext, outlineFailure } from "@/features/progress/outline";
+import {
+  outlineContext,
+  outlineFailure,
+  passageDates,
+} from "@/features/progress/outline";
 import { cn } from "@/lib/utils";
 
 /**
@@ -59,8 +63,14 @@ export function ProgressTracker({
   const latest = useRef(0);
   useEffect(() => setPending(null), [entry.progress_marks, entry.progress]);
   const save = useMutation({
-    mutationFn: ({ marks }: { marks: ProgressMarks; seq: number }) =>
-      patchEntry(entry.id, { progress_marks: marks }),
+    mutationFn: ({
+      marks,
+      dates,
+    }: {
+      marks: ProgressMarks;
+      dates: ReturnType<typeof passageDates>;
+      seq: number;
+    }) => patchEntry(entry.id, { progress_marks: marks, ...dates }),
     onSuccess: (saved, { seq }) => {
       if (seq === latest.current) refresh(saved);
     },
@@ -87,8 +97,18 @@ export function ProgressTracker({
   const done = outline.length ? countMarks(marks) : (entry.progress ?? 0);
   const write = (next: ProgressMarks) => {
     latest.current += 1;
+    // The first light starts the entry and the last finishes it, where those dates
+    // are empty (DEC-175).
+    const dates = passageDates(
+      entry,
+      types,
+      countMarks(marks),
+      countMarks(next),
+      total,
+      new Date(),
+    );
     setPending(next);
-    save.mutate({ marks: next, seq: latest.current });
+    save.mutate({ marks: next, dates, seq: latest.current });
   };
 
   const value = total

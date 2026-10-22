@@ -237,6 +237,35 @@ describe("ProgressTracker", () => {
     );
   });
 
+  it("starts the entry on its first light and finishes it on its last", async () => {
+    const fetchMock = mockApi((input) =>
+      String(input).endsWith("/api/entries/7") ? json(entryOf({})) : undefined,
+    );
+    const user = userEvent.setup();
+    const withDates = [
+      { ...series, entry_fields: ["date_started", "date_finished"] },
+    ] as unknown as ItemType[];
+    show(<ProgressTracker entry={entryOf({})} types={withDates} />);
+    await user.click(screen.getByRole("button", { name: /Show episodes/ }));
+    await user.click(
+      screen.getByRole("button", { name: "Mark all of season 1" }),
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Mark all of season 2" }),
+    );
+    const today = new Date();
+    const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    await waitFor(() =>
+      expect(patches(fetchMock, "/api/entries/7")).toEqual([
+        { progress_marks: { "1": [1, 2, 3] }, date_started: day },
+        {
+          progress_marks: { "1": [1, 2, 3], "2": [1, 2, 3, 4] },
+          date_finished: day,
+        },
+      ]),
+    );
+  });
+
   it("takes a typed count where there are no lights to draw", async () => {
     const fetchMock = mockApi((input) =>
       String(input).endsWith("/api/entries/7") ? json(entryOf({})) : undefined,

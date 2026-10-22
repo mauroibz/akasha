@@ -61,3 +61,45 @@ export function outlineFailure(error: Error, unit: string): string {
     return `No ${unit} list was found for this one.`;
   return `The ${unit} list could not be reached. Try again later.`;
 }
+
+/** A day as the date fields store it, in the reader's own time zone. */
+export function localDay(now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
+ * The dates a change of marks fills in, when they are empty (DEC-175): the first one
+ * lit starts the entry, the last one lit finishes it. Only an empty date is filled and
+ * nothing is ever cleared, so a date the owner set, or one already recorded, stands.
+ */
+export function passageDates(
+  entry: LibraryEntry,
+  types: ItemType[] | undefined,
+  before: number,
+  after: number,
+  total: number,
+  today: Date,
+): { date_started?: string; date_finished?: string } {
+  const fields = types?.find(
+    (type) => type.id === entry.item.type,
+  )?.entry_fields;
+  const day = localDay(today);
+  const dates: { date_started?: string; date_finished?: string } = {};
+  if (
+    before === 0 &&
+    after > 0 &&
+    !entry.date_started &&
+    fields?.includes("date_started")
+  )
+    dates.date_started = day;
+  if (
+    total > 0 &&
+    before < total &&
+    after >= total &&
+    !entry.date_finished &&
+    fields?.includes("date_finished")
+  )
+    dates.date_finished = day;
+  return dates;
+}

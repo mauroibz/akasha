@@ -6970,3 +6970,22 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
 - Consequences: the opinion dialog cannot clear marks at all, so DEC-173 point 1's
   "send the count only when edited" is moot and removed. The drop question is still asked
   after the opinion dialog sets an abandoned status.
+
+## DEC-175 — The first light starts an entry, the last finishes it
+
+- Date: 2026-10-22
+- Status: accepted
+- Context: the owner, before 2.7.0 was tagged: *"can you make the first entry / last episode
+  edit dates update the started/finished rows?"*
+- Decision: when a change of marks takes an entry from none lit to some, and *Started* is
+  empty, *Started* is set to today; when it lights the last of the outline, and *Finished* is
+  empty, *Finished* is set to today. Both in the same `PATCH` as the marks, from the tracker
+  and from *How far did you get?*.
+  1. **Only empty dates are filled, and nothing is cleared.** A date the owner set, or one
+     an import brought, stands; unticking does not undo a date.
+  2. **Today is the reader's own day**, computed in the browser, as the date fields are
+     typed there; the server's UTC day would be tomorrow for an evening in Buenos Aires.
+  3. **A count without marks is already started**: an imported 22 lit from the start does
+     not set *Started* on the next tap.
+  4. **Only dates the domain has**, read from `entry_fields`. Status is not changed: lighting
+     the last episode does not mark a series completed.

@@ -33,10 +33,21 @@ test("a season is ticked off on the detail page, one episode and then all of it"
   await expect(
     page.getByRole("button", { name: "Clear season 2" }),
   ).toBeVisible();
+  // The last light finishes the entry, where the date was empty (DEC-175).
+  const now = new Date();
+  const day = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
   expect(patches).toEqual([
     { progress_marks: { "1": [1, 2, 3], "2": [1] } },
-    { progress_marks: { "1": [1, 2, 3], "2": [1, 2, 3, 4] } },
+    {
+      progress_marks: { "1": [1, 2, 3], "2": [1, 2, 3, 4] },
+      date_finished: day,
+    },
   ]);
+  await expect(page.locator("[data-fact='finished'] dd")).toContainText(day);
   // The parts field is the tracker's, not a second table.
   await expect(page.getByText("Episodes per season")).toHaveCount(0);
 });

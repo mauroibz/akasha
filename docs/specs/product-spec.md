@@ -883,7 +883,8 @@ edit.
   count with no marks is drawn as the first N. A series without its season list offers *Load
   the episode list* (TVmaze, on request only); a book without a chapter count takes one typed.
   No ratings, notes or dates per episode. The opinion dialog has no progress field; with no
-  lights to draw, the opened row takes a typed count
+  lights to draw, the opened row takes a typed count. The first light sets an empty *Started* to today and the last sets an empty
+  *Finished* (DEC-175); neither is ever overwritten or cleared
 - **How far did you get?** (DEC-172) — setting an entry to a status its domain declares
   *abandoned* (`Dropped`), from the detail page or a library row, asks with the same lights: a
   tap saves everything through that one; *Skip* saves nothing more. Not asked from the inbox,

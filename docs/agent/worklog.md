@@ -6510,3 +6510,13 @@ its `dt`, `dd` and the panel `dd` directly. Looked at Breaking Bad (22 of 62, th
 and Frieren (28 of 28) in the running app on the scratchpad library.
 
 **Next.** No sprint is planned; 2.7.0 waits for the owner.
+
+## 2026-10-22 — The first and last lights fill Started and Finished (DEC-175)
+
+**Done.** From the owner, mid-release: the first light sets an empty *Started* to today and
+the last sets an empty *Finished*, from the tracker and from the drop question. The release
+gate that had begun on the earlier tree was stopped and is rerun after this.
+
+**Verified and how.** `outline.test.ts` (7), the progress unit tests (27), `make check`,
+`progress-marks.spec.ts` (5, the season test now also reads today's date in the *Finished*
+row).
