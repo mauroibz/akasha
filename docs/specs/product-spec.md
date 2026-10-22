@@ -35,7 +35,9 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 - Multiuser, auth, registration — **auth and multiuser shipped in 2.0** (§9); public registration remains out of scope (an admin creates accounts)
 - Public sharing / profile links
 - Reviews, comments, discussion, follows, activity feeds
-- Reading progress (page counts, % complete), reading sessions, streaks
+- Reading progress (page counts, % complete), reading sessions, streaks. *Which* episodes or
+  chapters you finished is tracked since 2.7, as optional marks on the entry (DEC-171); page
+  counts, sessions and streaks remain out
 - Ebook file management or runtime linkage to Kavita/Calibre. Read-only Calibre
   metadata import is explicitly in scope.
 - Recommendations, statistics dashboards, year-in-review
@@ -873,6 +875,17 @@ edit.
   what does not exist yet, creating and assigning in one action. Not in the opinion dialog
   and not a trip to `/shelves`; and never converged with the format control, because a
   shelf is one you invent and a format is a closed per-domain vocabulary (DEC-059)
+- **Episodes and chapters** (2.7, DEC-171) — for a domain that counts progress, one closed
+  line under the personal fields ("Episodes · 23 of 62"). Opened, a row of lights per season
+  (one row for an anime or a book), in the goal calendar's style: a tap marks one, a tap on a
+  season marks or clears all of it, and *Episodes watched* follows the marks. An imported
+  count with no marks is drawn as the first N. A series without its season list offers *Load
+  the episode list* (TVmaze, on request only); a book without a chapter count takes one typed.
+  No ratings, notes or dates per episode. Typing a count in the opinion dialog replaces the marks
+- **How far did you get?** (DEC-172) — setting an entry to a status its domain declares
+  *abandoned* (`Dropped`), from the detail page or a library row, asks with the same lights: a
+  tap saves everything through that one; *Skip* saves nothing more. Not asked from the inbox,
+  the deck or a bulk action
 - Link to edit underlying item metadata
 - **Files** — its own region, at the weight of *Edit opinion* rather than a corner of the
   edition facts (DEC-074): attachments on the edition, with name, size, download, rename, remove.

@@ -6931,3 +6931,20 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   5. **The outline action never overwrites.** An item that already has its outline field is
      returned unchanged, so a typed chapter count stays the owner's.
 - Consequences: Sprint 108 gains the drop question. Nothing else in the plan moves.
+
+## DEC-173 — What Sprint 108 found
+
+- Date: 2026-10-22
+- Status: accepted
+- Decision:
+  1. **The opinion dialog sends the count only when it was edited.** It used to send
+     `progress` on every save. Since a typed count clears the marks (DEC-171 point 3), saving
+     a score would have wiped the ticked episodes.
+  2. **The tracker and the question share one component and shipped in one commit.** The
+     sprint planned two checkpoints; the question is the tracker's lights with a different
+     tap (fill through), and the half between them was not a coherent state.
+  3. **A light's state is `aria-pressed`, not a verb.** "Watched" and "read" are domain words
+     the shared layer does not have; the light is named "Season 2, episode 5" and its pressed
+     state says whether it is done. The season word is the parts field's first column label.
+- Consequences: none for other sprints. A 19px sideways scroll on one book's detail page at
+  390px, from the cover column, was seen and is recorded in the worklog as a separate defect.

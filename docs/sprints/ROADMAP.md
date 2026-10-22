@@ -2,8 +2,8 @@
 
 **Plan revision:** 48
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 108 (ready). Sprint 107 is completed. Sprints 107–108, the owner's 2026-10-22 request for an optional
-episode and chapter tracker (DEC-171), are planned; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
+**Active sprint:** none. Sprints 107–108, the owner's 2026-10-22 request for an optional
+episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
@@ -228,7 +228,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [105](105-shelves-with-opinions.md) | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | completed |
 | [106](106-inbox-one-at-a-time.md) | The inbox one at a time: a full-screen deck of cards to file or pass | 105 | completed |
 | [107](107-progress-marks-underneath.md) | Episodes and chapters underneath: outlines, marks on the entry, the API | 106 | completed |
-| [108](108-progress-marks-on-the-detail-page.md) | Episodes and chapters on the detail page: the tracker of lights, and how far when dropped | 107 | ready |
+| [108](108-progress-marks-on-the-detail-page.md) | Episodes and chapters on the detail page: the tracker of lights, and how far when dropped | 107 | completed |
 
 ## Sprint contracts
 
@@ -1831,7 +1831,7 @@ the goal calendar's style. No ratings per part.
   or Open Library; `entries.progress_marks` (migration 0027) driving the progress count; an
   explicit outline fetch for series added before 2.7.
 - **[108 — Episodes and chapters on the detail page](108-progress-marks-on-the-detail-page.md)**
-  (**ready**). One collapsed line that opens to rows of lights; a tap per episode, a tap per
+  (**completed**). One collapsed line that opens to rows of lights; a tap per episode, a tap per
   season; *Load the episode list* and *Add chapters* where there is no outline yet; and, from
   the owner's mid-sprint request (DEC-172), dropping an entry asks how far it got.
 

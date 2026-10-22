@@ -1,7 +1,7 @@
 # Sprint 108 — Episodes and chapters on the detail page
 
 **Sprint:** 108
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 48
 **Depends on:** 107
 **Owner:** Mauro
@@ -97,4 +97,35 @@ a book given chapters, an imported count drawn, an entry dropped and asked.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-22 in `cae17c0`, with the hint's copy corrected in the closing commit.
+
+- **AC1.** A tap toggles one episode, a season's label marks or clears it, the line's count
+  follows (`ProgressTracker.test.tsx`, `progress-marks.spec.ts`).
+- **AC2.** A count of 3 with no marks draws season 1 lit; the first tap stores
+  `{"1": [1, 2, 3], "2": [1]}` (unit and browser tests).
+- **AC3.** *Load the episode list* posts to the outline action and names a miss; *Add
+  chapters* patches the item's `chapters` (unit tests; live in the walkthrough).
+- **AC4.** Closed by default (`aria-expanded="false"`), absent for a domain without progress.
+- **AC5.** Dropping from the opinion dialog and from a library row opens *How far did you
+  get?*; a tap on season 2 episode 2 saves `{"1": [1, 2, 3], "2": [1, 2]}`; *Skip* sends
+  nothing after the status. The status save carries no count.
+- **AC6.** Axe passes on the open tracker and on the question, Paper and Ink.
+
+**Verified.** `vitest related` over the changed files (255, then 45 after the copy fix),
+`make check`, `progress-marks.spec.ts` (5), `accessibility.spec.ts` (29, two new),
+`add-detail.spec.ts`, `library.spec.ts` and `formats.spec.ts` (34). Walkthrough on the
+scratchpad library with a real backend and live providers: Breaking Bad (5 seasons, a season
+and an episode ticked, 8 of 62), Frieren added from AniList with an imported count of 10
+(episodes 1–10 lit, 11 not), Rayuela given 155 chapters, dropped, asked, saved through
+chapter 40; Paper, Ink, and 390px.
+
+**Deviations (DEC-173).**
+- One commit for both checkpoints: the question reuses the lights and the outline reading,
+  and splitting them would have left a half-wired component in between.
+- The opinion dialog sent `progress` on every save, which would have cleared the marks on
+  any score change; it now sends it only when edited.
+- The hint was "Tap a episode"; it reads "Tap one to mark it, or a season for all of it."
+
+**Found, out of scope.** At 390px Rayuela's detail page scrolls 19px sideways with the
+tracker closed or open: the cover column (`aside`) is wider than the viewport. Breaking Bad
+and Frieren do not; it depends on the cover image, not on this sprint.

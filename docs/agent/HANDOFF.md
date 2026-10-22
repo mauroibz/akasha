@@ -3,9 +3,10 @@
 ## Where the project stands
 
 **2026-10-22, later:** the owner asked for an optional episode and chapter tracker for a 2.7
-release (DEC-171). The plan reopens as Sprints 107 (model and API) and 108 (the tracker on the
-detail page). **107 is completed; 108 is active (ready)**, and carries the owner's mid-sprint
-request that dropping an entry ask how far it got (DEC-172). Release, push and deploy wait for the owner to ask.
+release (DEC-171). Sprints 107 (model and API) and 108 (the tracker on the detail page, and the
+question asked when an entry is dropped, DEC-172) are **completed**; the project state is
+`complete`. They are unreleased on top of 2.6.0: a 2.7.0 release needs the version surfaces,
+release notes and the full gate (`make test`, the full Playwright run, `make smoke-container`). Release, push and deploy wait for the owner to ask.
 
 **2026-10-22:** the owner asked for a way through a large inbox one entry at a time on a phone
 (DEC-170). Sprint 106 delivered `/inbox/deck` and shipped as **v2.6.0** (tagged, pushed, GitHub
@@ -51,8 +52,8 @@ Waiting on the owner:
 
 ## Next session
 
-Run Sprint 108. A series added through Wikidata has no season list until the outline action runs, so the tracker offers *Load the episode list* whenever the domain's `parts_field` is empty on the item, even though a one-part outline exists. The ZimaBoard (192.168.100.240, port 4441, auth on) refuses this machine's
-SSH key (`ibz@comma`) for `ibz` and `root`; the board upgrade to 2.6.0 is the owner's unless
-access is given: `AKASHA_VERSION=2.6.0` in the board's `.env`, `./render-compose.sh`, then
-`docker compose pull && docker compose up -d`. Walkthroughs can use a copy of the owner's library
-from the board's nightly backup, kept in the session scratchpad and never committed.
+No sprint is planned. When the owner asks for 2.7.0: move the version surfaces, write
+`docs/operations/release-notes-v2.7.md` (migration 0027 adds `entries.progress_marks`; books
+now count chapters read), and run the full release gate. Known and left from 108: at 390px
+one book's detail page scrolls 19px sideways from its cover column, independent of the
+tracker.

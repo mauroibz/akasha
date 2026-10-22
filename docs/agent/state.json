@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 47,
-  "project_status": "in_progress",
-  "active_sprint": "108",
-  "active_sprint_file": "docs/sprints/108-progress-marks-on-the-detail-page.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "107",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "108",
   "completed_sprints": [
     "001",
     "002",
@@ -113,8 +113,9 @@
     "104",
     "105",
     "106",
-    "107"
+    "107",
+    "108"
   ],
-  "started_at": "2026-10-22T11:20:53-03:00",
-  "updated_at": "2026-10-22T11:20:53-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-22T11:32:51-03:00"
 }

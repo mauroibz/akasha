@@ -6459,3 +6459,37 @@ session; other usernames were reset by the board after two attempts.
   tracker must offer it even when the one-part fallback outline exists.
 
 **Next.** Sprint 108.
+
+## 2026-10-22 — Sprint 108: episodes and chapters on the detail page
+
+**Done.**
+
+- `features/progress/`: the marks logic, the lights, the tracker on the detail page, and
+  *How far did you get?* on dropping from the detail page or a library row (`cae17c0`,
+  hint copy `[FIX]` after the walkthrough).
+- The opinion dialog sends the count only when edited, so a score change keeps the marks.
+
+**Verified and how.**
+
+- `vitest related` (255; 45 after the copy fix), `make check`, Playwright
+  `progress-marks.spec.ts` (5), `accessibility.spec.ts` (29), `add-detail`, `library` and
+  `formats` specs (34).
+- Walkthrough: backend on the scratchpad copy of `data/` (port 8000, live providers), Vite
+  dev on 5173, scripted with Playwright in `frontend/e2e/scratchpad/walk108.mjs` and
+  `asked108.mjs` (ignored). Breaking Bad: a season and an episode ticked, 8 of 62, read back.
+  Frieren added from AniList with a count of 10: episodes 1–10 lit, 11 not. Rayuela: 155
+  chapters typed, dropped through the opinion dialog, asked, chapter 40 tapped, saved, the
+  line read 40 of 155. Paper, Ink, 390px. No page errors.
+
+**Found.**
+
+- The first dialog screenshot showed no lights lit: it caught the 150ms colour transition
+  (the same artefact as the deck's score tap). Waiting 400ms showed 40 and then 60 lit.
+- The hint read "Tap a episode"; fixed.
+- At 390px Rayuela's detail page scrolls 19px sideways with or without the tracker: the
+  cover column is wider than the viewport. Not this sprint's; recorded here.
+- A season label reads in the domain's language only through the parts field's column
+  label ("Season"); a Spanish label would need the domain to declare it.
+
+**Next.** No sprint is planned. 107–108 are unreleased on top of 2.6.0; a 2.7.0 release
+(version surfaces, release notes, the full gate) waits for the owner to ask.
