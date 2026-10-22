@@ -642,6 +642,7 @@ GET    /api/items/{id}/cover           → the stored cover image
 GET    /api/items/{id}/cover-candidates → alternative covers for choosing
 POST   /api/items/{id}/cover           → upload replacement cover
 POST   /api/items/{id}/cover/fetch     → re-fetch the cover from providers
+POST   /api/items/{id}/outline         → fetch a season list or chapter count the item lacks
 PATCH  /api/items/{id}/attachments/{aid} → rename an attachment
 GET    /api/items/{id}/attachments     → files attached to this edition
 POST   /api/items/{id}/attachments     → upload one opaque file, size-capped

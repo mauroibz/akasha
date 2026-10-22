@@ -258,8 +258,10 @@ async def test_only_the_domains_that_count_progress_publish_a_spec(tmp_path: Pat
         "label": "Episodes watched",
         "unit_label": "episode",
         "total_field": "episodes",
+        "parts_field": None,
     }
-    assert published["book"]["progress"] is None
+    assert published["book"]["progress"]["total_field"] == "chapters"
+    assert published["movie"]["progress"] is None
     assert published["album"]["progress"] is None
 
 

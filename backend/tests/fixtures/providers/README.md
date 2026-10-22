@@ -209,6 +209,9 @@ otherwise guess wrong are pinned here:
 | `tvmaze_show_76954_samantha_oups.json` | `GET /shows/76954` — both `runtime` and `averageRuntime` null, so `episode_minutes` stays empty; `network.name` is `France 2`. |
 | `tvmaze_show_10577_los_simuladores.json` | `GET /shows/10577` — the AC2 series' full record. |
 | `tvmaze_show_45942_okupas.json` | `GET /shows/45942` — the second AC2 series' full record. |
+| `tvmaze_show_38963_episodes.json` | `GET /shows/38963/episodes`, captured **2026-10-22**: *The Mandalorian*, 24 episodes in three seasons of eight. |
+| `tvmaze_show_76954_episodes.json` | `GET /shows/76954/episodes`, captured **2026-10-22**: *Samantha Oups!*, 31 episodes, 29 then 2 — an uneven pair. |
+| `tvmaze_show_169_episodes.json` | `GET /shows/169/episodes`, captured **2026-10-22** for Sprint 107: 62 episodes in five seasons (7, 13, 13, 13, 16), specials excluded by the endpoint's default. The season list a series' progress marks are drawn against (DEC-171). `/lookup/shows?imdb=…&embed=episodes` redirects to `/shows/169` and drops the `embed` parameter (measured the same day), which is why the episodes are their own request. |
 
 ## Cinemeta (Sprint 063, captured 2026-09-03)
 
@@ -277,3 +280,14 @@ failure containment is synthetic.
 One file was **added** on 2026-10-21 for Sprint 095: `spotify_oembed_kind_of_blue.json`, Spotify's
 keyless oEmbed answer for the *Kind of Blue* album link, which names the title a Spotify link
 is searched by when MusicBrainz holds no link to it.
+
+## Chapters (Sprint 107, captured 2026-10-22)
+
+Open Library's edition `table_of_contents`, for a book's chapter count (DEC-171). Of eight
+books sampled, two carried one; *Don Quijote*'s eight rows were the edition's essays, not its
+chapters, which is why only rows with a numeric `label` count.
+
+| File | Source |
+|---|---|
+| `edition_OL26208390M_thinking_fast_and_slow.json` | `GET https://openlibrary.org/books/OL26208390M.json` (ISBN 9780374533557): fifty contents rows, 38 of them numbered chapters, the rest the introduction, part headings and back matter. |
+| `work_OL15992072W_thinking_fast_and_slow.json` | `GET https://openlibrary.org/works/OL15992072W.json`, the work the edition above names. |

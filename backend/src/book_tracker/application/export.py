@@ -221,6 +221,7 @@ _ENTRY_COLUMNS = (
     EntryRow.date_finished,
     EntryRow.reread_count,
     EntryRow.progress,
+    EntryRow.progress_marks,
 )
 
 
@@ -274,6 +275,10 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 # `None` where the domain records none, which is the honest shape:
                 # an export that dropped it would lose owner data silently.
                 "progress": entry.progress,
+                # Which episodes or chapters, when the owner ticked them (DEC-171).
+                "progress_marks": json.loads(entry.progress_marks)
+                if entry.progress_marks
+                else None,
                 # Names rather than ids: an id means nothing outside this database,
                 # and the name is what the owner typed.
                 "shelves": shelves.get(entry.id, []),

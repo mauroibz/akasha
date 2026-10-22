@@ -115,6 +115,23 @@ def _keys(values: object, prefix: str) -> list[str]:
     ]
 
 
+def _numbered_chapters(contents: object) -> int | None:
+    """How many numbered chapters an edition's table of contents lists (DEC-171).
+
+    Only rows with a numeric `label` count: the introduction, part headings and back
+    matter are rows too, and *Don Quijote*'s measured contents were eight essays about
+    the novel rather than its chapters. `None` when nothing is numbered.
+    """
+    if not isinstance(contents, list):
+        return None
+    count = sum(
+        1
+        for row in contents
+        if isinstance(row, Mapping) and str(row.get("label") or "").strip().isdigit()
+    )
+    return count or None
+
+
 class OpenLibraryProvider:
     name = "openlibrary"
     item_type = "book"
@@ -300,6 +317,7 @@ class OpenLibraryProvider:
             "subjects": [str(value) for value in subjects if value],
             "series": next(iter(row.get("series", [])), None),
             "original_year": original_year,
+            "chapters": _numbered_chapters(row.get("table_of_contents")),
         }
         metadata = {
             key: value for key, value in metadata.items() if value not in (None, "", [], {})

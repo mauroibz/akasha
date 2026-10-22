@@ -89,6 +89,9 @@ class StatusSpec:
     #: Whether an entry in this status is waiting to be started: where a goal's picks
     #: come from (Sprint 103). Declared for the same reason as `in_progress`.
     planned: bool = False
+    #: Whether an entry in this status was stopped partway: the detail page asks how
+    #: far it got (Sprint 108, DEC-171). Declared, so the screen never names "dropped".
+    abandoned: bool = False
 
 
 @dataclass(frozen=True)
@@ -163,6 +166,52 @@ class ProgressSpec:
     #: constraint over data the domain does not control (DEC-067 row 1). The reader's
     #: number wins over our cache.
     total_field: str | None = None
+    #: A `rows` metadata field on the item whose rows are a part and its size — a
+    #: series' seasons and how many episodes each has (Sprint 107, DEC-171). The
+    #: outline marks are drawn against. Absent, or empty on an item, the outline is
+    #: one part of `total_field`. Like the total, it is never a bound.
+    parts_field: str | None = None
+
+
+#: The two columns a `parts_field` row carries, in this order: which part, how many.
+PARTS_COLUMNS = 2
+
+#: The most marks one entry may hold. A 1,000-episode anime fits ten times over.
+MAX_PROGRESS_MARKS = 10_000
+
+
+def resolve_outline(domain: "Domain", metadata: Mapping[str, Any]) -> list[dict[str, int]] | None:
+    """The parts an entry's marks are drawn against, or `None` when nothing says.
+
+    Read from declarations alone (technical spec 6.6): the `parts_field` rows when
+    the item has usable ones, else one part of the `total_field` number. A row with a
+    missing or non-positive cell is skipped rather than drawn, since a provider's
+    season with no episodes yet is not a place to mark.
+    """
+    spec = domain.progress
+    if spec is None:
+        return None
+    if spec.parts_field is not None:
+        field = next((row for row in domain.fields if row.name == spec.parts_field), None)
+        rows = metadata.get(spec.parts_field)
+        if field is not None and isinstance(rows, Sequence) and not isinstance(rows, str):
+            part_column, size_column = (column.name for column in field.columns[:PARTS_COLUMNS])
+            parts = [
+                {"part": row[part_column], "size": row[size_column]}
+                for row in rows
+                if isinstance(row, Mapping)
+                and _positive(row.get(part_column))
+                and _positive(row.get(size_column))
+            ]
+            if parts:
+                return parts
+    if spec.total_field is not None and _positive(metadata.get(spec.total_field)):
+        return [{"part": 1, "size": metadata[spec.total_field]}]
+    return None
+
+
+def _positive(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 @dataclass(frozen=True)
@@ -450,6 +499,38 @@ def validate_progress(domain: Domain, value: int | None) -> int | None:
     return value
 
 
+def validate_progress_marks(domain: Domain, value: object) -> dict[str, list[int]] | None:
+    """Which episodes or chapters are done, keyed by part (DEC-171).
+
+    `{"1": [1, 2, 3], "2": [1]}`: part numbers as strings, since this is stored and
+    sent as JSON, and the numbers within each sorted and unique. An empty part is
+    dropped, and no marks at all is `None`. Like `progress`, nothing here is bounded by
+    the outline: a refresh may shrink it under marks already made (DEC-092).
+    """
+    if value is None:
+        return None
+    if domain.progress is None:
+        raise InvalidProgress(f"{domain.label} entries do not record progress")
+    if not isinstance(value, Mapping):
+        raise InvalidProgress("progress marks are a set of numbers per part")
+    marks: dict[str, list[int]] = {}
+    total = 0
+    for part, numbers in value.items():
+        if not isinstance(part, str) or not part.isdigit() or int(part) < 1:
+            raise InvalidProgress(f"{part!r} is not a part number")
+        if not isinstance(numbers, Sequence) or isinstance(numbers, str):
+            raise InvalidProgress(f"part {part} holds a list of numbers")
+        if not all(_positive(number) for number in numbers):
+            raise InvalidProgress(f"part {part} holds whole numbers from 1")
+        unique = sorted(set(numbers))
+        total += len(unique)
+        if unique:
+            marks[str(int(part))] = unique
+    if total > MAX_PROGRESS_MARKS:
+        raise InvalidProgress(f"at most {MAX_PROGRESS_MARKS} marks")
+    return dict(sorted(marks.items(), key=lambda item: int(item[0]))) or None
+
+
 def validate_entry_values(domain: Domain, values: Mapping[str, Any]) -> dict[str, Any]:
     """Allow only neutral values and the entry values this domain declares.
 
@@ -459,13 +540,24 @@ def validate_entry_values(domain: Domain, values: Mapping[str, Any]) -> dict[str
     refusal, never an implicit new storage contract.
     """
     validated = validate_entry_fields(domain, values)
-    allowed = NEUTRAL_ENTRY_VALUES | domain.entry_fields | {"progress"}
+    allowed = NEUTRAL_ENTRY_VALUES | domain.entry_fields | {"progress", "progress_marks"}
     unknown = set(validated) - allowed
     if unknown:
         names = ", ".join(repr(name) for name in sorted(unknown))
         raise InvalidEntryField(f"{domain.label} entries have no declared value {names}")
+    if "progress" in validated and "progress_marks" in validated:
+        raise InvalidProgress("send progress or progress_marks, not both")
     if "progress" in validated:
         validated["progress"] = validate_progress(domain, validated["progress"])
+        # A count typed by hand says nothing about which ones, so the marks go.
+        validated["progress_marks"] = None
+    elif "progress_marks" in validated:
+        sent = validated["progress_marks"]
+        validated["progress_marks"] = validate_progress_marks(domain, sent)
+        # The boxes drive the count (DEC-171); clearing the marks alone leaves it.
+        if sent is not None:
+            marks = validated["progress_marks"] or {}
+            validated["progress"] = sum(len(numbers) for numbers in marks.values())
     return validated
 
 

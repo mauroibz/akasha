@@ -1019,6 +1019,23 @@
             ],
             "title": "Progress"
           },
+          "progress_marks": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Marks"
+          },
           "reread_count": {
             "anyOf": [
               {
@@ -1139,6 +1156,23 @@
               }
             ],
             "title": "Progress"
+          },
+          "progress_marks": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Marks"
           },
           "reread_count": {
             "title": "Reread Count",
@@ -2385,6 +2419,20 @@
             "title": "Metadata",
             "type": "object"
           },
+          "outline": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OutlinePartResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outline"
+          },
           "sources": {
             "items": {
               "$ref": "#/components/schemas/SourceResponse"
@@ -2751,6 +2799,24 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "OutlinePartResponse": {
+        "properties": {
+          "part": {
+            "title": "Part",
+            "type": "integer"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "part",
+          "size"
+        ],
+        "title": "OutlinePartResponse",
+        "type": "object"
+      },
       "PreviewResponse": {
         "properties": {
           "batch_id": {
@@ -2847,6 +2913,17 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "parts_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parts Field"
           },
           "total_field": {
             "anyOf": [
@@ -3573,6 +3650,11 @@
       },
       "StatusSpecResponse": {
         "properties": {
+          "abandoned": {
+            "default": false,
+            "title": "Abandoned",
+            "type": "boolean"
+          },
           "choosable": {
             "title": "Choosable",
             "type": "boolean"
@@ -8231,6 +8313,76 @@
           }
         },
         "summary": "Fetch Cover"
+      }
+    },
+    "/api/items/{item_id}/outline": {
+      "post": {
+        "description": "Fetch the season list or chapter count an item has none of (Sprint 107, DEC-171).\n\nOnly on request, and only into an empty field: an item that already has one is\nreturned as it is, so a chapter count the owner typed is never replaced.",
+        "operationId": "fetch_outline_api_items__item_id__outline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Fetch Outline"
       }
     },
     "/api/items/{item_id}/refresh": {

@@ -47,6 +47,7 @@ from book_tracker.domain.spec import (
     InvalidGroupableKey,
     InvalidProgress,
     InvalidStatus,
+    resolve_outline,
     validate_entry_values,
     validate_formats,
     validate_groupable_key,
@@ -294,6 +295,7 @@ class LibraryService:
             "date_finished": entry.date_finished,
             "reread_count": entry.reread_count,
             "progress": entry.progress,
+            "progress_marks": json.loads(entry.progress_marks) if entry.progress_marks else None,
             "score_provisional": bool(entry.score_provisional),
             "suggested_status": entry.suggested_status,
             "item": self._item_dict(session, item),
@@ -337,6 +339,11 @@ class LibraryService:
             if item.cover_path
             else None,
             "metadata": metadata,
+            # What progress marks are drawn against, read from the domain's declaration
+            # (DEC-171); `None` where nothing says how many.
+            "outline": resolve_outline(DOMAINS[item.type], metadata)
+            if item.type in DOMAINS
+            else None,
             "identifiers": {row.kind: row.normalized_value for row in identifiers},
             "sources": [
                 {
@@ -530,6 +537,9 @@ class LibraryService:
                 # stored value instead of being mistaken for "not sent".
                 if field in changes:
                     setattr(entry, field, changes[field])
+            if "progress_marks" in changes:
+                marks = changes["progress_marks"]
+                entry.progress_marks = json.dumps(marks) if marks is not None else None
             if "score" in changes:
                 entry.score_provisional = 0
             if "formats" in changes:

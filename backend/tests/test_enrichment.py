@@ -666,7 +666,12 @@ def _series_enrichment_providers(
 
     wikidata = make_wikidata(IMDB_RESOLUTION)
     lookup = tvmaze_lookup or (200, recording("tvmaze_lookup_tt0903747.json"))
-    tvmaze_provider = make_tvmaze({"/lookup/shows": lookup})
+    tvmaze_provider = make_tvmaze(
+        {
+            "/lookup/shows": lookup,
+            "/shows/169/episodes": (200, recording("tvmaze_show_169_episodes.json")),
+        }
+    )
     return {"wikidata-series": wikidata, "tvmaze": tvmaze_provider}
 
 

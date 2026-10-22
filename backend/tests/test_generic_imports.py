@@ -1179,13 +1179,14 @@ async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
 
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        # Goodreads targets books, and a book records no progress at all.
+        # Letterboxd targets films, and a film records no progress at all. (Books
+        # count chapters since Sprint 107, DEC-171.)
         service = ImportService(
-            app.state.engine, tmp_path, tmp_path, IMPORTERS["goodreads"], user_id=1
+            app.state.engine, tmp_path, tmp_path, IMPORTERS["letterboxd"], user_id=1
         )
         with pytest.raises(LibraryError) as refused:
             service._validate(record(3))
-        assert service._validate(record(None)) == {"progress": None}
+        assert service._validate(record(None)) == {"progress": None, "progress_marks": None}
     assert refused.value.status_code == 422
     assert "progress" in str(refused.value).lower() or "Book" in str(refused.value)
 

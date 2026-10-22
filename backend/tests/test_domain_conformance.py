@@ -262,6 +262,14 @@ def statuses_are_a_usable_vocabulary(domain: Domain) -> None:
     assert all(status.hotkey for status in domain.statuses if status.choosable), (
         f"{domain.item_type} has a choosable status with no triage key"
     )
+    # Stopping partway asks how far you got (DEC-171), which only means something where
+    # the domain counts progress, and only for a status someone can choose.
+    for status in domain.statuses:
+        if status.abandoned:
+            assert domain.progress is not None, (
+                f"{domain.item_type} asks how far {status.value!r} got, but counts no progress"
+            )
+            assert status.choosable, f"{domain.item_type} declares {status.value!r} abandoned"
 
 
 @registry_check
@@ -320,16 +328,29 @@ def progress_counts_something_this_domain_declares(domain: Domain) -> None:
     assert spec.unit_label and spec.unit_label.strip(), (
         f"{domain.item_type} progress has no unit to count in"
     )
-    if spec.total_field is None:
+    if spec.total_field is not None:
+        field = next((row for row in domain.fields if row.name == spec.total_field), None)
+        assert field is not None, (
+            f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+            "which it does not declare as a metadata field"
+        )
+        assert field.type == "number", (
+            f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+            f"which is {field.type} rather than a number"
+        )
+    if spec.parts_field is None:
         return
-    field = next((row for row in domain.fields if row.name == spec.total_field), None)
-    assert field is not None, (
-        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
-        "which it does not declare as a metadata field"
+    # The outline's parts (DEC-171): a `rows` field whose first two columns are which
+    # part and how many, both numbers, or `resolve_outline` could never read a part.
+    parts = next((row for row in domain.fields if row.name == spec.parts_field), None)
+    assert parts is not None, (
+        f"{domain.item_type} draws its parts from {spec.parts_field!r}, which it does not declare"
     )
-    assert field.type == "number", (
-        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
-        f"which is {field.type} rather than a number"
+    assert parts.type == "rows" and len(parts.columns) >= 2, (
+        f"{domain.item_type}'s {spec.parts_field!r} is not a list of parts"
+    )
+    assert all(column.type == "number" for column in parts.columns[:2]), (
+        f"{domain.item_type}'s {spec.parts_field!r} parts are not numbered"
     )
 
 
@@ -1524,6 +1545,27 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "progress_counts_something_this_domain_declares",
         "a progress count with nothing to call it",
         a_third_domain(progress=ProgressSpec("   ", "percent")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "parts drawn from a field the domain does not store",
+        a_third_domain(progress=ProgressSpec("Levels", "level", parts_field="worlds")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "parts drawn from a field that is not a list of rows",
+        a_third_domain(progress=ProgressSpec("Levels", "level", parts_field="platform")),
+    ),
+    (
+        "statuses_are_a_usable_vocabulary",
+        "a status that asks how far you got, where nothing counts progress",
+        a_third_domain(
+            statuses=(
+                StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
+                StatusSpec("owned", "Owned", hotkey="o"),
+                StatusSpec("dropped", "Dropped", hotkey="d", abandoned=True),
+            )
+        ),
     ),
 ]
 

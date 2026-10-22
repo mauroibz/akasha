@@ -1050,6 +1050,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/items/{item_id}/outline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Fetch Outline
+     * @description Fetch the season list or chapter count an item has none of (Sprint 107, DEC-171).
+     *
+     *     Only on request, and only into an empty field: an item that already has one is
+     *     returned as it is, so a chapter count the owner typed is never replaced.
+     */
+    post: operations["fetch_outline_api_items__item_id__outline_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/items/{item_id}/refresh": {
     parameters: {
       query?: never;
@@ -1601,6 +1624,10 @@ export interface components {
       notes?: string | null;
       /** Progress */
       progress?: number | null;
+      /** Progress Marks */
+      progress_marks?: {
+        [key: string]: number[];
+      } | null;
       /** Reread Count */
       reread_count?: number | null;
       /** Score */
@@ -1628,6 +1655,10 @@ export interface components {
       notes: string | null;
       /** Progress */
       progress: number | null;
+      /** Progress Marks */
+      progress_marks?: {
+        [key: string]: number[];
+      } | null;
       /** Reread Count */
       reread_count: number;
       /** Score */
@@ -2096,6 +2127,8 @@ export interface components {
       metadata: {
         [key: string]: unknown;
       };
+      /** Outline */
+      outline?: components["schemas"]["OutlinePartResponse"][] | null;
       /** Sources */
       sources: components["schemas"]["SourceResponse"][];
       /** Subtitle */
@@ -2215,6 +2248,13 @@ export interface components {
       setup_required: boolean;
       user: components["schemas"]["UserResponse"] | null;
     };
+    /** OutlinePartResponse */
+    OutlinePartResponse: {
+      /** Part */
+      part: number;
+      /** Size */
+      size: number;
+    };
     /** PreviewResponse */
     PreviewResponse: {
       /** Batch Id */
@@ -2261,6 +2301,8 @@ export interface components {
     ProgressSpecResponse: {
       /** Label */
       label: string;
+      /** Parts Field */
+      parts_field?: string | null;
       /** Total Field */
       total_field: string | null;
       /** Unit Label */
@@ -2524,6 +2566,11 @@ export interface components {
     };
     /** StatusSpecResponse */
     StatusSpecResponse: {
+      /**
+       * Abandoned
+       * @default false
+       */
+      abandoned: boolean;
       /** Choosable */
       choosable: boolean;
       /** Hotkey */
@@ -5818,6 +5865,64 @@ export interface operations {
     };
   };
   fetch_cover_api_items__item_id__cover_fetch_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ItemResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  fetch_outline_api_items__item_id__outline_post: {
     parameters: {
       query?: never;
       header?: never;

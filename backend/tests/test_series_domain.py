@@ -75,6 +75,7 @@ def test_fields_match_the_measured_coverage_table() -> None:
         "genres",
         "episodes",
         "seasons",
+        "season_episodes",
         "episode_minutes",
         "network",
         "airing_status",

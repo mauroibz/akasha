@@ -47,11 +47,25 @@ def tvmaze(routes: dict[str, object], **kwargs: object) -> TvmazeSeriesProvider:
 SEARCH_BREAKING_BAD = {"/search/shows": (200, recording("tvmaze_search_breaking_bad.json"))}
 SEARCH_SIMULADORES = {"/search/shows": (200, recording("tvmaze_search_los_simuladores.json"))}
 SEARCH_OKUPAS = {"/search/shows": (200, recording("tvmaze_search_okupas.json"))}
-LOOKUP_HIT = {"/lookup/shows": (200, recording("tvmaze_lookup_tt0903747.json"))}
+# A fetch or a hit asks for the episode list too (Sprint 107), so each carries it.
+EPISODES_169 = {"/shows/169/episodes": (200, recording("tvmaze_show_169_episodes.json"))}
+LOOKUP_HIT = {
+    "/lookup/shows": (200, recording("tvmaze_lookup_tt0903747.json")),
+    **EPISODES_169,
+}
 LOOKUP_MISS = {"/lookup/shows": (404, recording("tvmaze_lookup_no_match.json"))}
-FETCH_BREAKING_BAD = {"/shows/169": (200, recording("tvmaze_show_169_breaking_bad.json"))}
-FETCH_MANDALORIAN = {"/shows/38963": (200, recording("tvmaze_show_38963_mandalorian.json"))}
-FETCH_SAMANTHA_OUPS = {"/shows/76954": (200, recording("tvmaze_show_76954_samantha_oups.json"))}
+FETCH_BREAKING_BAD = {
+    "/shows/169": (200, recording("tvmaze_show_169_breaking_bad.json")),
+    **EPISODES_169,
+}
+FETCH_MANDALORIAN = {
+    "/shows/38963": (200, recording("tvmaze_show_38963_mandalorian.json")),
+    "/shows/38963/episodes": (200, recording("tvmaze_show_38963_episodes.json")),
+}
+FETCH_SAMANTHA_OUPS = {
+    "/shows/76954": (200, recording("tvmaze_show_76954_samantha_oups.json")),
+    "/shows/76954/episodes": (200, recording("tvmaze_show_76954_episodes.json")),
+}
 
 
 class TestTvmazeSearch:
@@ -214,6 +228,8 @@ class TestBothAdaptersAgree:
             "episode_minutes",
             "airing_status",
             "synopsis",
+            # The season list, a declared field (Sprint 107).
+            "season_episodes",
         }
         assert payload.identifiers.keys() <= {"imdb", "thetvdb", "tvmaze"}
 

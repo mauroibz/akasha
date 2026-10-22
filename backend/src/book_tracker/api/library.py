@@ -17,6 +17,7 @@ from book_tracker.application.library import (
     LibraryService,
     clean_attachment_filename,
 )
+from book_tracker.application.outline import fetch_outline_value, outline_field
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
@@ -142,6 +143,7 @@ class StatusSpecResponse(BaseModel):
     hotkey: str | None = None
     in_progress: bool = False
     planned: bool = False
+    abandoned: bool = False
 
 
 class FormatSpecResponse(BaseModel):
@@ -159,6 +161,15 @@ class ProgressSpecResponse(BaseModel):
     label: str
     unit_label: str
     total_field: str | None
+    #: A `rows` field of parts and their sizes, when the domain has one (DEC-171).
+    parts_field: str | None = None
+
+
+class OutlinePartResponse(BaseModel):
+    #: Which part: a season's number. `1` for a domain whose outline is one part.
+    part: int
+    #: How many episodes or chapters it has.
+    size: int
 
 
 class ItemTypeResponse(BaseModel):
@@ -200,6 +211,8 @@ class ItemResponse(BaseModel):
     creator_sort_override: str | None
     cover_url: str | None
     metadata: dict[str, Any]
+    #: What progress marks are drawn against, or `None` where nothing says how many.
+    outline: list[OutlinePartResponse] | None = None
     identifiers: dict[str, str]
     sources: list[SourceResponse]
 
@@ -218,6 +231,9 @@ class EntryResponse(BaseModel):
     #: even when null — these routes deliberately do not set `response_model_exclude_none`,
     #: because a client has to tell "not recorded" from "this field does not exist".
     progress: int | None
+    #: Which episodes or chapters are done, by part (`{"1": [1, 2]}`), or `None` when
+    #: none were ticked. When present, `progress` is their count (DEC-171).
+    progress_marks: dict[str, list[int]] | None = None
     score_provisional: bool
     suggested_status: EntryStatus | None
     item: ItemResponse
@@ -391,6 +407,9 @@ class EntryPatch(BaseModel):
     #: leaves the stored value alone, an explicit `null` clears it back to "not
     #: recorded", and `0` records zero — a row the owner's library actually holds.
     progress: int | None = Field(default=None, ge=0)
+    #: Replaces the marks; the count follows them. A typed `progress` clears them, so
+    #: sending both is refused (DEC-171).
+    progress_marks: dict[str, list[int]] | None = None
     shelf_ids: list[int] | None = None
     #: Replaces the set, the way `shelf_ids` does; `[]` clears it.
     formats: list[str] | None = Field(default=None, max_length=20)
@@ -1228,6 +1247,43 @@ async def refresh_item(
     if await _install_cover_from_payload(request, payload, item_id, user):
         refreshed = await off_loop(library.get_item, item_id)
     return ItemResponse.model_validate(refreshed)
+
+
+@router.post(
+    "/items/{item_id}/outline",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
+async def fetch_outline(item_id: int, request: Request, user: CurrentUser) -> ItemResponse:
+    """Fetch the season list or chapter count an item has none of (Sprint 107, DEC-171).
+
+    Only on request, and only into an empty field: an item that already has one is
+    returned as it is, so a chapter count the owner typed is never replaced.
+    """
+    library = library_for(request, user)
+    item = await off_loop(library.get_item, item_id)
+    domain = DOMAINS.get(str(item["type"]))
+    if domain is None:
+        raise LibraryError("unknown_item_type", f"No domain describes {item['type']!r}")
+    field = outline_field(domain)
+    if field is not None and item["metadata"].get(field) not in (None, [], ""):
+        return ItemResponse.model_validate(item)
+    try:
+        primary: tuple[str, str] | None = await off_loop(library.primary_source, item_id)
+    except LibraryError:
+        primary = None
+    value = await fetch_outline_value(
+        domain, item["identifiers"], primary, request.app.state.providers
+    )
+    assert field is not None  # fetch_outline_value refuses a domain without one
+    try:
+        patch = validate_metadata_patch(domain, {field: value})
+    except InvalidMetadata as error:
+        raise LibraryError("provider_failure", str(error), status_code=502) from error
+    return ItemResponse.model_validate(
+        await off_loop(library.update_item, item_id, {"metadata": patch})
+    )
 
 
 def _primary_provider(request: Request, library: LibraryService, item_id: int) -> tuple[Any, str]:

@@ -463,7 +463,8 @@ async def _an_anime(app: object) -> int:
 
 @pytest.mark.anyio
 async def test_only_a_domain_that_declares_progress_may_record_one(tmp_path: Path) -> None:
-    """DEC-077 shape (a), at the boundary. A book records no partial progress."""
+    """DEC-077 shape (a), at the boundary. A film records no partial progress; a book
+    counts chapters since Sprint 107 (DEC-171)."""
     app = create_app(settings(tmp_path))
     async with (
         app.router.lifespan_context(app),
@@ -471,14 +472,23 @@ async def test_only_a_domain_that_declares_progress_may_record_one(tmp_path: Pat
     ):
         book_entry, album_entry = await _one_of_each(app)
         anime_entry = await _an_anime(app)
+        film = DomainRepository(app.state.engine, 1).create_or_get_entry(
+            title="La Ciénaga", creators=("Lucrecia Martel",)
+        )
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='movie' WHERE id=:id"), {"id": film.item_id}
+            )
 
+        on_a_film = await client.patch(f"/api/entries/{film.entry_id}", json={"progress": 3})
         on_a_book = await client.patch(f"/api/entries/{book_entry}", json={"progress": 3})
         on_an_album = await client.patch(f"/api/entries/{album_entry}", json={"progress": 3})
         on_an_anime = await client.patch(f"/api/entries/{anime_entry}", json={"progress": 20})
         negative = await client.patch(f"/api/entries/{anime_entry}", json={"progress": -1})
 
-    assert on_a_book.status_code == 422
-    assert "Book" in on_a_book.json()["error"]["message"]
+    assert on_a_film.status_code == 422
+    assert "Movie" in on_a_film.json()["error"]["message"]
+    assert on_a_book.status_code == 200
     assert on_an_album.status_code == 422
     assert on_an_anime.status_code == 200
     assert on_an_anime.json()["progress"] == 20
@@ -651,6 +661,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("PATCH", "/api/items/{item_id}/attachments/{attachment_id}"),
         ("DELETE", "/api/items/{item_id}/attachments/{attachment_id}"),
         ("POST", "/api/items/{item_id}/refresh"),
+        ("POST", "/api/items/{item_id}/outline"),
         ("POST", "/api/items/{item_id}/cover/fetch"),
         ("GET", "/api/shelves"),
         ("POST", "/api/shelves"),

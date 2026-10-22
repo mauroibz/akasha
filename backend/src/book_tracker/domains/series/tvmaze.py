@@ -1,12 +1,21 @@
 """Series' second adapter: TVmaze's official API, keyless and CC BY-SA.
 
-Three endpoints and nothing else (Sprint 050, measured live 2026-08-31):
+Four endpoints and nothing else (Sprint 050, measured live 2026-08-31; the episode
+list added in Sprint 107):
 
 | Operation | Endpoint |
 |---|---|
 | search | `GET api.tvmaze.com/search/shows?q=` |
 | resolve by IMDb id | `GET api.tvmaze.com/lookup/shows?imdb=tt…` |
 | fetch | `GET api.tvmaze.com/shows/<id>` |
+| seasons | `GET api.tvmaze.com/shows/<id>/episodes` |
+
+The episode list is asked for after a fetch or a lookup, never during a search, and
+becomes `season_episodes`: each season and how many episodes it has, the outline a
+reader's episode marks are drawn against (DEC-171). Specials are left out by the
+endpoint's default. `?embed=episodes` would save the request on a fetch, but the
+lookup's 301 drops the parameter (measured 2026-10-22), so both paths ask the same
+way. A failed episode list leaves the rest of the record as it was.
 
 What this source is for: a real synopsis (Wikidata's `synopsis` holds a one-line
 identification sentence), a real airing status, and the shows Wikidata's title
@@ -43,6 +52,7 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping
+from dataclasses import replace
 from typing import Any
 
 import httpx
@@ -110,6 +120,27 @@ def _names(values: object) -> list[str]:
     if not isinstance(values, list):
         return []
     return [name for name in (_text(value) for value in values) if name]
+
+
+def _season_sizes(body: object) -> list[dict[str, int]]:
+    """Each season and how many episodes it has, in season order.
+
+    Counted from the episode rows rather than read from `/seasons`, whose
+    `episodeOrder` is null for a season still airing. A row without a whole season
+    and episode number is left out rather than guessed at.
+    """
+    if not isinstance(body, list):
+        return []
+    counts: dict[int, int] = {}
+    for row in body:
+        if not isinstance(row, Mapping):
+            continue
+        season = _whole(row.get("season"))
+        number = _whole(row.get("number"))
+        if season is None or season < 1 or number is None or number < 1:
+            continue
+        counts[season] = counts.get(season, 0) + 1
+    return [{"season": season, "episodes": counts[season]} for season in sorted(counts)]
 
 
 class _Paced:
@@ -260,6 +291,18 @@ class TvmazeSeriesProvider:
 
     # -- the Provider protocol --------------------------------------------------------
 
+    async def _with_seasons(self, candidate: SearchCandidate) -> ItemPayload:
+        """The fetched record, with its season list when TVmaze gives one."""
+        payload = ItemPayload(**vars(candidate))
+        try:
+            body = await self._read(f"/shows/{candidate.source_id}/episodes", {})
+        except ProviderPayloadError:
+            return payload
+        seasons = _season_sizes(body)
+        if not seasons:
+            return payload
+        return replace(payload, metadata={**payload.metadata, "season_episodes": seasons})
+
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._read("/search/shows", {"q": query})
         if not isinstance(body, list):
@@ -282,7 +325,7 @@ class TvmazeSeriesProvider:
         candidate = self._candidate(body)
         if candidate is None:
             raise ProviderPayloadError("TVmaze returned a record with no usable title")
-        return ItemPayload(**vars(candidate))
+        return await self._with_seasons(candidate)
 
     async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
         """Background enrichment's entry point (DEC-067 row 3).
@@ -306,4 +349,4 @@ class TvmazeSeriesProvider:
         candidate = self._candidate(body)
         if candidate is None:
             raise ProviderPayloadError("TVmaze returned a record with no usable title")
-        return ItemPayload(**vars(candidate))
+        return await self._with_seasons(candidate)

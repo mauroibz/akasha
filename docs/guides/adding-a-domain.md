@@ -231,8 +231,12 @@ DOMAIN = Domain(
   "20 / 170" against. **The total is display only and never a bound**: a cached total
   goes stale, an airing series has none at all, and a refresh could lower it under a
   count already stored, so the reader's number always wins (DEC-092). `None` is a
-  complete answer, and books and albums both give it. `NULL` means *not recorded* and
+  complete answer, and films and albums both give it. `NULL` means *not recorded* and
   `0` means *recorded as zero*; they are different facts and the API keeps them apart.
+  If your works come in parts (seasons), add `parts_field` naming a `rows` field whose
+  first two columns are numbers — the part, then its size — and the reader can tick off
+  each one (DEC-171). A status that means "stopped partway" may declare `abandoned=True`
+  so the detail page asks how far it got.
 - **Entry field labels.** Optional, and only for a field you declared. `Started` and `Finished` read
   correctly for anything that takes time; `reread_count` does not, so a domain that has it says what
   it calls it — `Rereads`, `Rewatches`. Anything you leave out falls back to a neutral word, never to

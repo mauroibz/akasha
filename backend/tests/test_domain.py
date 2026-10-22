@@ -215,17 +215,22 @@ def test_an_album_has_no_reread_count_and_no_dates() -> None:
 
 def test_entry_values_are_allowlisted_by_the_domain_that_owns_them() -> None:
     from book_tracker.domains.anime import DOMAIN as ANIME
+    from book_tracker.domains.movie import DOMAIN as MOVIE
 
     values = {"notes": "kept", "date_finished": "2026-08-27", "progress": 20}
-    assert validate_entry_values(ANIME, values) == values
+    # A typed count says nothing about which episodes, so it clears the marks (DEC-171).
+    assert validate_entry_values(ANIME, values) == {**values, "progress_marks": None}
 
     with pytest.raises(InvalidEntryField, match="Album"):
         validate_entry_values(ALBUM, {"date_finished": "2026-08-27"})
-    with pytest.raises(InvalidProgress, match="Book"):
-        validate_entry_values(BOOK, {"progress": 1})
+    with pytest.raises(InvalidProgress, match="Movie"):
+        validate_entry_values(MOVIE, {"progress": 1})
 
     # Clearing is recovery, even if a domain no longer declares the value.
-    assert validate_entry_values(BOOK, {"progress": None}) == {"progress": None}
+    assert validate_entry_values(MOVIE, {"progress": None}) == {
+        "progress": None,
+        "progress_marks": None,
+    }
 
     with pytest.raises(InvalidEntryField, match="Book"):
         validate_entry_values(BOOK, {"future_domain_value": "silent without an allowlist"})
@@ -258,12 +263,13 @@ def test_the_published_enums_agree_with_the_registry() -> None:
 def test_only_a_domain_that_declares_progress_may_record_it() -> None:
     """The fourth validator, beside status, formats and metadata (DEC-077).
 
-    A book has no partial-progress concept: a page count is not something the entry
-    records. So the value is refused on write rather than merely hidden, for the same
-    reason a reread count on a record is (DEC-057).
+    A film or an album has no partial-progress concept. So the value is refused on
+    write rather than merely hidden, for the same reason a reread count on a record is
+    (DEC-057). Books count chapters since Sprint 107 (DEC-171).
     """
     from book_tracker.domain.spec import InvalidProgress, validate_progress
     from book_tracker.domains.anime import DOMAIN as ANIME
+    from book_tracker.domains.movie import DOMAIN as MOVIE
 
     assert validate_progress(ANIME, 20) == 20
     # Zero is a recorded value, not an absence: the owner's own library holds a row
@@ -272,9 +278,10 @@ def test_only_a_domain_that_declares_progress_may_record_it() -> None:
     # Not recorded at all, which is a different fact from zero.
     assert validate_progress(ANIME, None) is None
     # Clearing it is always allowed, even on a domain that has no progress.
-    assert validate_progress(BOOK, None) is None
+    assert validate_progress(MOVIE, None) is None
+    assert validate_progress(BOOK, 3) == 3
 
-    for domain in (BOOK, ALBUM):
+    for domain in (MOVIE, ALBUM):
         with pytest.raises(InvalidProgress) as refused:
             validate_progress(domain, 3)
         assert domain.label in str(refused.value)

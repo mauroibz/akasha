@@ -112,6 +112,9 @@ class EntryRow(Base):
     #: How far through this one you are, when the domain records such a thing.
     #: NULL is *not recorded*; 0 is *recorded as zero* (DEC-077, Sprint 040).
     progress: Mapped[int | None]
+    #: Which episodes or chapters are done, as JSON `{"<part>": [n, ...]}`, or NULL
+    #: for none recorded (DEC-171). When present, `progress` is their count.
+    progress_marks: Mapped[str | None]
     score_provisional: Mapped[int]
     suggested_status: Mapped[str | None]
     created_at: Mapped[str]

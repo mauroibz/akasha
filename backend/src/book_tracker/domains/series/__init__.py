@@ -25,6 +25,7 @@ from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
+    ColumnSpec,
     Domain,
     EnrichmentSpec,
     FieldSpec,
@@ -50,6 +51,19 @@ SERIES_FIELDS = (
     FieldSpec("genres", "Genres", multiplicity="many", groupable=True),
     FieldSpec("episodes", "Episodes", type="number", minimum=1, maximum=100_000),
     FieldSpec("seasons", "Seasons", type="number", minimum=1, maximum=1_000),
+    # Each season and how many episodes it has, from TVmaze's episode list (Sprint
+    # 107, DEC-171): the outline progress marks are drawn against. TVmaze rather than
+    # Wikidata because only TVmaze lists episodes; `episodes` stays Wikidata's.
+    FieldSpec(
+        "season_episodes",
+        "Episodes per season",
+        type="rows",
+        multiplicity="many",
+        columns=(
+            ColumnSpec("season", "Season", "number"),
+            ColumnSpec("episodes", "Episodes", "number"),
+        ),
+    ),
     FieldSpec("episode_minutes", "Episode length", type="number", minimum=1, maximum=1_000),
     FieldSpec("network", "Network", groupable=True),
     FieldSpec("airing_status", "Airing"),
@@ -64,7 +78,7 @@ SERIES_STATUSES = (
     StatusSpec("watching", "Watching", hotkey="w", in_progress=True),
     StatusSpec("completed", "Completed", hotkey="c"),
     StatusSpec("on_hold", "On hold", hotkey="h"),
-    StatusSpec("dropped", "Dropped", hotkey="d"),
+    StatusSpec("dropped", "Dropped", hotkey="d", abandoned=True),
     StatusSpec("plan_to_watch", "Plan to watch", hotkey="p", planned=True),
 )
 
@@ -203,7 +217,9 @@ DOMAIN = Domain(
     # carries the total as `P1113` on 13/13 measured entities — the case DEC-077's
     # shape (a) was designed for. The total is display only and never a bound
     # (DEC-092): an airing series' cached total is stale by definition.
-    progress=ProgressSpec("Episodes watched", "episode", total_field="episodes"),
+    progress=ProgressSpec(
+        "Episodes watched", "episode", total_field="episodes", parts_field="season_episodes"
+    ),
     recognize=lambda value: recognize_series_url(value),
     chooses_covers=False,
     list_columns=ListColumnSpec(

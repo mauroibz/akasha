@@ -18,6 +18,7 @@ from book_tracker.domain.spec import (
     FieldSpec,
     FormatSpec,
     ListColumnSpec,
+    ProgressSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -32,6 +33,10 @@ BOOK_FIELDS = (
     FieldSpec("subjects", "Subjects", multiplicity="many", groupable=True),
     FieldSpec("series", "Series", groupable=True),
     FieldSpec("original_year", "Original publication year", type="number", minimum=0, maximum=9999),
+    # How many chapters, for the reader's own chapter marks (Sprint 107, DEC-171). Most
+    # editions carry no contents, so this is usually typed by the owner; Open Library
+    # fills it from a numbered table of contents when there is one.
+    FieldSpec("chapters", "Chapters", type="number", minimum=1, maximum=2_000),
 )
 
 BOOK_STATUSES = (
@@ -40,7 +45,7 @@ BOOK_STATUSES = (
     StatusSpec("reading", "Reading", hotkey="g", in_progress=True),
     StatusSpec("to_read", "To read", hotkey="t", planned=True),
     StatusSpec("wishlist", "Wishlist", hotkey="w"),
-    StatusSpec("dropped", "Dropped", hotkey="d"),
+    StatusSpec("dropped", "Dropped", hotkey="d", abandoned=True),
 )
 
 BOOK_FORMATS = (
@@ -130,6 +135,9 @@ DOMAIN = Domain(
     # book's word, so the domain that wants one says so (technical spec 6.6).
     entry_field_labels={"reread_count": "Rereads"},
     enrichment=BOOK_ENRICHMENT,
+    # Chapters rather than pages: a page count is not something the entry holds, but
+    # how far into a book you got before putting it down is (DEC-171 point 4).
+    progress=ProgressSpec("Chapters read", "chapter", total_field="chapters"),
     recognize=lambda value: recognize_book_input(value),
     chooses_covers=True,
     list_columns=ListColumnSpec(
