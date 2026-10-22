@@ -1,6 +1,6 @@
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { m } from "motion/react";
 import { toast } from "sonner";
 import {
@@ -16,11 +16,9 @@ import {
   bulkUpdateEntries,
   getLibraryPage,
   type EntryStatus,
-  type LibraryFilters,
-  type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
-import { Check } from "lucide-react";
+import { Check, Layers } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
 import { PageHeader } from "@/components/PageHeader";
@@ -63,49 +61,16 @@ import { usePatchEntry } from "@/features/library/usePatchEntry";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Loading } from "@/components/ui/skeleton";
 import { navigateWithTransition } from "@/lib/viewTransition";
-
-const STATUS_DRAFTS_STORAGE_KEY = "akasha.triage.status-drafts.v1";
-
-function loadStatusDrafts(): Map<number, EntryStatus> {
-  try {
-    const stored = window.sessionStorage.getItem(STATUS_DRAFTS_STORAGE_KEY);
-    if (!stored) return new Map();
-    const parsed: unknown = JSON.parse(stored);
-    if (!Array.isArray(parsed)) return new Map();
-    return new Map(
-      parsed.filter(
-        (draft): draft is [number, EntryStatus] =>
-          Array.isArray(draft) &&
-          Number.isInteger(draft[0]) &&
-          typeof draft[1] === "string",
-      ),
-    );
-  } catch {
-    return new Map();
-  }
-}
-
-function filtersFromParams(params: URLSearchParams): LibraryFilters {
-  const statuses = params.getAll("status") as EntryStatus[];
-  return {
-    statuses: statuses.length ? statuses : ["unsorted"],
-    shelves: params.getAll("shelf"),
-    formats: [],
-    // Triage has no domain tab: the inbox is one queue whatever landed in it.
-    types: [],
-    query: params.get("q") ?? "",
-    sort: (params.get("sort") as SortKey) ?? "date_added",
-    order: (params.get("order") as "asc" | "desc") ?? "desc",
-    key: "",
-    value: "",
-    valueLabel: "",
-  };
-}
+import {
+  loadStatusDrafts,
+  saveStatusDrafts,
+  triageFiltersFromParams,
+} from "@/features/triage/deck";
 
 export function TriagePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
-    () => filtersFromParams(searchParams),
+    () => triageFiltersFromParams(searchParams),
     [searchParams],
   );
   // The bulk chooser below stays on the shared vocabulary on purpose: a selection can
@@ -125,21 +90,7 @@ export function TriagePage() {
   const presets = useMotionPresets();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    try {
-      if (pendingStatuses.size === 0) {
-        window.sessionStorage.removeItem(STATUS_DRAFTS_STORAGE_KEY);
-      } else {
-        window.sessionStorage.setItem(
-          STATUS_DRAFTS_STORAGE_KEY,
-          JSON.stringify(Array.from(pendingStatuses)),
-        );
-      }
-    } catch {
-      // Storage can be unavailable in privacy-restricted browser contexts. The
-      // row still works for the current visit; only cross-navigation recovery is lost.
-    }
-  }, [pendingStatuses]);
+  useEffect(() => saveStatusDrafts(pendingStatuses), [pendingStatuses]);
 
   // Debounce search. Same guard as the library: writing an identical query
   // string back to the URL re-rendered the whole virtualized table a quarter
@@ -653,13 +604,30 @@ export function TriagePage() {
         }
         actions={
           firstPage?.total ? (
-            <Button
-              className="rounded-full px-5"
-              disabled={acceptMutation.isPending}
-              onClick={() => acceptMutation.mutate()}
-            >
-              {acceptMutation.isPending ? "Accepting…" : "Accept all suggested"}
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              {/* The deck (DEC-170): one card at a time, with the whole title and
+                  every control on one screen. It carries this list's filter. */}
+              <Link
+                to={{
+                  pathname: "/inbox/deck",
+                  search: searchParams.toString(),
+                }}
+                className={cn(buttonVariants(), "gap-2 rounded-full px-5")}
+              >
+                <Layers className="h-4 w-4" aria-hidden="true" />
+                One at a time
+              </Link>
+              <Button
+                variant="secondary"
+                className="rounded-full px-5"
+                disabled={acceptMutation.isPending}
+                onClick={() => acceptMutation.mutate()}
+              >
+                {acceptMutation.isPending
+                  ? "Accepting…"
+                  : "Accept all suggested"}
+              </Button>
+            </div>
           ) : undefined
         }
       />

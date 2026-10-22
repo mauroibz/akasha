@@ -1,7 +1,7 @@
 # Sprint 106 — The inbox, one at a time
 
 **Sprint:** 106
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 47
 **Depends on:** 105
 **Owner:** Mauro
