@@ -1196,7 +1196,12 @@ describe("DetailPage", () => {
     const anime = {
       ...entry,
       progress: 20,
-      item: { ...entry.item, type: "anime", metadata: { episodes: 170 } },
+      item: {
+        ...entry.item,
+        type: "anime",
+        metadata: { episodes: 170 },
+        outline: [{ part: 1, size: 170 }],
+      },
     };
     const types = [
       {
@@ -1223,8 +1228,12 @@ describe("DetailPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
-    const fact = document.querySelector("[data-fact='progress'] dd");
+    // The progress row is the tracker (DEC-174): its value, and a way to open it.
+    const fact = document.querySelector("[data-fact='progress'] dd span");
     expect(fact?.textContent).toBe("20 / 170 episodes");
+    expect(
+      screen.getByRole("button", { name: /Show episodes/ }),
+    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("offers no progress control to a domain that counts nothing", async () => {

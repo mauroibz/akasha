@@ -16,7 +16,9 @@ test("a season is ticked off on the detail page, one episode and then all of it"
   await stubSeries(page, patches);
   await page.goto("/books/7");
 
-  const line = page.getByRole("button", { name: /Episodes 3 of 7/ });
+  const row = page.locator("[data-fact='progress']");
+  await expect(row.getByText("3 / 7 episodes")).toBeVisible();
+  const line = page.getByRole("button", { name: /Show episodes/ });
   await expect(line).toHaveAttribute("aria-expanded", "false");
   await line.click();
   // An imported count of three is drawn as the first season.
@@ -25,13 +27,9 @@ test("a season is ticked off on the detail page, one episode and then all of it"
   ).toHaveAttribute("aria-pressed", "true");
 
   await page.getByRole("button", { name: "Season 2, episode 1" }).click();
-  await expect(
-    page.getByRole("button", { name: /Episodes 4 of 7/ }),
-  ).toBeVisible();
+  await expect(row.getByText("4 / 7 episodes")).toBeVisible();
   await page.getByRole("button", { name: "Mark all of season 2" }).click();
-  await expect(
-    page.getByRole("button", { name: /Episodes 7 of 7/ }),
-  ).toBeVisible();
+  await expect(row.getByText("7 / 7 episodes")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Clear season 2" }),
   ).toBeVisible();
@@ -46,7 +44,7 @@ test("a season is ticked off on the detail page, one episode and then all of it"
 test("the arrow keys move between the lights", async ({ page }) => {
   await stubSeries(page, []);
   await page.goto("/books/7");
-  await page.getByRole("button", { name: /Episodes 3 of 7/ }).click();
+  await page.getByRole("button", { name: /Show episodes/ }).click();
   // The tab stop is the first episode not yet watched.
   const first = page.getByRole("button", { name: "Season 2, episode 1" });
   await first.focus();
@@ -130,7 +128,7 @@ test("the tracker fits a phone without scrolling sideways", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await stubSeries(page, []);
   await page.goto("/books/7");
-  await page.getByRole("button", { name: /Episodes 3 of 7/ }).click();
+  await page.getByRole("button", { name: /Show episodes/ }).click();
   await expect(
     page.getByRole("button", { name: "Season 2, episode 4" }),
   ).toBeVisible();

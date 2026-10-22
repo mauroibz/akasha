@@ -6493,3 +6493,20 @@ session; other usernames were reset by the board after two attempts.
 
 **Next.** No sprint is planned. 107–108 are unreleased on top of 2.6.0; a 2.7.0 release
 (version surfaces, release notes, the full gate) waits for the owner to ask.
+
+
+## 2026-10-22 — The progress row is the tracker (DEC-174)
+
+**Done.** From the owner's first look at 108: the *Episodes watched* row and the tracker line
+were two controls for one number, and the row's dialog field rewrote the lights without
+saying so. The row is now the tracker; the dialog's progress field is gone; a typed count
+lives in the opened row only where there are no lights; a count without marks says it is
+lit from the start.
+
+**Verified and how.** `vitest related` (111, then 46 after the wording change), `make check`,
+Playwright `progress-marks`, `accessibility` and `add-detail` (41). The first accessibility
+run failed on a `div` nested in the `dl` row (`definition-list`, `dlitem`); the row now holds
+its `dt`, `dd` and the panel `dd` directly. Looked at Breaking Bad (22 of 62, the note shown)
+and Frieren (28 of 28) in the running app on the scratchpad library.
+
+**Next.** No sprint is planned; 2.7.0 waits for the owner.

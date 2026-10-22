@@ -6948,3 +6948,25 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      state says whether it is done. The season word is the parts field's first column label.
 - Consequences: none for other sprints. A 19px sideways scroll on one book's detail page at
   390px, from the cover column, was seen and is recorded in the worklog as a separate defect.
+
+## DEC-174 — The progress row is the tracker
+
+- Date: 2026-10-22
+- Status: accepted
+- Context: the owner, looking at 108 in the running app: *"On the shows 'your watch data'
+  there is an entry called 'Episodes watched' that has a change hover. that feels
+  disconnected from the new system, it opens a screen to input a number but does not show
+  the lights marker and is not clear what changes it does … could we integrate both
+  better?"*
+- Decision:
+  1. The *Episodes watched* / *Chapters read* row in the personal region **is** the tracker.
+     It reads "22 / 62 episodes" with *Show episodes*; opened, the lights sit under it, in
+     the same row. The separate "Episodes · 22 of 62" line is gone.
+  2. The opinion dialog no longer has a progress field. Where there are lights they are the
+     only way to change the count; where there are none (no total known) the opened row
+     takes a typed count, beside *Load the episode list* or *How many chapters?*.
+  3. A count with no marks says so when the row is opened: "Your count of 22 is lit from the
+     start; change any light to say which ones."
+- Consequences: the opinion dialog cannot clear marks at all, so DEC-173 point 1's
+  "send the count only when edited" is moot and removed. The drop question is still asked
+  after the opinion dialog sets an abandoned status.

@@ -122,7 +122,8 @@ describe("ProgressTracker", () => {
   it("is one closed line until opened", async () => {
     mockApi(() => undefined);
     show(<ProgressTracker entry={entryOf({ progress: 5 })} types={types} />);
-    const line = screen.getByRole("button", { name: /Episodes 5 of 7/ });
+    expect(screen.getByText("5 / 7 episodes")).toBeInTheDocument();
+    const line = screen.getByRole("button", { name: /Show episodes/ });
     expect(line).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByRole("group")).not.toBeInTheDocument();
     await userEvent.setup().click(line);
@@ -136,7 +137,7 @@ describe("ProgressTracker", () => {
     );
     const user = userEvent.setup();
     show(<ProgressTracker entry={entryOf({ progress: 5 })} types={types} />);
-    await user.click(screen.getByRole("button", { name: /Episodes/ }));
+    await user.click(screen.getByRole("button", { name: /Show episodes/ }));
     expect(
       screen.getByRole("button", { name: "Season 2, episode 2" }),
     ).toHaveAttribute("aria-pressed", "true");
@@ -168,7 +169,7 @@ describe("ProgressTracker", () => {
         types={types}
       />,
     );
-    await user.click(screen.getByRole("button", { name: /Episodes/ }));
+    await user.click(screen.getByRole("button", { name: /Show episodes/ }));
     await user.click(
       screen.getByRole("button", { name: "Mark all of season 2" }),
     );
@@ -199,7 +200,8 @@ describe("ProgressTracker", () => {
         types={types}
       />,
     );
-    await user.click(screen.getByRole("button", { name: /Episodes 0 of 62/ }));
+    expect(screen.getByText("0 / 62 episodes")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Show episodes/ }));
     await user.click(
       screen.getByRole("button", { name: "Load the episode list" }),
     );
@@ -225,15 +227,38 @@ describe("ProgressTracker", () => {
         types={types}
       />,
     );
-    await user.click(
-      screen.getByRole("button", { name: /Chapters not counted/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Set/ }));
     await user.type(screen.getByLabelText("How many chapters?"), "155");
     await user.click(screen.getByRole("button", { name: "Add chapters" }));
     await waitFor(() =>
       expect(patches(fetchMock, "/api/items/3")).toEqual([
         { metadata: { chapters: 155 } },
       ]),
+    );
+  });
+
+  it("takes a typed count where there are no lights to draw", async () => {
+    const fetchMock = mockApi((input) =>
+      String(input).endsWith("/api/entries/7") ? json(entryOf({})) : undefined,
+    );
+    const user = userEvent.setup();
+    show(
+      <ProgressTracker
+        entry={entryOf({
+          progress: 4,
+          item: { type: "series", metadata: {}, outline: null },
+        })}
+        types={types}
+      />,
+    );
+    expect(screen.getByText("4 episodes")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Set/ }));
+    const count = screen.getByLabelText("Episodes watched");
+    await user.clear(count);
+    await user.type(count, "9");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(patches(fetchMock, "/api/entries/7")).toEqual([{ progress: 9 }]),
     );
   });
 

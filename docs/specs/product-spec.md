@@ -875,13 +875,15 @@ edit.
   what does not exist yet, creating and assigning in one action. Not in the opinion dialog
   and not a trip to `/shelves`; and never converged with the format control, because a
   shelf is one you invent and a format is a closed per-domain vocabulary (DEC-059)
-- **Episodes and chapters** (2.7, DEC-171) — for a domain that counts progress, one closed
-  line under the personal fields ("Episodes · 23 of 62"). Opened, a row of lights per season
+- **Episodes and chapters** (2.7, DEC-171, DEC-174) — for a domain that counts progress,
+  the *Episodes watched* / *Chapters read* row is the tracker ("23 / 62 episodes", *Show
+  episodes*). Opened, a row of lights per season
   (one row for an anime or a book), in the goal calendar's style: a tap marks one, a tap on a
   season marks or clears all of it, and *Episodes watched* follows the marks. An imported
   count with no marks is drawn as the first N. A series without its season list offers *Load
   the episode list* (TVmaze, on request only); a book without a chapter count takes one typed.
-  No ratings, notes or dates per episode. Typing a count in the opinion dialog replaces the marks
+  No ratings, notes or dates per episode. The opinion dialog has no progress field; with no
+  lights to draw, the opened row takes a typed count
 - **How far did you get?** (DEC-172) — setting an entry to a status its domain declares
   *abandoned* (`Dropped`), from the detail page or a library row, asks with the same lights: a
   tap saves everything through that one; *Skip* saves nothing more. Not asked from the inbox,

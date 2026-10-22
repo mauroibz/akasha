@@ -317,13 +317,6 @@ export function DetailPage() {
   // The domain's own word for the field, not a book's (technical spec 6.6).
   const nameOf = (field: EntryFieldName) =>
     entryFieldLabel(item.type, itemTypes.data, field);
-  const progress = progressFor(item.type, itemTypes.data);
-  // The total is the item's own metadata and is often absent — an airing series has
-  // none — so the reading falls back to the bare count rather than "20 / —".
-  const progressTotal =
-    progress?.total_field != null
-      ? item.metadata[progress.total_field]
-      : undefined;
 
   async function handleDelete() {
     setDeleteError("");
@@ -523,20 +516,13 @@ export function DetailPage() {
                   {entry.reread_count}
                 </PropertyRow>
               )}
-              {progress && (
-                <PropertyRow
-                  name="progress"
-                  label={progress.label}
-                  icon={<Gauge aria-hidden="true" />}
-                  onEdit={() => setDialog("opinion")}
-                >
-                  {entry.progress == null
-                    ? "—"
-                    : typeof progressTotal === "number"
-                      ? `${entry.progress} / ${progressTotal} ${progress.unit_label}s`
-                      : `${entry.progress} ${progress.unit_label}s`}
-                </PropertyRow>
-              )}
+              {/* The progress row is the tracker: one control for one number
+                  (DEC-171, the owner's note on the first look). */}
+              <ProgressTracker
+                entry={entry}
+                types={itemTypes.data}
+                icon={<Gauge aria-hidden="true" />}
+              />
               {/* Editable where it is read. The owner's complaint was distance:
                   shelf membership lived inside a dialog named after something
                   else, and creating a shelf was a whole route. */}
@@ -557,7 +543,6 @@ export function DetailPage() {
                 />
               </PropertyRow>
             </dl>
-            <ProgressTracker entry={entry} types={itemTypes.data} />
             {entry.notes && (
               // The note as a callout, marked with the arch (Sprint 092).
               <div className="mt-4 flex gap-3 rounded-lg bg-muted/60 p-4">
@@ -696,11 +681,6 @@ export function DetailPage() {
         onOpenChange={(open) => setDialog(open ? "opinion" : null)}
         entry={entry}
         onSave={(values) => {
-          // Sent only when edited: a typed count clears the ticked episodes, so
-          // saving a score must not resend the count and wipe them (DEC-171).
-          const progressEdited =
-            values.progress !==
-            (entry.progress == null ? "" : String(entry.progress));
           return update
             .mutateAsync(() =>
               patchEntry(entry.id, {
@@ -719,23 +699,16 @@ export function DetailPage() {
                 ...(has("reread_count")
                   ? { reread_count: Number(values.reread_count || 0) }
                   : {}),
-                // `""` is "not recorded" and must reach the server as null, while
-                // `"0"` is a recorded zero. `Number("")` is `0`, so the empty check
-                // comes first — the reread line above cannot be copied here.
-                ...(progress && progressEdited
-                  ? {
-                      progress:
-                        values.progress === "" ? null : Number(values.progress),
-                    }
-                  : {}),
+                // No progress: the progress row changes it, never this dialog
+                // (DEC-174), so saving a score cannot touch the marks.
               }),
             )
             .then((saved) => {
-              // Dropped just now, and nothing typed about how far: ask (DEC-172).
+              // Dropped just now: ask how far (DEC-172).
               const dropped =
                 values.status !== entry.status &&
                 isAbandoned(item.type, values.status, itemTypes.data);
-              if (dropped && !progressEdited) setAsking(saved as LibraryEntry);
+              if (dropped) setAsking(saved as LibraryEntry);
             });
         }}
       />

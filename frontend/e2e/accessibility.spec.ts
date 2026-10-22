@@ -1075,7 +1075,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await stubSeries(page, []);
     await page.goto("/books/7");
-    await page.getByRole("button", { name: /Episodes 3 of 7/ }).click();
+    await page.getByRole("button", { name: /Show episodes/ }).click();
     await expect(
       page.getByRole("button", { name: "Season 2, episode 4" }),
     ).toBeVisible();
