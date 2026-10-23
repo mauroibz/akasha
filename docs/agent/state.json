@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 50,
-  "project_status": "in_progress",
-  "active_sprint": "117",
-  "active_sprint_file": "docs/sprints/117-the-tier-board.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "116",
+  "project_status": "ready",
+  "active_sprint": "118",
+  "active_sprint_file": "docs/sprints/118-the-diary-as-a-timeline.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "117",
   "completed_sprints": [
     "001",
     "002",
@@ -122,8 +122,9 @@
     "113",
     "114",
     "115",
-    "116"
+    "116",
+    "117"
   ],
-  "started_at": "2026-10-23T20:41:03-03:00",
-  "updated_at": "2026-10-23T20:41:03-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T20:46:48-03:00"
 }

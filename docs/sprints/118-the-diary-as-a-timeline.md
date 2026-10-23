@@ -1,7 +1,7 @@
 # Sprint 118 — The Diary as a timeline
 
 **Sprint:** 118
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 49
 **Depends on:** 117
 **Owner:** Mauro

@@ -6656,3 +6656,16 @@ books and reading the library's score sort back.
 deck's answers. Both fixed; the fit test now checks reachability.
 
 **Next.** Sprint 117, the tier board.
+
+## 2026-10-23 — Sprint 117: the tier board
+
+**Done.** `/tiers/:type` with tap-to-place and keys, ranks saved at once, score moves as
+proposals applied on confirmation; links from Insights, the rank picker, the command bar.
+
+**Verified and how.** Vitest 42 related; Playwright 49; walkthrough `walk117.mjs` applying a
+move on the real backend and reading the history.
+
+**Found.** The proposal bar sat under the phone's navigation; empty rows faded the score chip
+below contrast. Both fixed.
+
+**Next.** Sprint 118, the Diary as a timeline.
