@@ -1498,4 +1498,192 @@ describe("DetailPage", () => {
       expect(await within(row).findByText(/Juan/)).toBeVisible();
     });
   });
+
+  describe("the score over time, and Still an 8? (Sprint 115)", () => {
+    const readingTypes = [
+      {
+        ...itemTypes[0],
+        statuses: [
+          {
+            value: "read",
+            label: "Read",
+            choosable: true,
+            hotkey: "r",
+            finished: true,
+          },
+          {
+            value: "reading",
+            label: "Reading",
+            choosable: true,
+            hotkey: "g",
+            in_progress: true,
+          },
+        ],
+        entry_fields: ["date_started", "date_finished", "reread_count"],
+      },
+    ];
+    type Call = {
+      url: string;
+      method: string;
+      body: Record<string, unknown> | null;
+    };
+
+    function routes(
+      calls: Call[],
+      overrides: Record<string, unknown> = {},
+      history: unknown[] = [],
+    ) {
+      let current: Record<string, unknown> = { ...entry, ...overrides };
+      mockApi(
+        async (input, init) => {
+          const url = String(input);
+          const method = init?.method ?? "GET";
+          if (url === "/api/item-types")
+            return new Response(JSON.stringify(readingTypes));
+          if (url === "/api/entries/7/score-history")
+            return new Response(JSON.stringify(history));
+          if (url === "/api/entries/7" && method === "PATCH") {
+            const body = JSON.parse(String(init?.body)) as Record<
+              string,
+              unknown
+            >;
+            calls.push({ url, method, body });
+            current = { ...current, ...body };
+            return new Response(JSON.stringify(current));
+          }
+          if (url === "/api/entries/7")
+            return new Response(JSON.stringify(current));
+        },
+        { fallback: current },
+      );
+    }
+
+    const today = () => {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    };
+
+    it("finishing a scored entry asks whether the score holds, and keeping it says so", async () => {
+      const calls: Call[] = [];
+      routes(calls);
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+      await user.click(screen.getByRole("combobox", { name: "Status" }));
+      await user.click(await screen.findByRole("option", { name: "Read" }));
+      await user.click(screen.getByRole("button", { name: /save opinion/i }));
+      const still = await screen.findByRole("dialog", { name: "Still an 8?" });
+      await user.click(within(still).getByRole("button", { name: "Keep 8" }));
+      await waitFor(() =>
+        expect(calls.at(-1)?.body).toEqual({ score: 8, score_reason: "time" }),
+      );
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("a changed score after a reread says why, in the owner's words", async () => {
+      const calls: Call[] = [];
+      routes(calls, { reread_count: 1 });
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+      await user.click(screen.getByRole("combobox", { name: "Status" }));
+      await user.click(await screen.findByRole("option", { name: "Read" }));
+      await user.click(screen.getByRole("button", { name: /save opinion/i }));
+      const still = await screen.findByRole("dialog", { name: "Still an 8?" });
+      await user.click(within(still).getByRole("button", { name: "Score 10" }));
+      await user.type(
+        within(still).getByRole("textbox", { name: /why/i }),
+        "It got better",
+      );
+      await user.click(
+        within(still).getByRole("button", { name: "Change to 10" }),
+      );
+      await waitFor(() =>
+        expect(calls.at(-1)?.body).toEqual({
+          score: 10,
+          score_reason: "reread",
+          score_note: "It got better",
+        }),
+      );
+    });
+
+    it("Not now writes nothing", async () => {
+      const calls: Call[] = [];
+      routes(calls);
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+      await user.click(screen.getByRole("combobox", { name: "Status" }));
+      await user.click(await screen.findByRole("option", { name: "Read" }));
+      await user.click(screen.getByRole("button", { name: /save opinion/i }));
+      const still = await screen.findByRole("dialog", { name: "Still an 8?" });
+      const before = calls.length;
+      await user.click(within(still).getByRole("button", { name: "Not now" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      expect(calls.length).toBe(before);
+    });
+
+    it("starting again begins another pass and keeps the score", async () => {
+      const calls: Call[] = [];
+      routes(calls, {
+        status: "read",
+        date_started: "2019-04-01",
+        date_finished: "2019-05-01",
+        progress: 12,
+      });
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      await user.click(screen.getByRole("button", { name: "Start again" }));
+      const confirm = await screen.findByRole("alertdialog");
+      expect(confirm).toHaveTextContent("2019-05-01");
+      await user.click(
+        within(confirm).getByRole("button", { name: "Start again" }),
+      );
+      await waitFor(() =>
+        expect(calls.at(-1)?.body).toEqual({
+          status: "reading",
+          date_started: today(),
+          date_finished: null,
+          reread_count: 1,
+          progress: 0,
+        }),
+      );
+    });
+
+    it("shows how the score changed when it has", async () => {
+      routes([], {}, [
+        {
+          score: 7,
+          previous: null,
+          reason: null,
+          note: null,
+          recorded_at: "2019-05-01",
+        },
+        {
+          score: 9,
+          previous: 7,
+          reason: "reread",
+          note: "Better the second time",
+          recorded_at: "2026-03-02T10:00:00Z",
+        },
+      ]);
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const row = await waitFor(() => {
+        const found = document.querySelector("[data-fact='score-history']");
+        if (!found) throw new Error("no history row yet");
+        return found as HTMLElement;
+      });
+      expect(row).toHaveTextContent("7 in 2019");
+      expect(row).toHaveTextContent("9 in 2026");
+      await user.click(within(row).getByRole("button", { name: /why/i }));
+      expect(within(row).getByText(/Better the second time/)).toBeVisible();
+      expect(within(row).getByText(/reread/i)).toBeVisible();
+    });
+  });
 });

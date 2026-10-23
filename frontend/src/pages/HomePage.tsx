@@ -62,6 +62,8 @@ import type { SearchCandidate } from "@/api/add";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { HowFarDialog } from "@/features/progress/HowFarDialog";
 import { isAbandoned } from "@/features/progress/outline";
+import { askStill } from "@/features/rescore/rescore";
+import { StillDialog } from "@/features/rescore/StillDialog";
 import {
   defaultLibraryFilters,
   domainPreferenceKey,
@@ -145,6 +147,8 @@ export function HomePage() {
   const [view, setView] = useState<LibraryView>(readViewPreference);
   // The entry just dropped from its row, while the page asks how far (DEC-172).
   const [asking, setAsking] = useState<LibraryEntry | null>(null);
+  // The entry just finished from its card, while the page asks "Still an 8?".
+  const [still, setStill] = useState<LibraryEntry | null>(null);
   // A shelf pinned from its own page (Sprint 074 deliverable 6) -- read once,
   // the same shape as the remembered domain, so a pin made elsewhere shows up
   // on the next visit without a second store between the two pages.
@@ -389,6 +393,13 @@ export function HomePage() {
         isAbandoned(saved.item.type, saved.status, itemTypes.data)
       )
         setAsking(saved);
+      // Finished again, with a score: ask whether it holds (Sprint 115).
+      else if (
+        !undo &&
+        changes.status !== undefined &&
+        askStill(previous, saved, itemTypes.data)
+      )
+        setStill(saved);
       if (!undo) offerUndo(saved, changes, previous);
       const activeKeyChanged =
         (changes.score !== undefined && filters.sort === "score") ||
@@ -1247,6 +1258,7 @@ export function HomePage() {
         types={itemTypes.data}
         onClose={() => setAsking(null)}
       />
+      <StillDialog entry={still} onClose={() => setStill(null)} />
     </main>
   );
 }

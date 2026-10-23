@@ -42,6 +42,7 @@ import type {
   LibraryPage,
   ProgressSpec,
   ScoreDistribution,
+  ScoreEvent,
   Shelf,
   StatusSpec,
 } from "./library";
@@ -98,4 +99,5 @@ export type Contract = [
   Holds<NamesOnly<LoanWithEntry, Schemas["LoanWithEntryResponse"]>>,
   Holds<NamesOnly<Location, Schemas["LocationResponse"]>>,
   Holds<NamesOnly<DuplicatePair, Schemas["DuplicatePairResponse"]>>,
+  Holds<NamesOnly<ScoreEvent, Schemas["ScoreEventResponse"]>>,
 ];

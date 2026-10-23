@@ -11,6 +11,8 @@ confirmation ("still a 9") that changed nothing.
 
 The backfill gives every scored entry one first row, dated when it was finished, else
 when it was added: the nearest thing to when that score was given that the library knows.
+An entry that arrives with a score (an import, an add) is dated the same way, by its
+finish date when it brings one, else now.
 """
 
 import sqlalchemy as sa
@@ -51,7 +53,7 @@ def upgrade() -> None:
         "CREATE TRIGGER score_events_insert AFTER INSERT ON entries "
         "WHEN NEW.score IS NOT NULL BEGIN "
         "INSERT INTO score_events (entry_id, score, previous, reason, note, recorded_at) "
-        f"VALUES (NEW.id, NEW.score, NULL, NULL, NULL, {_NOW}); END"
+        f"VALUES (NEW.id, NEW.score, NULL, NULL, NULL, COALESCE(NEW.date_finished, {_NOW})); END"
     )
     op.execute(
         "CREATE TRIGGER score_events_update AFTER UPDATE OF score ON entries "

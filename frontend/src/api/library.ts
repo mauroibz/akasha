@@ -77,6 +77,8 @@ export interface StatusSpec {
   planned?: boolean;
   /** Stopped partway: setting it asks how far it got (DEC-172). */
   abandoned?: boolean;
+  /** Done with: finishing again asks whether the score holds (Sprint 115). */
+  finished?: boolean;
 }
 
 /** How a domain counts progress, when that means something to it (DEC-077). */
@@ -445,6 +447,9 @@ export async function patchEntry(
     score_provisional?: boolean;
     /** Where it is kept; blank clears it (Sprint 110). */
     location?: string | null;
+    /** Why the score sent is what it is (Sprint 114). */
+    score_reason?: "reread" | "time";
+    score_note?: string;
   },
 ): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
@@ -898,3 +903,26 @@ import {
 import type { SearchCandidate } from "./add";
 import type { Loan } from "./loans";
 import type { components } from "./schema";
+
+/** One change of a score: what it became, from what, why and when (Sprint 114). */
+export interface ScoreEvent {
+  score: number | null;
+  previous: number | null;
+  /** `null` for a first score, else `time` or `reread`. */
+  reason: "time" | "reread" | null;
+  note: string | null;
+  recorded_at: string;
+}
+
+export async function getScoreHistory(
+  entryId: number,
+  signal?: AbortSignal,
+): Promise<ScoreEvent[]> {
+  const response = await request(`/api/entries/${entryId}/score-history`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The score history could not be loaded");
+  return response.json() as Promise<ScoreEvent[]>;
+}

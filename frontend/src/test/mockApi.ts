@@ -40,6 +40,7 @@ const DEFAULTS: Array<[string, () => Response]> = [
   ["/api/item-types", () => json([])],
   ["/attachments", () => json({ attachments: [] })],
   ["/loans", () => json([])],
+  ["/score-history", () => json([])],
   ["/api/locations", () => json([])],
 ];
 

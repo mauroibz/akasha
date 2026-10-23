@@ -1,7 +1,7 @@
 # Sprint 115 — The score history on screen, and "Still an 8?"
 
 **Sprint:** 115
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 49
 **Depends on:** 114
 **Owner:** Mauro

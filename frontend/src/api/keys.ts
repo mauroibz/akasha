@@ -53,4 +53,5 @@ export const queryKeys = {
   loans: ["loans"] as const,
   entryLoans: (entryId: number) => ["loans", "entry", entryId] as const,
   locations: ["locations"] as const,
+  scoreHistory: (entryId: number) => ["score-history", entryId] as const,
 };

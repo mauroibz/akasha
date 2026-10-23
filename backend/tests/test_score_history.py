@@ -204,3 +204,20 @@ def test_migration_0030_backfills_and_leaves(tmp_path: Path) -> None:
     assert "score_events" not in names
     assert not any(name.startswith("score_events_") for name in names)
     connection.close()
+
+
+async def test_an_entry_arriving_finished_is_scored_when_it_was_finished(tmp_path: Path) -> None:
+    """An import or an add that brings a finish date brings the nearest thing to when
+    the score was given, as the backfill does; with none, the score is given now."""
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        old = await _add(client, "Solaris", score=8, status="read", date_finished="2019-05-01")
+        new = await _add(client, "Stoner", score=9)
+        old_history = await client.get(f"/api/entries/{old['id']}/score-history")
+        new_history = await client.get(f"/api/entries/{new['id']}/score-history")
+    assert old_history.json()[0]["recorded_at"] == "2019-05-01"
+    assert new_history.json()[0]["recorded_at"].startswith("20")
+    assert new_history.json()[0]["recorded_at"] != "2019-05-01"

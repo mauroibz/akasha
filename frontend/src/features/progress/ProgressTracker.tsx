@@ -40,11 +40,14 @@ export function ProgressTracker({
   entry,
   types,
   icon,
+  onFinished,
 }: {
   entry: LibraryEntry;
   types: ItemType[] | undefined;
   /** The row's icon, as the other personal fields carry one. */
   icon?: React.ReactNode;
+  /** The last light finished the entry (its Finished date was set by this tap). */
+  onFinished?: (saved: LibraryEntry) => void;
 }) {
   const panelId = useId();
   const queryClient = useQueryClient();
@@ -71,8 +74,9 @@ export function ProgressTracker({
       dates: ReturnType<typeof passageDates>;
       seq: number;
     }) => patchEntry(entry.id, { progress_marks: marks, ...dates }),
-    onSuccess: (saved, { seq }) => {
+    onSuccess: (saved, { seq, dates }) => {
       if (seq === latest.current) refresh(saved);
+      if (dates.date_finished) onFinished?.(saved);
     },
     onError: (_error, { seq }) => {
       if (seq !== latest.current) return;

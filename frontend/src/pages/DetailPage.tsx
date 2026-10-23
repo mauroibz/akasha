@@ -5,6 +5,7 @@ import {
   CircleDot,
   Gauge,
   Handshake,
+  History,
   MapPin,
   Repeat,
   Shapes,
@@ -51,7 +52,10 @@ import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { LoanRow, LocationRow } from "@/features/house/HouseRows";
 import { HowFarDialog } from "@/features/progress/HowFarDialog";
-import { isAbandoned } from "@/features/progress/outline";
+import { isAbandoned, localDay } from "@/features/progress/outline";
+import { askStill, isFinished, statusWith } from "@/features/rescore/rescore";
+import { ScoreHistoryRow } from "@/features/rescore/ScoreHistoryRow";
+import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
@@ -267,12 +271,24 @@ export function DetailPage() {
   const backTo = from === "triage" ? "/inbox" : "/";
   const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
-    "opinion" | "metadata" | "refresh" | "delete" | "cover" | "refile" | null
+    | "opinion"
+    | "metadata"
+    | "refresh"
+    | "delete"
+    | "cover"
+    | "refile"
+    | "again"
+    | null
   >(null);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
   // The entry just dropped, while the page asks how far it got (DEC-172).
   const [asking, setAsking] = useState<LibraryEntry | null>(null);
+  // Finished again with a score: "Still an 8?" (Sprint 115).
+  const [still, setStill] = useState<{
+    entry: LibraryEntry;
+    again?: boolean;
+  } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
     queryKey: queryKeys.entry(entryId),
@@ -366,6 +382,30 @@ export function DetailPage() {
   // The domain's own word for the field, not a book's (technical spec 6.6).
   const nameOf = (field: EntryFieldName) =>
     entryFieldLabel(item.type, itemTypes.data, field);
+
+  // Another time through (Sprint 115). A domain with a status for "under way" goes
+  // back to it, with the dates of the last pass cleared; one without (a film) has no
+  // pass to begin, so watching it again is answered at once.
+  const underWay = statusWith(item.type, itemTypes.data, "in_progress");
+  function beginAgain() {
+    if (underWay) setDialog("again");
+    else setStill({ entry, again: true });
+  }
+  function startAgain() {
+    if (!underWay) return;
+    update.mutate(() =>
+      patchEntry(entry.id, {
+        status: underWay,
+        ...(has("date_started") ? { date_started: localDay(new Date()) } : {}),
+        ...(has("date_finished") ? { date_finished: null } : {}),
+        ...(has("reread_count")
+          ? { reread_count: entry.reread_count + 1 }
+          : {}),
+        // A typed count clears the marks (DEC-171): the new pass starts unlit.
+        ...(entry.progress !== null ? { progress: 0 } : {}),
+      }),
+    );
+  }
 
   async function handleDelete() {
     setDeleteError("");
@@ -523,6 +563,10 @@ export function DetailPage() {
                   </span>
                 )}
               </PropertyRow>
+              <ScoreHistoryRow
+                entryId={entry.id}
+                icon={<History aria-hidden="true" />}
+              />
               <PropertyRow
                 name="formats"
                 label="Format"
@@ -573,6 +617,10 @@ export function DetailPage() {
                 entry={entry}
                 types={itemTypes.data}
                 icon={<Gauge aria-hidden="true" />}
+                onFinished={(saved) => {
+                  // The last light finishes the pass (DEC-175): with a score, ask.
+                  if (saved.score !== null) setStill({ entry: saved });
+                }}
               />
               {/* Editable where it is read. The owner's complaint was distance:
                   shelf membership lived inside a dialog named after something
@@ -626,6 +674,15 @@ export function DetailPage() {
               >
                 Edit opinion
               </Button>
+              {isFinished(entry, itemTypes.data) && entry.score !== null && (
+                <Button
+                  variant="outline"
+                  className="rounded-full px-5"
+                  onClick={beginAgain}
+                >
+                  Start again
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="rounded-full border-destructive/60 px-5 text-destructive hover:bg-destructive/10 hover:text-destructive"
@@ -781,6 +838,9 @@ export function DetailPage() {
                 values.status !== entry.status &&
                 isAbandoned(item.type, values.status, itemTypes.data);
               if (dropped) setAsking(saved as LibraryEntry);
+              // Finished again, with a score: ask whether it holds (Sprint 115).
+              else if (askStill(entry, saved as LibraryEntry, itemTypes.data))
+                setStill({ entry: saved as LibraryEntry });
             });
         }}
       />
@@ -790,6 +850,44 @@ export function DetailPage() {
         types={itemTypes.data}
         onClose={() => setAsking(null)}
       />
+
+      <StillDialog
+        entry={still?.entry ?? null}
+        again={still?.again}
+        onClose={() => setStill(null)}
+      />
+
+      {/* Another pass (Sprint 115): the dates of this one clear, the score and its
+          history stay, and finishing will ask whether the score still holds. */}
+      <AlertDialog
+        open={dialog === "again"}
+        onOpenChange={(open) => setDialog(open ? "again" : null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start {item.title} again?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {entry.date_finished
+                ? `Finished (${entry.date_finished}) is cleared`
+                : "Finished stays empty"}
+              {entry.progress !== null
+                ? " and progress starts from nothing"
+                : ""}
+              . Your score and how it changed stay, and finishing again will ask
+              whether it still holds.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants(), "rounded-full px-5")}
+              onClick={() => startAgain()}
+            >
+              Start again
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CoverDialog
         open={dialog === "cover"}

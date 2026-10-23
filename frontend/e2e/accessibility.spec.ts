@@ -4,6 +4,7 @@ import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
 import { stubChores } from "./chores-fixture";
 import { stubHouse } from "./house-fixture";
+import { stubRescore } from "./rescore-fixture";
 import { stubSeries } from "./progress-fixture";
 
 import {
@@ -1151,5 +1152,34 @@ for (const scheme of ["light", "dark"] as const) {
       .poll(() => page.evaluate(() => document.getAnimations().length))
       .toBe(0);
     await expectNoSeriousViolations(page, `duplicates (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`starting again and Still an 8? have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubRescore(page);
+    await page.goto("/books/7");
+    await page.getByRole("button", { name: "Start again" }).click();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await expectNoSeriousViolations(page, `start again (${scheme})`);
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Start again" })
+      .click();
+    await page.getByRole("button", { name: /Show chapters/ }).click();
+    for (const chapter of [1, 2, 3])
+      await page
+        .getByRole("button", { name: `Chapter ${chapter}`, exact: true })
+        .click();
+    await expect(
+      page.getByRole("dialog", { name: "Still an 8?" }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `still an 8 (${scheme})`);
   });
 }

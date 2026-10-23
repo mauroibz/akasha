@@ -1827,3 +1827,64 @@ test("the library filters by where things are and by what is lent (Sprint 111)",
     expect(last).not.toMatch(/lent=/);
   });
 });
+
+test("finishing a scored entry from its card asks whether the score holds (Sprint 115)", async () => {
+  const bookType = {
+    id: "book",
+    label: "Book",
+    plural_label: "Books",
+    fields: [],
+    statuses: [
+      {
+        value: "read",
+        label: "Read",
+        choosable: true,
+        hotkey: "r",
+        finished: true,
+      },
+      {
+        value: "reading",
+        label: "Reading",
+        choosable: true,
+        hotkey: "g",
+        in_progress: true,
+      },
+    ],
+    default_status: "read",
+    entry_fields: [],
+    formats: [],
+    entry_panel_label: "Your reading data",
+  };
+  const reading = {
+    ...populated,
+    items: [{ ...populated.items[0], status: "reading", score: 8 }],
+  };
+  const bodies: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request, init?: RequestInit) => {
+      const url = String(request);
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify([bookType]));
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return new Response(JSON.stringify({ ...reading.items[0], ...body }));
+      }
+      return new Response(JSON.stringify(reading), { status: 200 });
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  await user.click(within(row).getByRole("combobox"));
+  await user.click(await screen.findByRole("option", { name: "Read" }));
+  const still = await screen.findByRole("dialog", { name: "Still an 8?" });
+  await user.click(within(still).getByRole("button", { name: "Keep 8" }));
+  await waitFor(() =>
+    expect(bodies).toEqual([
+      { status: "read" },
+      { score: 8, score_reason: "time" },
+    ]),
+  );
+});
