@@ -43,6 +43,8 @@ import type {
   ProgressSpec,
   ScoreDistribution,
   ScoreEvent,
+  Timeline,
+  TimelineEvent,
   Shelf,
   StatusSpec,
 } from "./library";
@@ -100,4 +102,6 @@ export type Contract = [
   Holds<NamesOnly<Location, Schemas["LocationResponse"]>>,
   Holds<NamesOnly<DuplicatePair, Schemas["DuplicatePairResponse"]>>,
   Holds<NamesOnly<ScoreEvent, Schemas["ScoreEventResponse"]>>,
+  Holds<NamesOnly<Timeline, Schemas["TimelineResponse"]>>,
+  Holds<NamesOnly<TimelineEvent, Schemas["TimelineEvent"]>>,
 ];

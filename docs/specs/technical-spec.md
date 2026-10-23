@@ -708,6 +708,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - `GET /api/events` streams the current person's job changes as Server-Sent Events, and
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- `GET /api/diary/timeline?before=&limit=` (Sprint 118): every finish and every score change
+  (not a first score) across years and libraries, newest first, keyset-paged on one text key
+  (the date, the kind, the row).
 - Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.

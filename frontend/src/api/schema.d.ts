@@ -176,6 +176,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/diary/timeline": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Diary Timeline
+     * @description Every finish and score change across years and libraries, newest first.
+     */
+    get: operations["diary_timeline_api_diary_timeline_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/duplicates": {
     parameters: {
       query?: never;
@@ -2938,6 +2958,35 @@ export interface components {
       /** Value */
       value: string;
     };
+    /**
+     * TimelineEvent
+     * @description One thing that happened: an entry finished, or its score changed (Sprint 118).
+     */
+    TimelineEvent: {
+      /** At */
+      at: string;
+      entry: components["schemas"]["EntryResponse"];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "finished" | "score";
+      /** Note */
+      note?: string | null;
+      /** Previous */
+      previous?: number | null;
+      /** Reason */
+      reason?: string | null;
+      /** Score */
+      score: number | null;
+    };
+    /** TimelineResponse */
+    TimelineResponse: {
+      /** Events */
+      events: components["schemas"]["TimelineEvent"][];
+      /** Next Cursor */
+      next_cursor: string | null;
+    };
     /** UndoEffectSummary */
     UndoEffectSummary: {
       /** Batch Id */
@@ -3448,6 +3497,65 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["DiaryResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  diary_timeline_api_diary_timeline_get: {
+    parameters: {
+      query?: {
+        before?: string | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["TimelineResponse"];
         };
       };
       /** @description Unauthorized */

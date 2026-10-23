@@ -943,3 +943,35 @@ export async function rankEntries(entryIds: number[]): Promise<LibraryEntry[]> {
     throw await apiFailure(response, "The order could not be saved");
   return response.json() as Promise<LibraryEntry[]>;
 }
+
+/** One thing that happened: an entry finished, or its score changed (Sprint 118). */
+export interface TimelineEvent {
+  kind: "finished" | "score";
+  /** A day for a finish; when the change was recorded for a score. */
+  at: string;
+  entry: LibraryEntry;
+  score: number | null;
+  previous?: number | null;
+  reason?: "time" | "reread" | null;
+  note?: string | null;
+}
+
+export interface Timeline {
+  events: TimelineEvent[];
+  next_cursor: string | null;
+}
+
+export async function getTimeline(
+  before?: string,
+  signal?: AbortSignal,
+): Promise<Timeline> {
+  const params = new URLSearchParams({ limit: "60" });
+  if (before) params.set("before", before);
+  const response = await request(`/api/diary/timeline?${params}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The timeline could not be loaded");
+  return response.json() as Promise<Timeline>;
+}

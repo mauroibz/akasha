@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import json
 import re
@@ -484,6 +485,78 @@ class LibraryService:
             bucket["counts"][item_type] = bucket["counts"].get(item_type, 0) + 1
             bucket["entries"].append(self.get_entry(entry_id))
         return {"year": year, "years": years, "months": list(months.values())}
+
+    _TIMELINE_KEY = re.compile(r"^[0-9T:.\-Z]+\|[12]\|\d{10}$")
+
+    def timeline(self, *, before: str | None = None, limit: int = 50) -> dict[str, Any]:
+        """Every finish and every change of a score, newest first (Sprint 118, DEC-176).
+
+        Across every library and year, as the Diary is across libraries. A first score
+        is not a change and is left out; a confirmation ("still a 9") is in. One text
+        key orders the two kinds together (the date, then the kind, then the row), so
+        the keyset cursor is a single comparison, as the library's is.
+        """
+        after_key: str | None = None
+        if before is not None:
+            try:
+                after_key = base64.urlsafe_b64decode(before + "=" * (-len(before) % 4)).decode()
+            except (ValueError, UnicodeDecodeError) as error:
+                raise LibraryError(
+                    "invalid_cursor", "The timeline cursor is invalid", status_code=400
+                ) from error
+            if not self._TIMELINE_KEY.match(after_key):
+                raise LibraryError(
+                    "invalid_cursor", "The timeline cursor is invalid", status_code=400
+                )
+        with Session(self.engine) as session:
+            rows = session.execute(
+                text(
+                    "SELECT k, kind, at, entry_id, score, previous, reason, note FROM ("
+                    " SELECT e.date_finished || '|1|' || printf('%010d', e.id) AS k,"
+                    "  'finished' AS kind, e.date_finished AS at, e.id AS entry_id,"
+                    # The score it had then: the last change recorded by the end of
+                    # that day, else the one it has (Sprint 118).
+                    "  COALESCE((SELECT s.score FROM score_events s"
+                    "   WHERE s.entry_id = e.id"
+                    "    AND s.recorded_at < date(e.date_finished, '+1 day')"
+                    "   ORDER BY s.recorded_at DESC, s.id DESC LIMIT 1), e.score) AS score,"
+                    "  NULL AS previous, NULL AS reason, NULL AS note"
+                    " FROM entries e WHERE e.user_id = :user"
+                    "  AND e.date_finished IS NOT NULL AND e.date_finished <> ''"
+                    " UNION ALL"
+                    " SELECT s.recorded_at || '|2|' || printf('%010d', s.id), 'score',"
+                    "  s.recorded_at, s.entry_id, s.score, s.previous, s.reason, s.note"
+                    " FROM score_events s JOIN entries e ON e.id = s.entry_id"
+                    " WHERE e.user_id = :user AND s.previous IS NOT NULL"
+                    ") WHERE :after IS NULL OR k < :after ORDER BY k DESC LIMIT :limit"
+                ),
+                {"user": self.user_id, "after": after_key, "limit": limit + 1},
+            ).all()
+            more = len(rows) > limit
+            rows = rows[:limit]
+            entries: dict[int, dict[str, Any]] = {}
+            events = []
+            for _key, kind, at, entry_id, score, previous, reason, note in rows:
+                if entry_id not in entries:
+                    entries[entry_id] = self._entry_dict(session, self._entry(session, entry_id))
+                entry = entries[entry_id]
+                events.append(
+                    {
+                        "kind": kind,
+                        "at": at,
+                        "entry": entry,
+                        "score": score,
+                        "previous": previous,
+                        "reason": reason,
+                        "note": note,
+                    }
+                )
+            next_cursor = (
+                base64.urlsafe_b64encode(rows[-1][0].encode()).decode().rstrip("=")
+                if more and rows
+                else None
+            )
+            return {"events": events, "next_cursor": next_cursor}
 
     def search_entries(self, q: str, *, limit: int = 10) -> list[dict[str, Any]]:
         """Your entries for what you typed, best first (Sprint 094, the command bar).

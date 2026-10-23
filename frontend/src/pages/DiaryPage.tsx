@@ -8,6 +8,7 @@ import { getDiary } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Timeline } from "@/features/diary/Timeline";
 import { GoalBand } from "@/features/goals/GoalBand";
 import { GoalDialog } from "@/features/goals/GoalDialog";
 import { goalDomains } from "@/features/goals/goals";
@@ -34,6 +35,8 @@ function monthName(month: string): string {
 export function DiaryPage() {
   const navigate = useNavigate();
   const [year, setYear] = useState<number | undefined>(undefined);
+  // Every year as one timeline (Sprint 118), beside the year-by-year view.
+  const [everyYear, setEveryYear] = useState(false);
   const itemTypes = useItemTypes();
   const diary = useQuery({
     queryKey: queryKeys.diary(year),
@@ -59,21 +62,37 @@ export function DiaryPage() {
         title="Diary"
         lede="What you finished, month by month."
         actions={
-          years.length > 1 ? (
+          years.length > 0 ? (
             <div
               role="group"
               aria-label="Year"
               className="flex flex-wrap gap-1.5"
             >
+              <button
+                type="button"
+                aria-pressed={everyYear}
+                onClick={() => setEveryYear(true)}
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-ring",
+                  everyYear
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                All years
+              </button>
               {years.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  aria-pressed={option === shown}
-                  onClick={() => setYear(option)}
+                  aria-pressed={!everyYear && option === shown}
+                  onClick={() => {
+                    setEveryYear(false);
+                    setYear(option);
+                  }}
                   className={cn(
                     "rounded-full px-3 py-1.5 text-sm font-medium tabular-nums transition-colors focus-ring",
-                    option === shown
+                    !everyYear && option === shown
                       ? "bg-primary/15 text-primary"
                       : "text-muted-foreground hover:text-foreground",
                   )}
@@ -85,96 +104,109 @@ export function DiaryPage() {
           ) : undefined
         }
       />
-      {goals.data?.map((goal) => (
-        <GoalBand
-          key={goal.item_type}
-          goal={goal}
-          year={goalYear}
-          types={types}
-          onChange={() => setEditing({ open: true, goal })}
-        />
-      ))}
-      {goals.data && canSetGoal && (
-        <p className="mt-6 text-sm text-muted-foreground">
-          {goals.data.length === 0 ? "Want something to aim at? " : null}
-          <button
-            type="button"
-            onClick={() => setEditing({ open: true })}
-            className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
-          >
-            {goals.data.length === 0
-              ? "Set a gentle goal"
-              : "Add a goal for another library"}
-          </button>
-        </p>
-      )}
-      <GoalDialog
-        open={editing.open}
-        onOpenChange={(open) => setEditing((value) => ({ ...value, open }))}
-        types={types}
-        initial={editing.goal}
-      />
-      {diary.isPending ? (
-        <Loading label="Loading your diary…" shape="grid" className="mt-8" />
-      ) : diary.isError ? (
-        <p role="alert" className="mt-8 text-destructive">
-          The diary could not be loaded.
-        </p>
-      ) : diary.data.months.length === 0 ? (
-        <EmptyState title={`Nothing finished in ${shown}`} className="mt-8">
-          An entry joins the diary when it has a finish date: set one on its
-          page, or import from a source that records it.
-        </EmptyState>
+      {everyYear ? (
+        <Timeline types={types} />
       ) : (
-        <ol className="mt-8 space-y-10">
-          {diary.data.months.map((month) => (
-            <li key={month.month} aria-labelledby={`month-${month.month}`}>
-              <h2
-                id={`month-${month.month}`}
-                className="font-display text-2xl font-medium tracking-tight"
-              >
-                {monthName(month.month)}
-              </h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {Object.entries(month.counts)
-                  .map(([id, count]) => labelFor(id, count))
-                  .join(", ")}
-              </p>
-              {/* A month's only cover is drawn large, a busy month's at shelf
-                  size (Sprint 104, the owner's "play with cover sizing"). */}
-              <ul
-                className={cn(
-                  "mt-4 grid gap-4",
-                  month.entries.length === 1
-                    ? "max-w-[11rem] grid-cols-1 sm:max-w-[13rem]"
-                    : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-5",
-                )}
-              >
-                {month.entries.map((entry) => (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigateWithTransition(navigate, `/books/${entry.id}`)
-                      }
-                      className="block w-full rounded-md text-left focus-ring"
-                      aria-label={`Open ${entry.item.title}`}
-                    >
-                      <CoverImage
-                        src={entry.item.cover_url}
-                        alt=""
-                        className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
-                      />
-                      <span className="mt-2 block truncate text-sm font-medium">
-                        {entry.item.title}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
+        <>
+          {goals.data?.map((goal) => (
+            <GoalBand
+              key={goal.item_type}
+              goal={goal}
+              year={goalYear}
+              types={types}
+              onChange={() => setEditing({ open: true, goal })}
+            />
           ))}
-        </ol>
+          {goals.data && canSetGoal && (
+            <p className="mt-6 text-sm text-muted-foreground">
+              {goals.data.length === 0 ? "Want something to aim at? " : null}
+              <button
+                type="button"
+                onClick={() => setEditing({ open: true })}
+                className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
+              >
+                {goals.data.length === 0
+                  ? "Set a gentle goal"
+                  : "Add a goal for another library"}
+              </button>
+            </p>
+          )}
+          <GoalDialog
+            open={editing.open}
+            onOpenChange={(open) => setEditing((value) => ({ ...value, open }))}
+            types={types}
+            initial={editing.goal}
+          />
+          {diary.isPending ? (
+            <Loading
+              label="Loading your diary…"
+              shape="grid"
+              className="mt-8"
+            />
+          ) : diary.isError ? (
+            <p role="alert" className="mt-8 text-destructive">
+              The diary could not be loaded.
+            </p>
+          ) : diary.data.months.length === 0 ? (
+            <EmptyState title={`Nothing finished in ${shown}`} className="mt-8">
+              An entry joins the diary when it has a finish date: set one on its
+              page, or import from a source that records it.
+            </EmptyState>
+          ) : (
+            <ol className="mt-8 space-y-10">
+              {diary.data.months.map((month) => (
+                <li key={month.month} aria-labelledby={`month-${month.month}`}>
+                  <h2
+                    id={`month-${month.month}`}
+                    className="font-display text-2xl font-medium tracking-tight"
+                  >
+                    {monthName(month.month)}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {Object.entries(month.counts)
+                      .map(([id, count]) => labelFor(id, count))
+                      .join(", ")}
+                  </p>
+                  {/* A month's only cover is drawn large, a busy month's at shelf
+                  size (Sprint 104, the owner's "play with cover sizing"). */}
+                  <ul
+                    className={cn(
+                      "mt-4 grid gap-4",
+                      month.entries.length === 1
+                        ? "max-w-[11rem] grid-cols-1 sm:max-w-[13rem]"
+                        : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-5",
+                    )}
+                  >
+                    {month.entries.map((entry) => (
+                      <li key={entry.id}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigateWithTransition(
+                              navigate,
+                              `/books/${entry.id}`,
+                            )
+                          }
+                          className="block w-full rounded-md text-left focus-ring"
+                          aria-label={`Open ${entry.item.title}`}
+                        >
+                          <CoverImage
+                            src={entry.item.cover_url}
+                            alt=""
+                            className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
+                          />
+                          <span className="mt-2 block truncate text-sm font-medium">
+                            {entry.item.title}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          )}
+        </>
       )}
     </main>
   );

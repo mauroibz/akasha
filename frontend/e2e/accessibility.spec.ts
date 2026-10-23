@@ -3,6 +3,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
 import { stubChores } from "./chores-fixture";
+import { stubTimeline } from "./diary-fixture";
 import { stubHouse } from "./house-fixture";
 import { stubRank } from "./rank-fixture";
 import { stubRescore } from "./rescore-fixture";
@@ -1209,5 +1210,18 @@ for (const scheme of ["light", "dark"] as const) {
       page,
       `tiers, a cover picked up (${scheme})`,
     );
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the diary's timeline has no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubTimeline(page);
+    await page.goto("/diary");
+    await page.getByRole("button", { name: "All years" }).click();
+    await expect(page.getByRole("list", { name: "Every year" })).toBeVisible();
+    await expectNoSeriousViolations(page, `timeline (${scheme})`);
   });
 }

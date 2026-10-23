@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -221,5 +222,79 @@ describe("DiaryPage with a gentle goal", () => {
       period: "month",
       suggest: true,
     });
+  });
+
+  it("shows every year as one timeline, finishes and score changes together (Sprint 118)", async () => {
+    const dune = (id: number, type: string) => ({
+      ...entry(id, type, "Dune"),
+      score: 9,
+      shelves: [],
+      formats: [],
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/api/item-types"))
+        return new Response(
+          JSON.stringify([
+            { ...book, plural_label: "Books" },
+            { ...movie, plural_label: "Movies" },
+          ]),
+        );
+      if (url.startsWith("/api/diary/timeline"))
+        return new Response(
+          JSON.stringify({
+            events: [
+              {
+                kind: "score",
+                at: "2026-03-02T10:00:00Z",
+                entry: dune(1, "book"),
+                score: 9,
+                previous: 7,
+                reason: "reread",
+                note: "Better now",
+              },
+              {
+                kind: "finished",
+                at: "2021-10-22",
+                entry: dune(2, "movie"),
+                score: 8,
+              },
+              {
+                kind: "finished",
+                at: "2019-03-02",
+                entry: dune(1, "book"),
+                score: 9,
+              },
+            ],
+            next_cursor: null,
+          }),
+        );
+      if (url.startsWith("/api/diary"))
+        return new Response(
+          JSON.stringify({ year: 2026, years: [2026, 2021, 2019], months: [] }),
+        );
+      return new Response("[]");
+    });
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter>
+          <DiaryPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "All years" }));
+    const timeline = await screen.findByRole("list", { name: "Every year" });
+    expect(
+      within(timeline).getByRole("heading", { name: "2021" }),
+    ).toBeVisible();
+    const events = within(timeline)
+      .getAllByRole("listitem")
+      .filter((item) => item.hasAttribute("data-event"));
+    expect(events.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/Dune.*7 → 9.*reread.*Better now/),
+      expect.stringMatching(/Dune.*Movie.*Finished/),
+      expect.stringMatching(/Dune.*Book.*Finished/),
+    ]);
   });
 });

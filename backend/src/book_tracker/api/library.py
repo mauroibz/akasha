@@ -854,6 +854,35 @@ class DiaryResponse(BaseModel):
     months: list[DiaryMonth]
 
 
+class TimelineEvent(BaseModel):
+    """One thing that happened: an entry finished, or its score changed (Sprint 118)."""
+
+    kind: Literal["finished", "score"]
+    #: A day for a finish; when the change was recorded for a score.
+    at: str
+    entry: EntryResponse
+    #: The score it has (a finish) or was given (a change); `previous` what it was.
+    score: int | None
+    previous: int | None = None
+    reason: str | None = None
+    note: str | None = None
+
+
+class TimelineResponse(BaseModel):
+    events: list[TimelineEvent]
+    next_cursor: str | None
+
+
+@router.get("/diary/timeline", response_model=TimelineResponse, responses=ERRORS)
+def diary_timeline(
+    library: Library,
+    before: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+) -> TimelineResponse:
+    """Every finish and score change across years and libraries, newest first."""
+    return TimelineResponse.model_validate(library.timeline(before=before, limit=limit))
+
+
 @router.get("/diary", response_model=DiaryResponse, responses=ERRORS)
 def diary(
     library: Library, year: Annotated[int | None, Query(ge=1000, le=9999)] = None
