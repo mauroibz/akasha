@@ -6669,3 +6669,14 @@ move on the real backend and reading the history.
 below contrast. Both fixed.
 
 **Next.** Sprint 118, the Diary as a timeline.
+
+## 2026-10-23 — Sprint 118: the Diary as a timeline
+
+**Done.** `/api/diary/timeline` and *All years* on the Diary.
+
+**Verified and how.** Backend 56; Vitest 281 related; Playwright 44; walkthrough `walk118.mjs`
+(a fresh backend each run; the running one predated the route once).
+
+**Found.** A finish showed today's score; it now shows the score it had then.
+
+**Next.** Sprint 119, suggested shelves.

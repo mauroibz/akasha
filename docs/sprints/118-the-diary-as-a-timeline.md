@@ -1,7 +1,7 @@
 # Sprint 118 — The Diary as a timeline
 
 **Sprint:** 118
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 117
 **Owner:** Mauro
@@ -36,4 +36,22 @@ spec, seen in the running app.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `a420400`. Verified per DEC-167: `test_diary_timeline.py` (3, observed
+failing first) with isolation and the diary suite (56); `vitest related` (281); `make check`;
+Playwright `diary-timeline` (new) and `accessibility` (new timeline checks, both themes; 44).
+Walkthrough on a fresh backend: *Solaris* (finished 2019 at 7, reread to 9 with a note),
+*Dune* the book (2019) and the film (2021, later 7 → 6), *Stoner* (2024); 1280 Paper and
+390 Ink, no sideways scroll.
+
+1. Events across domains interleave by date; paging is stable (tested across a day with two
+   finishes); a bad cursor is 400.
+2. The per-year view is unchanged; *All years* is the first option of the year switch.
+
+Deviations and notes:
+
+- **A finish shows the score it had then**, read from the history (the last change by the end
+  of that day), else the score it has. The walkthrough showed *Solaris* "Finished 9" in 2019
+  before this; the 9 belongs to the reread, which is its own event.
+- **No "started again" event.** *Start again* records no row of its own; the reread shows
+  through the score it produced. A row for it would need a table this line does not have.
+- The Diary's lede still says "month by month" over the timeline; it is true of both.
