@@ -7055,3 +7055,26 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   on the owner's behalf. The merged-away item is left for the prune sweep (DEC-158).
 - Consequences: nothing the owner wrote is lost by a merge, and a merge cannot be undone, so
   the deck says what will happen before it does it.
+
+## DEC-178 — Bringing things back: the year in review and the revisit deck (Sprints 120–121)
+
+- Date: 2026-10-23
+- Status: accepted
+- Context: DEC-176 left resurfacing waiting on mockups of four options: 01 an *On this day*
+  strip in the Diary, 02 a note prompted when something is finished, 03 a revisit deck,
+  04 a year in review. The owner, on the mockups: *"loved all except i worry about 01
+  becoming too intrusive, and 02 which im not convinced how often someone would open it if
+  not prompted. Everything else has my blessing."*
+- Decision: build 04 and 03, in that order, `FINAL_SPRINT` 119 → 121, plan revision 50.
+  1. **120 — The year in review.** One page per year, reached from the Diary's year switch,
+     in the Insights sentence style; across every library, as the Diary is (Insights stays
+     per domain). Computed when opened, so a score changed later changes the page.
+  2. **121 — The revisit deck.** Old scores one card at a time, "Still a 9?", with *Reread
+     it* or *Time* and a line of why, written to the score history. A chore on `/deck`; it
+     arrives nowhere uninvited.
+  3. **01 and 02 are not scheduled.** The concern about 02 ("how often someone would open
+     it if not prompted") describes 03 more than 02, which is the prompted one; 03 is placed
+     second so the owner can correct the reading before it is built.
+- Consequences: no migration for 120. Sprint 121 needs no schema: a kept score is already a
+  confirmation row in the history (DEC-176, Sprint 114), and the deck skips scores confirmed
+  in the last year.

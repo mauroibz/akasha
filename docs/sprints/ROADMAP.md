@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 49
+**Plan revision:** 50
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 115, the seventh of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** 116, the eighth of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -235,11 +235,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [112](112-the-deck-for-any-chore.md) | The deck for any chore: still want this, find a cover | 111 | completed |
 | [113](113-duplicates-in-the-deck.md) | Duplicates in the deck: pick which to keep, merge without loss | 112 | completed |
 | [114](114-score-history-underneath.md) | The score history underneath: every change, dated, with why | 113 | completed |
-| [115](115-score-history-on-screen.md) | The score history on screen, Start again, and "Still an 8?" | 114 | planned |
+| [115](115-score-history-on-screen.md) | The score history on screen, Start again, and "Still an 8?" | 114 | completed |
 | [116](116-rank-inside-a-score.md) | A rank inside a score, chosen in pairs | 115 | planned |
 | [117](117-the-tier-board.md) | The tier board: moves proposed, applied on confirmation | 116 | planned |
 | [118](118-the-diary-as-a-timeline.md) | The Diary as a timeline across years and libraries | 117 | planned |
 | [119](119-suggested-shelves.md) | Suggested shelves from what the library holds | 118 | planned |
+| [120](120-the-year-in-review.md) | The year in review, from the Diary | 119 | planned |
+| [121](121-the-revisit-deck.md) | The revisit deck: old scores, one card at a time | 120 | planned |
 
 ## Sprint contracts
 
@@ -1849,8 +1851,8 @@ the goal calendar's style. No ratings per part.
 ## The house and the history — the 2.8 line
 
 Brainstormed by the owner after v2.7.0 and sorted on 2026-10-23; accepted as **DEC-176**. Built
-in order; the resurfacing idea ("bringing things back") waits on the owner's choice among four
-mockups, and the commonplace book is a v3 candidate.
+in order; from the resurfacing mockups the owner approved the year in review and the revisit
+deck (DEC-178), and the commonplace book is a v3 candidate.
 
 - **[109 — Undo on the card, and facts that fill themselves](109-undo-and-facts.md)** (**completed**).
 - **[110 — Where things are: underneath](110-where-things-are-underneath.md)** and
@@ -1865,6 +1867,9 @@ mockups, and the commonplace book is a v3 candidate.
   **[117 — The tier board](117-the-tier-board.md)**.
 - **[118 — The Diary as a timeline](118-the-diary-as-a-timeline.md)** and
   **[119 — Suggested shelves](119-suggested-shelves.md)**.
+- **[120 — The year in review](120-the-year-in-review.md)** and
+  **[121 — The revisit deck](121-the-revisit-deck.md)**: the resurfacing options the owner
+  approved from the mockups (DEC-178).
 
 ## Not scheduled
 

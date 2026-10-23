@@ -1,7 +1,7 @@
 # Sprint 115 — The score history on screen, and "Still an 8?"
 
 **Sprint:** 115
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 114
 **Owner:** Mauro
@@ -45,4 +45,30 @@ the running app.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `3f94d09`. Verified per DEC-167: `vitest related` (278), the rescore
+unit tests (4), five new detail-page tests and a card test (each observed failing first),
+`test_score_history.py` (7), `make check`, Playwright `rescore` (new), `accessibility` (new
+checks in both themes), `add-detail`, `progress-marks`, `library`, `lent`, `editorial` (89).
+Walkthrough on a fresh backend with live Open Library: *Solaris* (read, 8, finished
+2019-05-01, four chapters) and *Stalker* (watched, 9); 390×800 Ink and 1280×900 Paper.
+
+1. Each path that finishes a scored entry asks once: the opinion dialog, a library card, the
+   tracker's last light (Vitest per surface; Playwright for the light).
+2. *Keep* records a confirmation; a change records the new score with its reason and note
+   (walkthrough: 8 → 9 "after a reread", the note shown under *Why*).
+3. The history row is drawn only from two scores on, and reads correctly (Vitest, walkthrough).
+4. Detail specs and accessibility pass; no sideways scroll at 390px.
+
+Deviations and notes:
+
+- **The inbox deck does not ask.** Filing an import as *Read* is not finishing something
+  again, and asking on every scored import would be the intrusion the owner warned about.
+- **The last light asks but does not change the status** (DEC-175); after a reread the entry
+  stays *Reading* until the owner sets it. Seen in the walkthrough; left as decided.
+- **A film is asked at once** (*Start again* on a domain with no under-way status) and the
+  answer also records the day and one more rewatch.
+- **Migration 0030 changed after its commit** (unreleased): the insert trigger dates a score
+  that arrives with a finish date by that date, as the backfill does. Found in the
+  walkthrough, where a 2019 finish was scored "today".
+- Seen and left: at 390px the personal region's date values wrap ("2026-10-" / "23"),
+  because each row keeps room for its hidden *Change* button. Existing; recorded.

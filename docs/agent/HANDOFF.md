@@ -4,7 +4,7 @@
 
 **2026-10-23:** the owner sorted a brainstorm into a new line (DEC-176): Sprints 109–119,
 the house (location, loans), the deck for chores and duplicates, the score history, ranks and
-tiers, the Diary timeline and suggested shelves. Sprints 109 (undo on cards, fill from provider) 110 (location and loans API, migration 0028) 111 (their screens, `/lent`) 112 (the deck shell, `/deck` chores) 113 (duplicates, migration 0029) and 114 (score history, migration 0030) are completed; **115 is active (ready).** The resurfacing idea
+tiers, the Diary timeline and suggested shelves. Sprints 109 (undo on cards, fill from provider) 110 (location and loans API, migration 0028) 111 (their screens, `/lent`) 112 (the deck shell, `/deck` chores) 113 (duplicates, migration 0029) 114 (score history, migration 0030) and 115 (its screens, *Still an 8?*) are completed; **116 is active (ready).** DEC-178 adds 120–121 (year in review, revisit deck) from the mockups. The resurfacing idea
 waits on the owner's choice of mockup; homelab sync is GitHub issue #31.
 
 **2026-10-22:** Sprints 107–108 (DEC-171–175: episode and chapter marks, the progress row as
@@ -49,7 +49,7 @@ Waiting on the owner:
 
 ## Next session
 
-Run Sprints 115–119 in order. Run checks under `set -o pipefail`: `make check | tail` hides a failure from `&&`. Walkthroughs: `scripts/walkthrough.py` from `backend/` with `uv run`, vite on 5180 with `AKASHA_E2E_BACKEND`; stop servers by port (`fuser -k`), since `pkill -f` matches the calling shell. The board upgrade to 2.7.0 is the owner's unless SSH access is given:
+Run Sprints 116–121 in order. Run checks under `set -o pipefail`: `make check | tail` hides a failure from `&&`. Walkthroughs: `scripts/walkthrough.py` from `backend/` with `uv run`, vite on 5180 with `AKASHA_E2E_BACKEND`; stop servers by port (`fuser -k`), since `pkill -f` matches the calling shell. The board upgrade to 2.7.0 is the owner's unless SSH access is given:
 `AKASHA_VERSION=2.7.0` in the board's `.env`, `./render-compose.sh`, then
 `docker compose pull && docker compose up -d` (migration 0027 runs with its pre-migration
 backup). The 390px sideways scroll on the detail page is fixed (`fca2bb8`).

@@ -6628,3 +6628,18 @@ scores; 0030 on a real database copy.
 commit was amended within the session. Checks now run under `set -o pipefail`.
 
 **Next.** Sprint 115, the history on screen and "Still an 8?".
+
+## 2026-10-23 — Sprint 115: the score over time, Start again, Still an 8?; DEC-178
+
+**Done.** The history row, *Start again*, `StillDialog` from the opinion dialog, cards and the
+last light. Migration 0030's insert trigger dates an arriving score by its finish date. The
+owner approved mockups 03 and 04; DEC-178 plans Sprints 120–121.
+
+**Verified and how.** Vitest 278 related; Playwright 89 across the covering specs; walkthrough
+`frontend/e2e/scratchpad/walk115.mjs` on a fresh backend (a reread of *Solaris* to 9 with a
+note; *Stalker* watched again).
+
+**Found.** A 2019 finish was first scored "today" (fixed). After the last light the status
+stays *Reading* (DEC-175, left). Dates wrap at 390px in the personal region (existing).
+
+**Next.** Sprint 116, a rank inside a score.

@@ -1,7 +1,7 @@
 # Sprint 116 — A rank inside a score
 
 **Sprint:** 116
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 49
 **Depends on:** 115
 **Owner:** Mauro
