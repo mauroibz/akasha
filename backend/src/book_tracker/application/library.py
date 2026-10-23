@@ -24,11 +24,12 @@ from sqlalchemy import (
     select,
     text,
     true,
+    update,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.normalization import insight_group, normalize_text, shelf_slug
+from book_tracker.domain.normalization import insight_group, normalize_text, shelf_slug, work_key
 from book_tracker.domain.pagination import (
     CursorError,
     CursorState,
@@ -59,6 +60,7 @@ from book_tracker.infrastructure.attachments import (
 )
 from book_tracker.infrastructure.models import (
     AttachmentRow,
+    DuplicateDismissalRow,
     EntryFormatRow,
     EntryRow,
     EntryShelfRow,
@@ -920,6 +922,161 @@ class LibraryService:
                 .order_by(func.count().desc(), EntryRow.location.collate("NOCASE"))
             ).all()
             return [{"location": location, "count": count} for location, count in rows]
+
+    # -- Duplicates (Sprint 113, DEC-176) ------------------------------------------
+
+    def duplicate_candidates(self) -> list[dict[str, Any]]:
+        """Pairs of the owner's entries that look like one work entered twice.
+
+        Same domain, the same title once edition notes are set aside (`work_key`), and
+        the same first creator. Read from stored data only, never a provider, and never
+        a pair the owner said differs. Each pair once, older entry first.
+        """
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(
+                    EntryRow.id,
+                    ItemRow.type,
+                    ItemRow.title,
+                    ItemRow.creator_primary_normalized,
+                )
+                .join(ItemRow, ItemRow.id == EntryRow.item_id)
+                .where(EntryRow.user_id == self.user_id)
+                .order_by(EntryRow.id)
+            ).all()
+            dismissed = {
+                (low, high)
+                for low, high in session.execute(
+                    select(DuplicateDismissalRow.entry_low, DuplicateDismissalRow.entry_high).where(
+                        DuplicateDismissalRow.user_id == self.user_id
+                    )
+                ).all()
+            }
+            groups: dict[tuple[str, str, str], list[int]] = {}
+            for entry_id, item_type, title, creator in rows:
+                key = work_key(title or "")
+                if not key or not creator:
+                    continue
+                groups.setdefault((item_type, key, creator), []).append(entry_id)
+            pairs = [
+                (low, high)
+                for ids in groups.values()
+                for index, low in enumerate(ids)
+                for high in ids[index + 1 :]
+                if (low, high) not in dismissed
+            ]
+            entries = {
+                entry_id: self._entry_dict(session, self._entry(session, entry_id))
+                for entry_id in {entry_id for pair in pairs for entry_id in pair}
+            }
+            return [
+                {"a": entries[low], "b": entries[high], "reason": "Same title and creator"}
+                for low, high in sorted(pairs)
+            ]
+
+    def _pair(self, session: Session, a: int, b: int) -> tuple[int, int]:
+        if a == b:
+            raise LibraryError("same_entry", "A pair needs two entries", status_code=422)
+        self._entry(session, a)
+        self._entry(session, b)
+        return (a, b) if a < b else (b, a)
+
+    def dismiss_duplicate(self, a: int, b: int) -> None:
+        """Remember that two entries are different works; asking twice is harmless."""
+        with self._write() as session:
+            low, high = self._pair(session, a, b)
+            exists = session.scalar(
+                select(DuplicateDismissalRow.id).where(
+                    DuplicateDismissalRow.user_id == self.user_id,
+                    DuplicateDismissalRow.entry_low == low,
+                    DuplicateDismissalRow.entry_high == high,
+                )
+            )
+            if exists is None:
+                session.add(
+                    DuplicateDismissalRow(
+                        user_id=self.user_id, entry_low=low, entry_high=high, created_at=_now()
+                    )
+                )
+
+    def undismiss_duplicate(self, a: int, b: int) -> None:
+        with self._write() as session:
+            low, high = self._pair(session, a, b)
+            session.execute(
+                delete(DuplicateDismissalRow).where(
+                    DuplicateDismissalRow.user_id == self.user_id,
+                    DuplicateDismissalRow.entry_low == low,
+                    DuplicateDismissalRow.entry_high == high,
+                )
+            )
+
+    def merge_entries(self, keep_id: int, drop_id: int) -> dict[str, Any]:
+        """Fold one entry into another without losing anything the owner wrote.
+
+        The kept entry keeps every value it has. Its empty ones are filled from the
+        other; both notes survive, the kept one's first; shelves and formats are the
+        union; the other's loans move over. Two open loans are refused rather than one
+        silently closed. The other entry is then deleted; its item stays for the prune
+        sweep, as after any delete (DEC-158).
+        """
+        with self._write() as session:
+            self._pair(session, keep_id, drop_id)
+            keep = self._entry(session, keep_id)
+            drop = self._entry(session, drop_id)
+            keep_type = self._item(session, keep.item_id).type
+            if keep_type != self._item(session, drop.item_id).type:
+                raise LibraryError(
+                    "different_libraries",
+                    "Only two entries in the same library can be merged",
+                    status_code=422,
+                )
+            if self._open_loan(session, keep.id) and self._open_loan(session, drop.id):
+                raise LibraryError(
+                    "both_lent", "Both are lent out; record one return before merging"
+                )
+            empty = (None, "")
+            for field in ("date_started", "date_finished", "location", "suggested_status"):
+                if getattr(keep, field) in empty and getattr(drop, field) not in empty:
+                    setattr(keep, field, getattr(drop, field))
+            if keep.score is None and drop.score is not None:
+                keep.score = drop.score
+                keep.score_provisional = drop.score_provisional
+            if keep.progress is None and drop.progress is not None:
+                keep.progress = drop.progress
+                keep.progress_marks = drop.progress_marks
+            keep.reread_count = max(keep.reread_count, drop.reread_count)
+            notes = [note.strip() for note in (keep.notes, drop.notes) if note and note.strip()]
+            if len(notes) == 2 and notes[0] == notes[1]:
+                notes = notes[:1]
+            keep.notes = "\n\n".join(notes) or None
+            held_shelves = set(
+                session.scalars(
+                    select(EntryShelfRow.shelf_id).where(EntryShelfRow.entry_id == keep.id)
+                )
+            )
+            for shelf_id in session.scalars(
+                select(EntryShelfRow.shelf_id).where(EntryShelfRow.entry_id == drop.id)
+            ):
+                if shelf_id not in held_shelves:
+                    session.add(EntryShelfRow(entry_id=keep.id, shelf_id=shelf_id))
+            held_formats = set(
+                session.scalars(
+                    select(EntryFormatRow.format).where(EntryFormatRow.entry_id == keep.id)
+                )
+            )
+            for value in session.scalars(
+                select(EntryFormatRow.format).where(EntryFormatRow.entry_id == drop.id)
+            ):
+                if value not in held_formats:
+                    session.add(EntryFormatRow(entry_id=keep.id, format=value))
+            session.execute(
+                update(LoanRow).where(LoanRow.entry_id == drop.id).values(entry_id=keep.id)
+            )
+            keep.updated_at = _now()
+            session.flush()
+            session.delete(drop)
+            session.flush()
+            return self._entry_dict(session, keep)
 
     def fill_empty_provider_fields(
         self, item_id: int, values: Mapping[str, Any]

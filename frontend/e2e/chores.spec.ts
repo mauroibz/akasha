@@ -49,6 +49,26 @@ for (const size of [
     );
     await expectOnScreen(page, ["Later", "Let go", "Keep"]);
 
+    await page.goto("/deck/duplicates");
+    await expect(
+      page.getByRole("group", { name: "Stoner", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Keep this one" }).first().click();
+    const viewport = page.viewportSize()!;
+    for (const name of ["Later", "They’re different", "Merge"]) {
+      const box = (await page
+        .getByRole("button", { name, exact: true })
+        .boundingBox())!;
+      expect(box.y + box.height, `${name} bottom`).toBeLessThanOrEqual(
+        viewport.height,
+      );
+      expect(box.x + box.width, `${name} right`).toBeLessThanOrEqual(
+        viewport.width,
+      );
+    }
+    const card = (await page.locator("[data-deck-card]").boundingBox())!;
+    expect(card.y).toBeGreaterThanOrEqual(0);
+
     await page.goto("/deck/covers");
     await expect(page.getByTestId("deck-title")).toHaveText("Stoner");
     await expect(
@@ -99,4 +119,26 @@ test("a cover is chosen and installed", async ({ page }) => {
     method: "POST",
     url: "/api/items/101/cover",
   });
+});
+
+test("two editions are merged into the one kept", async ({ page }) => {
+  const calls: Array<{ method: string; url: string; body: unknown }> = [];
+  await stubChores(page, calls);
+  await page.goto("/deck/duplicates");
+  const kept = page.getByRole("group", {
+    name: "Stoner (New York Review Books Classics)",
+  });
+  await kept.getByRole("button", { name: "Keep this one" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "is removed" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Merge", exact: true }).click();
+  await expect(page.getByText("No duplicates left")).toBeVisible();
+  expect(calls).toEqual([
+    {
+      method: "POST",
+      url: "/api/duplicates/merge",
+      body: { keep: 4, drop: 1 },
+    },
+  ]);
 });

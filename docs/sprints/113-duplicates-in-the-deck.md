@@ -1,7 +1,7 @@
 # Sprint 113 — Duplicates, in the deck
 
 **Sprint:** 113
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 49
 **Depends on:** 112
 **Owner:** Mauro

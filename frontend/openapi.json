@@ -669,6 +669,28 @@
         "title": "DiaryResponse",
         "type": "object"
       },
+      "DuplicatePairResponse": {
+        "description": "Two entries that look like one work entered twice (Sprint 113).",
+        "properties": {
+          "a": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "b": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "a",
+          "b",
+          "reason"
+        ],
+        "title": "DuplicatePairResponse",
+        "type": "object"
+      },
       "EntryCreateBody": {
         "properties": {
           "confirm_near_match": {
@@ -3120,6 +3142,24 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MergeBody": {
+        "properties": {
+          "drop": {
+            "title": "Drop",
+            "type": "integer"
+          },
+          "keep": {
+            "title": "Keep",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "keep",
+          "drop"
+        ],
+        "title": "MergeBody",
+        "type": "object"
+      },
       "OutlinePartResponse": {
         "properties": {
           "part": {
@@ -3136,6 +3176,24 @@
           "size"
         ],
         "title": "OutlinePartResponse",
+        "type": "object"
+      },
+      "PairBody": {
+        "properties": {
+          "a": {
+            "title": "A",
+            "type": "integer"
+          },
+          "b": {
+            "title": "B",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "a",
+          "b"
+        ],
+        "title": "PairBody",
         "type": "object"
       },
       "PreviewResponse": {
@@ -4737,6 +4795,248 @@
           }
         },
         "summary": "Diary"
+      }
+    },
+    "/api/duplicates": {
+      "get": {
+        "description": "Possible duplicates, from stored data only (Sprint 113, DEC-176).",
+        "operationId": "list_duplicates_api_duplicates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DuplicatePairResponse"
+                  },
+                  "title": "Response List Duplicates Api Duplicates Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Duplicates"
+      }
+    },
+    "/api/duplicates/dismiss": {
+      "delete": {
+        "operationId": "undismiss_duplicate_api_duplicates_dismiss_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Undismiss Duplicate"
+      },
+      "post": {
+        "operationId": "dismiss_duplicate_api_duplicates_dismiss_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Dismiss Duplicate"
+      }
+    },
+    "/api/duplicates/merge": {
+      "post": {
+        "description": "Fold `drop` into `keep`; nothing the owner wrote is lost (Sprint 113).",
+        "operationId": "merge_duplicates_api_duplicates_merge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Merge Duplicates"
       }
     },
     "/api/enrichment/backfill": {

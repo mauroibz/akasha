@@ -129,3 +129,17 @@ def strip_html(value: str) -> str:
     # result reads as paragraphs rather than as one wall or a column of gaps.
     lines = [re.sub(r"[^\S\n]+", " ", line).strip() for line in text.split("\n")]
     return "\n\n".join(line for line in lines if line).strip()
+
+
+_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
+
+
+def work_key(title: str) -> str:
+    """A title as the work's name, without what tells one edition from another.
+
+    "Rayuela (Spanish Edition)", "RAYUELA" and "Rayuela: edición conmemorativa" are one
+    work: the subtitle after a colon and anything in brackets go, then the text is
+    normalized. What duplicate detection compares (Sprint 113); never shown.
+    """
+    head = title.split(":", 1)[0]
+    return normalize_text(_EDITION_NOTE.sub(" ", head))

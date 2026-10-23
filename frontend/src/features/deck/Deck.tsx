@@ -70,6 +70,7 @@ export function Deck<Card, Draft>({
   entryOf,
   passedStorageKey,
   initialDraft,
+  canUndo,
   canFile,
   stamp,
   file,
@@ -95,6 +96,8 @@ export function Deck<Card, Draft>({
   /** Session storage for passes, so a reload keeps them at the back. */
   passedStorageKey?: string;
   initialDraft: (card: Card) => Draft;
+  /** Whether a filed card can be taken back; a merge cannot. Defaults to yes. */
+  canUndo?: (card: Card, draft: Draft) => boolean;
   /** Whether *File* has anything to write; when not, a swipe right passes instead. */
   canFile?: (card: Card, draft: Draft) => boolean;
   /** What *File* would do, stamped on the card as it leans right. */
@@ -253,9 +256,13 @@ export function Deck<Card, Draft>({
     }
   };
 
+  const last = history.at(-1);
+  const undoable =
+    last !== undefined &&
+    (last.kind === "passed" || !canUndo || canUndo(last.card, last.draft));
+
   const undo = async () => {
-    const last = history.at(-1);
-    if (!last) return;
+    if (!last || !undoable) return;
     setHistory((stack) => stack.slice(0, -1));
     setFlipped(false);
     const key = keyOf(last.card);
@@ -403,7 +410,7 @@ export function Deck<Card, Draft>({
             <Button
               variant="ghost"
               className="h-11 shrink-0 gap-2 rounded-full px-3"
-              disabled={history.length === 0}
+              disabled={!undoable}
               onClick={() => void undo()}
             >
               <Undo2 className="h-4 w-4" aria-hidden="true" />

@@ -1143,5 +1143,13 @@ for (const scheme of ["light", "dark"] as const) {
       .poll(() => page.evaluate(() => document.getAnimations().length))
       .toBe(0);
     await expectNoSeriousViolations(page, `find a cover (${scheme})`);
+    await page.goto("/deck/duplicates");
+    await expect(
+      page.getByRole("group", { name: "Stoner", exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `duplicates (${scheme})`);
   });
 }

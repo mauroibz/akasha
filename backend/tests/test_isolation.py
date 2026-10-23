@@ -87,6 +87,12 @@ ROUTE_POLICY = {
     ("PATCH", "/api/loans/{loan_id}"): "private-id",
     ("DELETE", "/api/loans/{loan_id}"): "private-id",
     ("GET", "/api/loans"): "private-collection",
+    # Sprint 113: pairs are read from the requester's own entries; every write names
+    # two entry ids and answers 404 for anyone else's.
+    ("GET", "/api/duplicates"): "private-collection",
+    ("POST", "/api/duplicates/dismiss"): "private-id",
+    ("DELETE", "/api/duplicates/dismiss"): "private-id",
+    ("POST", "/api/duplicates/merge"): "private-id",
     ("GET", "/api/locations"): "private-collection",
     ("GET", "/api/items/{item_id}"): "owned-shared-cache",
     ("PATCH", "/api/items/{item_id}"): "owned-shared-cache",
@@ -325,6 +331,9 @@ PRIVATE_PROBES = (
     ("POST", "/api/entries/{entry_id}/loans", {"person": "probe", "lent_on": "2026-01-01"}, None),
     ("PATCH", "/api/loans/{loan_id}", {"returned_on": "2026-05-01"}, None),
     ("DELETE", "/api/loans/{loan_id}", None, None),
+    ("POST", "/api/duplicates/dismiss", {"a": "ENTRY", "b": "SECOND_ENTRY"}, None),
+    ("DELETE", "/api/duplicates/dismiss", {"a": "ENTRY", "b": "SECOND_ENTRY"}, None),
+    ("POST", "/api/duplicates/merge", {"keep": "SECOND_ENTRY", "drop": "ENTRY"}, None),
     ("PATCH", "/api/entries/bulk", {"entry_ids": ["ENTRY"], "set": {"score": 5}}, None),
     (
         "PATCH",
@@ -566,6 +575,7 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             assert (await second.get("/api/goals")).json() == []
             # The admin's loan to Sofi (seeded) is the admin's alone (Sprint 110).
             assert (await second.get("/api/loans")).json() == []
+            assert (await second.get("/api/duplicates")).json() == []
             assert (await second.get("/api/locations")).json() == []
             lent = await second.get("/api/entries", params={"lent": "true"})
             assert lent.json()["items"] == []

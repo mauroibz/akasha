@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Image, Inbox, ListChecks } from "lucide-react";
+import { ArrowRight, Copy, Image, Inbox, ListChecks } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { getDuplicates } from "@/api/duplicates";
 import { getInboxCount, getLibraryPage } from "@/api/library";
 import { queryKeys } from "@/api/keys";
 import { PageHeader } from "@/components/PageHeader";
@@ -34,6 +35,11 @@ export function ChoresPage() {
       ),
   });
 
+  const duplicates = useQuery({
+    queryKey: ["chores", "duplicates"],
+    queryFn: ({ signal }) => getDuplicates(signal),
+  });
+
   const chores = [
     {
       to: "/inbox/deck",
@@ -55,6 +61,13 @@ export function ChoresPage() {
       lede: "Everything without a cover, with editions to choose from.",
       icon: <Image aria-hidden="true" />,
       count: coverless.data,
+    },
+    {
+      to: "/deck/duplicates",
+      title: "Duplicates",
+      lede: "The same work entered twice. Keep one; nothing the other holds is lost.",
+      icon: <Copy aria-hidden="true" />,
+      count: duplicates.data?.length,
     },
   ];
 

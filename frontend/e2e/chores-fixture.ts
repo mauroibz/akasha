@@ -118,6 +118,28 @@ export async function stubChores(
       json: { affected: 1, ...choreEntry(1, "Stoner").item },
     });
   };
+  await page.route("**/api/duplicates", (route) =>
+    route.fulfill({
+      json: [
+        {
+          a: { ...choreEntry(1, "Stoner"), status: "read", score: 9 },
+          b: {
+            ...choreEntry(4, "Stoner (New York Review Books Classics)"),
+            status: "read",
+            score: 7,
+            item: {
+              ...choreEntry(4, "x").item,
+              title: "Stoner (New York Review Books Classics)",
+              cover_url: editionCovers[1],
+            },
+          },
+          reason: "Same title and creator",
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/duplicates/merge", record);
+  await page.route("**/api/duplicates/dismiss", record);
   await page.route("**/api/entries/bulk", record);
   await page.route("**/api/items/101/cover", record);
 }

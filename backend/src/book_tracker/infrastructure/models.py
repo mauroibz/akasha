@@ -140,6 +140,17 @@ class LoanRow(Base):
     updated_at: Mapped[str]
 
 
+class DuplicateDismissalRow(Base):
+    """Two entries the owner said are not the same work (Sprint 113, DEC-176)."""
+
+    __tablename__ = "duplicate_dismissals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int]
+    entry_low: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"))
+    entry_high: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"))
+    created_at: Mapped[str]
+
+
 class ShelfRow(Base):
     __tablename__ = "shelves"
     id: Mapped[int] = mapped_column(primary_key=True)

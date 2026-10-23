@@ -644,6 +644,12 @@ PATCH  /api/loans/{id}                 → record the return or correct a loan
 DELETE /api/loans/{id}
 GET    /api/loans?open=true            → what is out, longest out first, with its entry
 GET    /api/locations                  → the places written on entries, most used first
+GET    /api/duplicates                 → pairs that look like one work twice (same domain,
+                                          title without edition notes, first creator)
+POST   /api/duplicates/dismiss         → {a, b}: these differ, never offer them again
+DELETE /api/duplicates/dismiss         → {a, b}: take that answer back
+POST   /api/duplicates/merge           → {keep, drop}: fold drop into keep, filling only
+                                          what keep lacks; 409 both_lent
 GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction
 POST   /api/items/{id}/refresh         → re-pull from source, OVERWRITES edits

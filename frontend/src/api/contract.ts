@@ -23,6 +23,7 @@ import type {
   JobProgress,
 } from "./imports";
 import type { CreateEntryResponse, SearchCandidate, SourceRef } from "./add";
+import type { DuplicatePair } from "./duplicates";
 import type { Loan, LoanWithEntry, Location } from "./loans";
 import type {
   Attachment,
@@ -96,4 +97,5 @@ export type Contract = [
   Holds<NamesOnly<Loan, Schemas["LoanResponse"]>>,
   Holds<NamesOnly<LoanWithEntry, Schemas["LoanWithEntryResponse"]>>,
   Holds<NamesOnly<Location, Schemas["LocationResponse"]>>,
+  Holds<NamesOnly<DuplicatePair, Schemas["DuplicatePairResponse"]>>,
 ];

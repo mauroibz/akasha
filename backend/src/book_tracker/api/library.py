@@ -861,6 +861,48 @@ def update_entry(entry_id: int, body: EntryPatch, library: Library) -> EntryResp
     )
 
 
+class DuplicatePairResponse(BaseModel):
+    """Two entries that look like one work entered twice (Sprint 113)."""
+
+    a: EntryResponse
+    b: EntryResponse
+    reason: str
+
+
+class PairBody(BaseModel):
+    a: int
+    b: int
+
+
+class MergeBody(BaseModel):
+    keep: int
+    drop: int
+
+
+@router.get("/duplicates", response_model=list[DuplicatePairResponse])
+def list_duplicates(library: Library) -> list[DuplicatePairResponse]:
+    """Possible duplicates, from stored data only (Sprint 113, DEC-176)."""
+    return [DuplicatePairResponse.model_validate(row) for row in library.duplicate_candidates()]
+
+
+@router.post("/duplicates/dismiss", status_code=204, responses=ERRORS)
+def dismiss_duplicate(body: PairBody, library: Library) -> Response:
+    library.dismiss_duplicate(body.a, body.b)
+    return Response(status_code=204)
+
+
+@router.delete("/duplicates/dismiss", status_code=204, responses=ERRORS)
+def undismiss_duplicate(body: PairBody, library: Library) -> Response:
+    library.undismiss_duplicate(body.a, body.b)
+    return Response(status_code=204)
+
+
+@router.post("/duplicates/merge", response_model=EntryResponse, responses=ERRORS)
+def merge_duplicates(body: MergeBody, library: Library) -> EntryResponse:
+    """Fold `drop` into `keep`; nothing the owner wrote is lost (Sprint 113)."""
+    return EntryResponse.model_validate(library.merge_entries(body.keep, body.drop))
+
+
 @router.get("/entries/{entry_id}/loans", response_model=list[LoanResponse], responses=ERRORS)
 def entry_loans(entry_id: int, library: Library) -> list[LoanResponse]:
     return [LoanResponse.model_validate(row) for row in library.entry_loans(entry_id)]
