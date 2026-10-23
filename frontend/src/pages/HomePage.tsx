@@ -19,6 +19,7 @@ import {
   type LibraryPage,
   type SortKey,
 } from "@/api/library";
+import { getLocations } from "@/api/loans";
 import { getShelves } from "@/api/shelves";
 import { AkashaMark } from "@/components/AkashaMark";
 import { DomainStrip } from "@/components/DomainStrip";
@@ -90,6 +91,7 @@ import { SaveView } from "@/features/library/SaveView";
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
 const allFormats = "__all_formats__";
+const allPlaces = "__anywhere__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
@@ -106,6 +108,8 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     key: params.get("key") ?? "",
     value: params.get("value") ?? "",
     valueLabel: params.get("label") ?? "",
+    location: params.get("location") ?? "",
+    lent: params.get("lent") === "true",
   };
 }
 
@@ -121,6 +125,8 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
     params.set("value", filters.value);
     if (filters.valueLabel) params.set("label", filters.valueLabel);
   }
+  if (filters.location) params.set("location", filters.location);
+  if (filters.lent) params.set("lent", "true");
   params.set("sort", filters.sort);
   params.set("order", filters.order);
   return params;
@@ -248,6 +254,13 @@ export function HomePage() {
     queryFn: getShelves,
     retry: false,
   });
+  // The places the owner has written (Sprint 111); the filter shows only when any are.
+  const placesQuery = useQuery({
+    queryKey: queryKeys.locations,
+    queryFn: ({ signal }) => getLocations(signal),
+    retry: false,
+  });
+  const places = Array.isArray(placesQuery.data) ? placesQuery.data : [];
   const shelves = useMemo(() => {
     // The shelf filter is a convenience; a failed or odd-shaped shelves response must
     // not take the whole library page down with it.
@@ -305,7 +318,9 @@ export function HomePage() {
     filters.shelves.length > 0 ||
     filters.formats.length > 0 ||
     filters.query.trim().length > 0 ||
-    (filters.key !== "" && filters.value !== "");
+    (filters.key !== "" && filters.value !== "") ||
+    Boolean(filters.location) ||
+    Boolean(filters.lent);
   // Facets clear only their own dimension: under a shelf, query, format, or
   // insights filter their sum is the filtered total again, not the size of the
   // domain. Fetch the domain's unfiltered first page when the readout needs an
@@ -532,7 +547,9 @@ export function HomePage() {
     filters.shelves.length +
     filters.formats.length +
     (filters.query.trim() ? 1 : 0) +
-    (filters.key !== "" && filters.value !== "" ? 1 : 0);
+    (filters.key !== "" && filters.value !== "" ? 1 : 0) +
+    (filters.location ? 1 : 0) +
+    (filters.lent ? 1 : 0);
   const libraryWhole = wholeLibrary.data?.total;
   const shownDomain = domains.find((type) => type.id === selectedDomain);
   const web = useWebSearch(selectedDomain);
@@ -835,6 +852,42 @@ export function HomePage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {places.length > 0 && (
+                    <Select
+                      value={filters.location || allPlaces}
+                      onValueChange={(value) =>
+                        updateFilters({
+                          location: value === allPlaces ? "" : value,
+                        })
+                      }
+                    >
+                      <SelectTrigger
+                        aria-label="Filter by where it is"
+                        className="h-11 w-auto gap-2 rounded-full bg-surface"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={allPlaces}>Anywhere</SelectItem>
+                        {places.map((place) => (
+                          <SelectItem
+                            key={place.location}
+                            value={place.location}
+                          >
+                            {place.location} {place.count}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Button
+                    variant="outline"
+                    aria-pressed={Boolean(filters.lent)}
+                    onClick={() => updateFilters({ lent: !filters.lent })}
+                    className="h-11 rounded-full bg-surface px-4 font-normal aria-pressed:border-primary aria-pressed:text-primary"
+                  >
+                    Lent out
+                  </Button>
                   {shownDomains.map((type) => (
                     <StatusFilter
                       key={type.id}
@@ -943,6 +996,18 @@ export function HomePage() {
                 }
               />
             ))}
+            {filters.location && (
+              <FilterChip
+                label={`Where · ${filters.location}`}
+                onClear={() => updateFilters({ location: "" })}
+              />
+            )}
+            {filters.lent && (
+              <FilterChip
+                label="Lent out"
+                onClear={() => updateFilters({ lent: false })}
+              />
+            )}
             {filters.query.trim() && (
               <FilterChip
                 label={`Search · “${filters.query.trim()}”`}

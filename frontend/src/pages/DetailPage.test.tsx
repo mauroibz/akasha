@@ -1361,4 +1361,141 @@ describe("DetailPage", () => {
       expect(screen.queryByText(/missing/)).toBeNull();
     });
   });
+
+  describe("where it is and who has it (Sprint 111)", () => {
+    function routes(
+      calls: Array<{ url: string; method: string; body: unknown }>,
+      overrides: Partial<typeof entry> & Record<string, unknown> = {},
+      history: unknown[] = [],
+    ) {
+      mockApi(
+        async (input, init) => {
+          const url = String(input);
+          const method = init?.method ?? "GET";
+          if (url === "/api/item-types")
+            return new Response(JSON.stringify(itemTypes));
+          if (url === "/api/locations")
+            return new Response(
+              JSON.stringify([{ location: "Hall", count: 3 }]),
+            );
+          if (url === "/api/entries/7/loans" && method === "GET")
+            return new Response(JSON.stringify(history));
+          if (method !== "GET") {
+            const body = init?.body ? JSON.parse(String(init.body)) : null;
+            calls.push({ url, method, body });
+            if (url === "/api/entries/7/loans")
+              return new Response(
+                JSON.stringify({
+                  id: 4,
+                  entry_id: 7,
+                  returned_on: null,
+                  note: null,
+                  ...body,
+                }),
+                { status: 201 },
+              );
+            if (url.startsWith("/api/loans/"))
+              return new Response(
+                JSON.stringify({ id: 4, entry_id: 7, ...body }),
+              );
+            return new Response(
+              JSON.stringify({ ...entry, ...overrides, ...body }),
+            );
+          }
+        },
+        { fallback: { ...entry, ...overrides } },
+      );
+    }
+
+    it("sets where it is, from the row", async () => {
+      const calls: Array<{ url: string; method: string; body: unknown }> = [];
+      routes(calls);
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const row = document.querySelector(
+        "[data-fact='location']",
+      ) as HTMLElement;
+      expect(row).toHaveTextContent("—");
+      await user.click(
+        within(row).getByRole("button", { name: "Change where it is" }),
+      );
+      const field = within(row).getByRole("combobox", { name: "Where it is" });
+      await user.type(field, "Living room, shelf 2{Enter}");
+      await waitFor(() =>
+        expect(calls).toContainEqual({
+          url: "/api/entries/7",
+          method: "PATCH",
+          body: { location: "Living room, shelf 2" },
+        }),
+      );
+    });
+
+    it("lends it to someone today, and takes it back", async () => {
+      const calls: Array<{ url: string; method: string; body: unknown }> = [];
+      routes(calls);
+      const first = renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const row = document.querySelector("[data-fact='loan']") as HTMLElement;
+      await user.click(within(row).getByRole("button", { name: "Lend…" }));
+      await user.type(
+        within(row).getByRole("combobox", { name: "Who has it" }),
+        "Sofi",
+      );
+      await user.click(within(row).getByRole("button", { name: "Lend" }));
+      const today = new Date();
+      const day = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      await waitFor(() =>
+        expect(calls).toContainEqual({
+          url: "/api/entries/7/loans",
+          method: "POST",
+          body: { person: "Sofi", lent_on: day },
+        }),
+      );
+      first.unmount();
+      vi.restoreAllMocks();
+
+      const back: Array<{ url: string; method: string; body: unknown }> = [];
+      routes(back, {
+        loan: {
+          id: 4,
+          entry_id: 7,
+          person: "Sofi",
+          lent_on: "2026-04-02",
+          returned_on: null,
+          note: null,
+        },
+      });
+      renderPage();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const lent = document.querySelector("[data-fact='loan']") as HTMLElement;
+      expect(lent).toHaveTextContent("Sofi");
+      await user.click(within(lent).getByRole("button", { name: "It's back" }));
+      await waitFor(() =>
+        expect(back).toContainEqual({
+          url: "/api/loans/4",
+          method: "PATCH",
+          body: { returned_on: day },
+        }),
+      );
+    });
+
+    it("lists who had it before", async () => {
+      routes([], {}, [
+        {
+          id: 2,
+          entry_id: 7,
+          person: "Juan",
+          lent_on: "2026-01-05",
+          returned_on: "2026-02-10",
+          note: null,
+        },
+      ]);
+      renderPage();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const row = document.querySelector("[data-fact='loan']") as HTMLElement;
+      expect(await within(row).findByText(/Juan/)).toBeVisible();
+    });
+  });
 });

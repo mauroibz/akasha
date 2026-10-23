@@ -6,6 +6,7 @@ import {
   BookPlus,
   ChartBar,
   Download,
+  Handshake,
   Inbox,
   LibraryBig,
   Bookmark,
@@ -209,6 +210,13 @@ export function CommandBar({
         run: () => go("/diary"),
       },
       {
+        id: "lent",
+        label: "Lent out",
+        words: "lent loan borrowed lend who has where out",
+        icon: <Handshake />,
+        run: () => go("/lent"),
+      },
+      {
         id: "insights",
         label: "Go to Insights",
         words: "insights stats statistics charts",
@@ -347,7 +355,15 @@ export function CommandBar({
                         {entry.item.title}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {entry.item.creator ?? ""}
+                        {/* Where it is and who has it answer "where is my copy
+                            of…?" from the search itself (Sprint 111). */}
+                        {[
+                          entry.item.creator,
+                          entry.location,
+                          entry.loan ? `Lent to ${entry.loan.person}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </span>
                     </span>
                     <ArrowRight

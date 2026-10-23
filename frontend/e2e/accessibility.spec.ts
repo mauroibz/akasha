@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
+import { stubHouse } from "./house-fixture";
 import { stubSeries } from "./progress-fixture";
 
 import {
@@ -1092,5 +1093,28 @@ for (const scheme of ["light", "dark"] as const) {
       .poll(() => page.evaluate(() => document.getAnimations().length))
       .toBe(0);
     await expectNoSeriousViolations(page, `how far did you get (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`where it is, who has it and what is lent out have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubHouse(page);
+    await page.goto("/books/7");
+    const lent = page.locator("[data-fact='loan']");
+    await lent.getByRole("button", { name: "Lend…" }).click();
+    await expect(
+      lent.getByRole("combobox", { name: "Who has it" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `lend form (${scheme})`);
+    await lent.getByRole("combobox", { name: "Who has it" }).fill("Sofi");
+    await lent.getByRole("button", { name: "Lend", exact: true }).click();
+    await expect(lent).toContainText("To Sofi");
+    await expectNoSeriousViolations(page, `lent row (${scheme})`);
+    await page.goto("/lent");
+    await expect(page.getByRole("heading", { name: "Lent out" })).toBeVisible();
+    await expectNoSeriousViolations(page, `lent out (${scheme})`);
   });
 }

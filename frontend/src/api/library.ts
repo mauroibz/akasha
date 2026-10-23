@@ -200,6 +200,10 @@ export interface LibraryEntry {
   shelves: Shelf[];
   /** How you hold this copy, in the domain's declared order (DEC-059). */
   formats: EntryFormat[];
+  /** Where it is kept, in the owner's words (Sprint 110). */
+  location?: string | null;
+  /** The loan that is out now, if any. */
+  loan?: Loan | null;
 }
 
 export interface LibraryPage {
@@ -231,6 +235,10 @@ export interface LibraryFilters {
    */
   key: string;
   value: string;
+  /** Only what is kept here, as written (Sprint 111). Absent means anywhere. */
+  location?: string;
+  /** Only what is out on loan now. */
+  lent?: boolean;
   /**
    * How to *say* `value`, which is normalized — case folded, diacritics
    * stripped — because that is what groups a ranking row. "julio cortazar" is
@@ -261,6 +269,8 @@ export function libraryQueryString(
     params.set("key", filters.key);
     params.set("value", filters.value);
   }
+  if (filters.location) params.set("location", filters.location);
+  if (filters.lent) params.set("lent", "true");
   if (cursor) params.set("after", cursor);
   return params.toString();
 }
@@ -430,6 +440,8 @@ export async function patchEntry(
     formats?: EntryFormat[];
     /** Qualifies `score`: write it back as provisional (Sprint 109). */
     score_provisional?: boolean;
+    /** Where it is kept; blank clears it (Sprint 110). */
+    location?: string | null;
   },
 ): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
@@ -881,4 +893,5 @@ import {
   request,
 } from "./request";
 import type { SearchCandidate } from "./add";
+import type { Loan } from "./loans";
 import type { components } from "./schema";

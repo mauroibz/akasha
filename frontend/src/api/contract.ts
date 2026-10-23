@@ -23,6 +23,7 @@ import type {
   JobProgress,
 } from "./imports";
 import type { CreateEntryResponse, SearchCandidate, SourceRef } from "./add";
+import type { Loan, LoanWithEntry, Location } from "./loans";
 import type {
   Attachment,
   BulkBody,
@@ -92,4 +93,7 @@ export type Contract = [
   Holds<NamesOnly<ScoreDistribution, Schemas["ScoreDistributionResponse"]>>,
   Holds<NamesOnly<Shelf, Schemas["ShelfResponse"]>>,
   Holds<NamesOnly<StatusSpec, Schemas["StatusSpecResponse"]>>,
+  Holds<NamesOnly<Loan, Schemas["LoanResponse"]>>,
+  Holds<NamesOnly<LoanWithEntry, Schemas["LoanWithEntryResponse"]>>,
+  Holds<NamesOnly<Location, Schemas["LocationResponse"]>>,
 ];

@@ -4,6 +4,8 @@ import {
   CalendarPlus,
   CircleDot,
   Gauge,
+  Handshake,
+  MapPin,
   Repeat,
   Shapes,
   Star,
@@ -47,6 +49,7 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
+import { LoanRow, LocationRow } from "@/features/house/HouseRows";
 import { HowFarDialog } from "@/features/progress/HowFarDialog";
 import { isAbandoned } from "@/features/progress/outline";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
@@ -532,6 +535,8 @@ export function DetailPage() {
                   )
                   .join(", ") || "—"}
               </PropertyRow>
+              <LocationRow entry={entry} icon={<MapPin aria-hidden="true" />} />
+              <LoanRow entry={entry} icon={<Handshake aria-hidden="true" />} />
               {has("date_started") && (
                 <PropertyRow
                   name="started"

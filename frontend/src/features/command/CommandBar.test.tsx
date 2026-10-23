@@ -99,6 +99,43 @@ describe("CommandBar", () => {
     expect(await screen.findByText("Detail page")).toBeInTheDocument();
   });
 
+  it("answers where a thing is, and goes to what is lent out (Sprint 111)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/api/search/library"))
+        return new Response(
+          JSON.stringify([
+            {
+              ...entry,
+              location: "Hall, shelf 2",
+              loan: {
+                id: 1,
+                entry_id: 7,
+                person: "Sofi",
+                lent_on: "2026-04-02",
+                returned_on: null,
+                note: null,
+              },
+            },
+          ]),
+        );
+      return new Response("[]");
+    });
+    const input = await renderBar();
+    await userEvent.type(input, "rayuela");
+    const hit = await screen.findByRole("option", { name: /Rayuela/ });
+    expect(hit).toHaveTextContent("Hall, shelf 2");
+    expect(hit).toHaveTextContent("Lent to Sofi");
+    await userEvent.clear(input);
+    await userEvent.type(input, "lent");
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Lent out/ }),
+    );
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
+      "/lent",
+    );
+  });
+
   it("adds a web result with the domain's default status, without leaving the page", async () => {
     const posts: unknown[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {

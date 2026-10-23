@@ -98,6 +98,10 @@ test("announces loading and then renders the populated library and inbox facet",
       if (String(request).startsWith("/api/now")) {
         return Promise.resolve(new Response("[]", { status: 200 }));
       }
+      // The places for the location filter (Sprint 111): none written yet.
+      if (String(request).startsWith("/api/locations")) {
+        return Promise.resolve(new Response("[]", { status: 200 }));
+      }
       return new Promise<Response>((resolve) => {
         resolveResponse = resolve;
       });
@@ -1789,4 +1793,37 @@ test("a card's status change can be undone (Sprint 109)", async () => {
   await user.click(within(toast).getByRole("button", { name: "Undo" }));
   await waitFor(() => expect(bodies).toHaveLength(2));
   expect(bodies).toEqual([{ status: "reading" }, { status: "read" }]);
+});
+
+test("the library filters by where things are and by what is lent (Sprint 111)", async () => {
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    const url = String(request);
+    if (url.startsWith("/api/item-types")) return new Response("[]");
+    if (url.startsWith("/api/locations"))
+      return new Response(JSON.stringify([{ location: "Hall", count: 3 }]));
+    return new Response(JSON.stringify(populated), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage("/?location=Hall&lent=true");
+  await screen.findByText("Rayuela");
+  const listCalls = () =>
+    fetchMock.mock.calls
+      .map(([request]) => String(request))
+      .filter((url) => url.startsWith("/api/entries?"));
+  await waitFor(() =>
+    expect(
+      listCalls().some(
+        (url) => /location=Hall/.test(url) && /lent=true/.test(url),
+      ),
+    ).toBe(true),
+  );
+  const chips = screen.getByRole("region", { name: "Active filters" });
+  const user = userEvent.setup();
+  await user.click(within(chips).getByRole("button", { name: /Where · Hall/ }));
+  await user.click(within(chips).getByRole("button", { name: /Lent out/ }));
+  await waitFor(() => {
+    const last = listCalls().at(-1) ?? "";
+    expect(last).not.toMatch(/location=/);
+    expect(last).not.toMatch(/lent=/);
+  });
 });

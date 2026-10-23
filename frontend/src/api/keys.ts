@@ -49,4 +49,8 @@ export const queryKeys = {
       ["shelf-entries", slug, domain] as const,
   },
   users: ["users"] as const,
+  /** What is out (Sprint 111); a loan written anywhere invalidates this root. */
+  loans: ["loans"] as const,
+  entryLoans: (entryId: number) => ["loans", "entry", entryId] as const,
+  locations: ["locations"] as const,
 };

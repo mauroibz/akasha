@@ -39,6 +39,8 @@ const DEFAULTS: Array<[string, () => Response]> = [
   ["/api/shelves", () => json([])],
   ["/api/item-types", () => json([])],
   ["/attachments", () => json({ attachments: [] })],
+  ["/loans", () => json([])],
+  ["/api/locations", () => json([])],
 ];
 
 export function mockApi(

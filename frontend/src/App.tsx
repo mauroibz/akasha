@@ -55,6 +55,9 @@ const TriagePage = lazy(async () => ({
 const TriageDeckPage = lazy(async () => ({
   default: (await import("@/pages/TriageDeckPage")).TriageDeckPage,
 }));
+const LentPage = lazy(async () => ({
+  default: (await import("@/pages/LentPage")).LentPage,
+}));
 const DiaryPage = lazy(async () => ({
   default: (await import("@/pages/DiaryPage")).DiaryPage,
 }));
@@ -154,6 +157,7 @@ function PrivateRoutes({
             {/* The phone's share sheet (Sprint 097): opens the command bar. */}
             <Route path="/share" element={<SharePage />} />
             <Route path="/diary" element={<DiaryPage />} />
+            <Route path="/lent" element={<LentPage />} />
             <Route
               path="/people"
               element={
