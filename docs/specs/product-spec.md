@@ -638,6 +638,8 @@ DELETE /api/entries/bulk               → {entry_ids[]} or
                                           Discard)
 DELETE /api/entries/{id}
 GET    /api/entries/{id}/loans         → every loan of this entry, latest first
+GET    /api/entries/{id}/score-history → every score change, oldest first: score, previous,
+                                          reason (null first, `time`, `reread`), note, when
 POST   /api/entries/{id}/loans         → lend it {person, lent_on, returned_on?, note?};
                                           409 already_lent while one is open
 PATCH  /api/loans/{id}                 → record the return or correct a loan

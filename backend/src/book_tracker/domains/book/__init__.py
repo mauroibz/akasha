@@ -41,7 +41,7 @@ BOOK_FIELDS = (
 
 BOOK_STATUSES = (
     UNSORTED,
-    StatusSpec("read", "Read", hotkey="r"),
+    StatusSpec("read", "Read", hotkey="r", finished=True),
     StatusSpec("reading", "Reading", hotkey="g", in_progress=True),
     StatusSpec("to_read", "To read", hotkey="t", planned=True),
     StatusSpec("wishlist", "Wishlist", hotkey="w"),

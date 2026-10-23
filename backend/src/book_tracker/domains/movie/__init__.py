@@ -62,7 +62,7 @@ MOVIE_FIELDS = (
 MOVIE_STATUSES = (
     UNSORTED,
     StatusSpec("watchlist", "Watchlist", hotkey="l", planned=True),
-    StatusSpec("watched", "Watched", hotkey="w"),
+    StatusSpec("watched", "Watched", hotkey="w", finished=True),
 )
 
 # How a copy is held, which is not how it was watched: a subtitled viewing is a property

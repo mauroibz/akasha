@@ -375,6 +375,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/entries/{entry_id}/score-history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Score History
+     * @description How this entry's score changed, oldest first (Sprint 114, DEC-176).
+     */
+    get: operations["score_history_api_entries__entry_id__score_history_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/events": {
     parameters: {
       query?: never;
@@ -1810,8 +1830,12 @@ export interface components {
       reread_count?: number | null;
       /** Score */
       score?: number | null;
+      /** Score Note */
+      score_note?: string | null;
       /** Score Provisional */
       score_provisional?: boolean | null;
+      /** Score Reason */
+      score_reason?: ("reread" | "time") | null;
       /** Shelf Ids */
       shelf_ids?: number[] | null;
       status?: components["schemas"]["EntryStatus"] | null;
@@ -2683,6 +2707,22 @@ export interface components {
       /** Unrated Count */
       unrated_count: number;
     };
+    /**
+     * ScoreEventResponse
+     * @description One change of a score: what it became, from what, why and when (Sprint 114).
+     */
+    ScoreEventResponse: {
+      /** Note */
+      note: string | null;
+      /** Previous */
+      previous: number | null;
+      /** Reason */
+      reason: string | null;
+      /** Recorded At */
+      recorded_at: string;
+      /** Score */
+      score: number | null;
+    };
     /** SearchCandidateResponse */
     SearchCandidateResponse: {
       /** Cover Url */
@@ -2849,6 +2889,11 @@ export interface components {
       abandoned: boolean;
       /** Choosable */
       choosable: boolean;
+      /**
+       * Finished
+       * @default false
+       */
+      finished: boolean;
       /** Hotkey */
       hotkey?: string | null;
       /**
@@ -4312,6 +4357,64 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["EntryResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  score_history_api_entries__entry_id__score_history_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ScoreEventResponse"][];
         };
       };
       /** @description Unauthorized */

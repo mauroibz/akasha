@@ -664,6 +664,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("POST", "/api/items/{item_id}/outline"),
         ("POST", "/api/items/{item_id}/fill"),
         ("GET", "/api/entries/{entry_id}/loans"),
+        ("GET", "/api/entries/{entry_id}/score-history"),
         ("POST", "/api/entries/{entry_id}/loans"),
         ("PATCH", "/api/loans/{loan_id}"),
         ("DELETE", "/api/loans/{loan_id}"),

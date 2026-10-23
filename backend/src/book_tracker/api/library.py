@@ -150,6 +150,7 @@ class StatusSpecResponse(BaseModel):
     in_progress: bool = False
     planned: bool = False
     abandoned: bool = False
+    finished: bool = False
 
 
 class FormatSpecResponse(BaseModel):
@@ -440,9 +441,17 @@ class EntryPatch(BaseModel):
     score_provisional: bool | None = None
     #: Where it is kept; blank or `null` clears it (Sprint 110).
     location: str | None = Field(default=None, max_length=120)
+    #: Why the score sent with it is what it is (Sprint 114): labels the history row
+    #: this write records, or, with an unchanged score, records "still an 8".
+    score_reason: Literal["reread", "time"] | None = None
+    score_note: str | None = Field(default=None, max_length=280)
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":
+        if {"score_reason", "score_note"} & self.model_fields_set and (
+            "score" not in self.model_fields_set
+        ):
+            raise ValueError("score_reason and score_note qualify a score; send one with them")
         if "status" in self.model_fields_set and self.status is None:
             raise ValueError("status cannot be null")
         if "score_provisional" in self.model_fields_set and (
@@ -507,6 +516,17 @@ class LoanPatch(BaseModel):
             if name in self.model_fields_set and getattr(self, name) is None:
                 raise ValueError(f"{name} cannot be null")
         return self
+
+
+class ScoreEventResponse(BaseModel):
+    """One change of a score: what it became, from what, why and when (Sprint 114)."""
+
+    score: int | None
+    previous: int | None
+    #: `None` for a first score, else `time` or `reread`.
+    reason: str | None
+    note: str | None
+    recorded_at: str
 
 
 class LocationResponse(BaseModel):
@@ -901,6 +921,16 @@ def undismiss_duplicate(body: PairBody, library: Library) -> Response:
 def merge_duplicates(body: MergeBody, library: Library) -> EntryResponse:
     """Fold `drop` into `keep`; nothing the owner wrote is lost (Sprint 113)."""
     return EntryResponse.model_validate(library.merge_entries(body.keep, body.drop))
+
+
+@router.get(
+    "/entries/{entry_id}/score-history",
+    response_model=list[ScoreEventResponse],
+    responses=ERRORS,
+)
+def score_history(entry_id: int, library: Library) -> list[ScoreEventResponse]:
+    """How this entry's score changed, oldest first (Sprint 114, DEC-176)."""
+    return [ScoreEventResponse.model_validate(row) for row in library.score_history(entry_id)]
 
 
 @router.get("/entries/{entry_id}/loans", response_model=list[LoanResponse], responses=ERRORS)

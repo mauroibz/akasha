@@ -92,6 +92,9 @@ class StatusSpec:
     #: Whether an entry in this status was stopped partway: the detail page asks how
     #: far it got (Sprint 108, DEC-171). Declared, so the screen never names "dropped".
     abandoned: bool = False
+    #: Whether an entry in this status is done with: finishing again asks whether the
+    #: score still holds (Sprint 115, DEC-176). Declared, so no layer names "read".
+    finished: bool = False
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,8 @@ NEUTRAL_ENTRY_VALUES = frozenset(
         "clear_provisional",
         "score_provisional",
         "location",
+        "score_reason",
+        "score_note",
     }
 )
 

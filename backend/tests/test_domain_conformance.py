@@ -270,6 +270,13 @@ def statuses_are_a_usable_vocabulary(domain: Domain) -> None:
                 f"{domain.item_type} asks how far {status.value!r} got, but counts no progress"
             )
             assert status.choosable, f"{domain.item_type} declares {status.value!r} abandoned"
+    # Finishing again asks whether the score holds (Sprint 115, DEC-176): one status
+    # means done, and someone can choose it.
+    finished = [status for status in domain.statuses if status.finished]
+    assert len(finished) <= 1, f"{domain.item_type} declares two finished statuses"
+    assert all(status.choosable for status in finished), (
+        f"{domain.item_type} declares an unchoosable status finished"
+    )
 
 
 @registry_check

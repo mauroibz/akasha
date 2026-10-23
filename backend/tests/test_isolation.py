@@ -83,6 +83,7 @@ ROUTE_POLICY = {
     ("POST", "/api/entries/{entry_id}/refile"): "private-id",
     # Sprint 110: a loan is reached only through its owner's entry.
     ("GET", "/api/entries/{entry_id}/loans"): "private-id",
+    ("GET", "/api/entries/{entry_id}/score-history"): "private-id",
     ("POST", "/api/entries/{entry_id}/loans"): "private-id",
     ("PATCH", "/api/loans/{loan_id}"): "private-id",
     ("DELETE", "/api/loans/{loan_id}"): "private-id",
@@ -328,6 +329,7 @@ PRIVATE_PROBES = (
     ("DELETE", "/api/entries/{entry_id}", None, None),
     ("POST", "/api/entries/{entry_id}/refile", {"source": "anilist", "source_id": "1"}, None),
     ("GET", "/api/entries/{entry_id}/loans", None, None),
+    ("GET", "/api/entries/{entry_id}/score-history", None, None),
     ("POST", "/api/entries/{entry_id}/loans", {"person": "probe", "lent_on": "2026-01-01"}, None),
     ("PATCH", "/api/loans/{loan_id}", {"returned_on": "2026-05-01"}, None),
     ("DELETE", "/api/loans/{loan_id}", None, None),

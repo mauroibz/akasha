@@ -43,6 +43,7 @@ from book_tracker.infrastructure.models import (
     ItemRow,
     ItemSourceRow,
     LoanRow,
+    ScoreEventRow,
     ShelfRow,
 )
 
@@ -275,12 +276,33 @@ def _loans_for(session: Session, entry_ids: list[int]) -> dict[int, list[dict[st
     return loans
 
 
+def _score_history_for(session: Session, entry_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    """How each score changed and why (Sprint 114): owner data, so it leaves too."""
+    history: dict[int, list[dict[str, Any]]] = {}
+    for event in session.scalars(
+        select(ScoreEventRow)
+        .where(ScoreEventRow.entry_id.in_(entry_ids))
+        .order_by(ScoreEventRow.entry_id, ScoreEventRow.recorded_at, ScoreEventRow.id)
+    ):
+        history.setdefault(event.entry_id, []).append(
+            {
+                "score": event.score,
+                "previous": event.previous,
+                "reason": event.reason,
+                "note": event.note,
+                "recorded_at": event.recorded_at,
+            }
+        )
+    return history
+
+
 def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
     for batch in _batches(session, _ENTRY_COLUMNS, user_id):
         entry_ids = [entry.id for entry in batch]
         shelves = _shelves_for(session, entry_ids)
         formats = _formats_for(session, entry_ids)
         loans = _loans_for(session, entry_ids)
+        scores = _score_history_for(session, entry_ids)
         for entry in batch:
             yield {
                 "id": entry.id,
@@ -308,6 +330,7 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 # Where it is and who has had it (Sprint 110).
                 "location": entry.location,
                 "loans": loans.get(entry.id, []),
+                "score_history": scores.get(entry.id, []),
             }
 
 

@@ -1111,6 +1111,18 @@
             ],
             "title": "Score"
           },
+          "score_note": {
+            "anyOf": [
+              {
+                "maxLength": 280,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Note"
+          },
           "score_provisional": {
             "anyOf": [
               {
@@ -1121,6 +1133,21 @@
               }
             ],
             "title": "Score Provisional"
+          },
+          "score_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "reread",
+                  "time"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Reason"
           },
           "shelf_ids": {
             "anyOf": [
@@ -3569,6 +3596,68 @@
         "title": "ScoreDistributionResponse",
         "type": "object"
       },
+      "ScoreEventResponse": {
+        "description": "One change of a score: what it became, from what, why and when (Sprint 114).",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "score",
+          "previous",
+          "reason",
+          "note",
+          "recorded_at"
+        ],
+        "title": "ScoreEventResponse",
+        "type": "object"
+      },
       "SearchCandidateResponse": {
         "properties": {
           "cover_url": {
@@ -4036,6 +4125,11 @@
           },
           "choosable": {
             "title": "Choosable",
+            "type": "boolean"
+          },
+          "finished": {
+            "default": false,
+            "title": "Finished",
             "type": "boolean"
           },
           "hotkey": {
@@ -6071,6 +6165,80 @@
           }
         },
         "summary": "Refile Entry"
+      }
+    },
+    "/api/entries/{entry_id}/score-history": {
+      "get": {
+        "description": "How this entry's score changed, oldest first (Sprint 114, DEC-176).",
+        "operationId": "score_history_api_entries__entry_id__score_history_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScoreEventResponse"
+                  },
+                  "title": "Response Score History Api Entries  Entry Id  Score History Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Score History"
       }
     },
     "/api/events": {

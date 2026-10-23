@@ -140,6 +140,22 @@ class LoanRow(Base):
     updated_at: Mapped[str]
 
 
+class ScoreEventRow(Base):
+    """One change of an entry's score, written by a trigger (Sprint 114, DEC-176).
+
+    `reason` is NULL for a first score, else `time` or `reread`.
+    """
+
+    __tablename__ = "score_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"))
+    score: Mapped[int | None]
+    previous: Mapped[int | None]
+    reason: Mapped[str | None]
+    note: Mapped[str | None]
+    recorded_at: Mapped[str]
+
+
 class DuplicateDismissalRow(Base):
     """Two entries the owner said are not the same work (Sprint 113, DEC-176)."""
 

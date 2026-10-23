@@ -68,6 +68,7 @@ from book_tracker.infrastructure.models import (
     ItemRow,
     ItemSourceRow,
     LoanRow,
+    ScoreEventRow,
     ShelfRow,
 )
 
@@ -529,6 +530,7 @@ class LibraryService:
         with self._write() as session:
             entry = self._entry(session, entry_id)
             changes = self._validated(self._domain(session, entry), changes)
+            last_event = self._last_score_event(session, entry.id)
             for field in (
                 "status",
                 "score",
@@ -571,7 +573,72 @@ class LibraryService:
                 )
             entry.updated_at = _now()
             session.flush()
+            if changes.get("score_reason") or changes.get("score_note"):
+                self._label_score_event(session, entry, last_event, changes)
             return self._entry_dict(session, entry)
+
+    @staticmethod
+    def _last_score_event(session: Session, entry_id: int) -> int:
+        return (
+            session.scalar(
+                select(func.max(ScoreEventRow.id)).where(ScoreEventRow.entry_id == entry_id)
+            )
+            or 0
+        )
+
+    def _label_score_event(
+        self, session: Session, entry: EntryRow, before: int, changes: Mapping[str, Any]
+    ) -> None:
+        """Say why the score this write sent is what it is (Sprint 114).
+
+        The trigger has already recorded a change, as `time`; this labels it. A score
+        sent unchanged with a reason is the owner saying it still holds ("still an 8"),
+        which is history too, so it is recorded as its own row.
+        """
+        reason = changes.get("score_reason")
+        note = (changes.get("score_note") or "").strip() or None
+        written = session.scalar(
+            select(ScoreEventRow)
+            .where(ScoreEventRow.entry_id == entry.id, ScoreEventRow.id > before)
+            .order_by(ScoreEventRow.id.desc())
+            .limit(1)
+        )
+        if written is not None:
+            if reason:
+                written.reason = reason
+            written.note = note
+        elif reason:
+            session.add(
+                ScoreEventRow(
+                    entry_id=entry.id,
+                    score=entry.score,
+                    previous=entry.score,
+                    reason=reason,
+                    note=note,
+                    recorded_at=_now(),
+                )
+            )
+        session.flush()
+
+    def score_history(self, entry_id: int) -> list[dict[str, Any]]:
+        """How an entry's score changed, oldest first (Sprint 114, DEC-176)."""
+        with Session(self.engine) as session:
+            self._entry(session, entry_id)
+            rows = session.scalars(
+                select(ScoreEventRow)
+                .where(ScoreEventRow.entry_id == entry_id)
+                .order_by(ScoreEventRow.recorded_at, ScoreEventRow.id)
+            )
+            return [
+                {
+                    "score": row.score,
+                    "previous": row.previous,
+                    "reason": row.reason,
+                    "note": row.note,
+                    "recorded_at": row.recorded_at,
+                }
+                for row in rows
+            ]
 
     def delete_entry(self, entry_id: int) -> None:
         with self._write() as session:
@@ -1071,6 +1138,12 @@ class LibraryService:
                     session.add(EntryFormatRow(entry_id=keep.id, format=value))
             session.execute(
                 update(LoanRow).where(LoanRow.entry_id == drop.id).values(entry_id=keep.id)
+            )
+            # The other copy's score history is the owner's history of this work.
+            session.execute(
+                update(ScoreEventRow)
+                .where(ScoreEventRow.entry_id == drop.id)
+                .values(entry_id=keep.id)
             )
             keep.updated_at = _now()
             session.flush()

@@ -76,7 +76,7 @@ SERIES_FIELDS = (
 SERIES_STATUSES = (
     UNSORTED,
     StatusSpec("watching", "Watching", hotkey="w", in_progress=True),
-    StatusSpec("completed", "Completed", hotkey="c"),
+    StatusSpec("completed", "Completed", hotkey="c", finished=True),
     StatusSpec("on_hold", "On hold", hotkey="h"),
     StatusSpec("dropped", "Dropped", hotkey="d", abandoned=True),
     StatusSpec("plan_to_watch", "Plan to watch", hotkey="p", planned=True),
