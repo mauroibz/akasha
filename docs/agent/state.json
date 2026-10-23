@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 49,
-  "project_status": "in_progress",
-  "active_sprint": "109",
-  "active_sprint_file": "docs/sprints/109-undo-and-facts.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "108",
+  "project_status": "ready",
+  "active_sprint": "110",
+  "active_sprint_file": "docs/sprints/110-where-things-are-underneath.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "109",
   "completed_sprints": [
     "001",
     "002",
@@ -114,8 +114,9 @@
     "105",
     "106",
     "107",
-    "108"
+    "108",
+    "109"
   ],
-  "started_at": "2026-10-23T19:15:19-03:00",
-  "updated_at": "2026-10-23T19:15:19-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T19:31:59-03:00"
 }

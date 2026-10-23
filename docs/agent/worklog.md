@@ -6539,3 +6539,22 @@ row).
 - `make check` and `make smoke-container` passed.
 
 **Next.** Tag, push, GitHub Release; the board upgrade needs the owner or SSH access.
+
+## 2026-10-23 — Plan 109–119 (DEC-176); Sprint 109
+
+**Done.** The owner sorted a brainstorm; DEC-176 plans Sprints 109–119 and GitHub issue #31
+records the homelab idea. Sprint 109: undo on library cards (toast with *Undo*, provisional
+scores restored; the deck's undo too) and *Fill from provider* on the detail page, which shows
+only the facts an item has and names the missing ones.
+
+**Verified and how.** Backend focused suites (332), `vitest related`, `make check`, Playwright
+`add-detail`, `library`, `editorial`, `triage-deck`, `feedback`, `accessibility`. Walkthrough on
+a fresh `scripts/walkthrough.py` backend with live Open Library and vite on 5180
+(`frontend/e2e/scratchpad/walk109.mjs`): the toast and its undo, fills on a sourced and a
+hand-entered book, at 1280 and 390.
+
+**Found.** The second fill on a hand-entered book reported "nothing to look this up by" while
+its first lookup ran, and the backfill's completeness rule skips `chapters`; both fixed. Naming
+the missing fields replaced a bare count.
+
+**Next.** Sprint 110.

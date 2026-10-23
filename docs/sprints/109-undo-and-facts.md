@@ -1,7 +1,7 @@
 # Sprint 109 — Undo on the card, and facts that fill themselves
 
 **Sprint:** 109
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 108
 **Owner:** Mauro
@@ -88,4 +88,37 @@ facts. 3. `[DOCS]` close.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `74888fd` (undo) and `4f73160` (fill). Verified per DEC-167: backend
+`test_score_undo.py`, `test_fill_from_provider.py` and the neighbouring suites (library API,
+isolation, enrichment, bulk, refresh, conformance: 332 passed); `vitest related` for the changed
+files (254 and 256 passed across the two slices); `make check`; Playwright `add-detail`,
+`library`, `editorial`, `triage-deck`, `feedback` and `accessibility` (all passed). Walkthrough
+against a fresh backend with live Open Library: Solaris added from a search result, Stoner by
+hand with an ISBN, at 1280 and 390 wide.
+
+1. A card score change raises "Scored Solaris 6" with *Undo*; undo wrote back 8 (seen in the
+   running app). A provisional score comes back provisional (Vitest, API test).
+2. Fill never replaces a value: the owner's publisher stayed, empty year, subtitle and page count
+   were filled (API test with a provider fake at the transport boundary; the provider adapters
+   are proven against recorded responses elsewhere).
+3. An item with no provider to ask (a hand-entered book's `manual` source) queues its own
+   enrichment; a lookup already waiting counts as queued and is not queued twice.
+4. With nothing missing, no line and no button (Vitest).
+5. Specs above pass; no sideways scroll at 390px.
+
+Found during the walkthrough and fixed:
+
+- A second press on Stoner said "nothing to look this up by": the backfill's completeness rule
+  ignores `chapters`, added in 2.7, and the first lookup was still running. An explicit request
+  now queues regardless of completeness (`requested=True`), and a waiting lookup counts.
+- "1 detail missing" did not say which; the line names them ("Missing: chapters").
+
+Deviations and notes:
+
+- `FillResponse.provider` is the provider's readable name ("Open Library"), from
+  `enrichment.provider_label`, which gains MusicBrainz and Cinemeta.
+- TDD order: the completeness test was written after its fix, then run green; every other test
+  was observed failing first.
+- A book's `chapters` is rarely in Open Library, so on most books *Fill from provider* stays
+  offered and answers "Nothing new from Open Library". Honest, but it may read as noise; the
+  owner can type the count. Left as is.
