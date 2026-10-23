@@ -205,6 +205,11 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - `StatusSpec.finished` marks the status that means done (book `read`, anime and series
   `completed`, movie `watched`); at most one per domain, and choosable
 
+`entries.score_rank` (migration `0031`, Sprint 116): place among the entries sharing a score,
+1 the best, NULL not placed. The trigger `score_rank_reset` clears it when the score changes.
+The library's `score` sort orders by `score × 1,000,000 − COALESCE(score_rank, 999,999)`, one
+value, so the keyset cursor is unchanged in shape.
+
 `shelves` and `entry_shelves`
 
 - as in product spec, with normalized unique slug per user, and `user_id` a foreign key to `users` with restrict-on-delete (migration `0018`), defaulted to the seeded user like `entries`

@@ -6643,3 +6643,16 @@ note; *Stalker* watched again).
 stays *Reading* (DEC-175, left). Dates wrap at 390px in the personal region (existing).
 
 **Next.** Sprint 116, a rank inside a score.
+
+## 2026-10-23 — Sprint 116: a rank inside a score
+
+**Done.** Migration 0031, `PUT /api/entries/rank`, the score sort with ranks, `score=` filter,
+`/rank` and `/rank/:type/:score`, the Insights link, the chore and command.
+
+**Verified and how.** Backend 207; Playwright 77; walkthrough `walk116.mjs` ranking five live
+books and reading the library's score sort back.
+
+**Found.** The Insights link failed the touch-target rule; the phone's bottom nav covered the
+deck's answers. Both fixed; the fit test now checks reachability.
+
+**Next.** Sprint 117, the tier board.

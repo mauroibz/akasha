@@ -1,7 +1,7 @@
 # Sprint 117 — The tier board
 
 **Sprint:** 117
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 49
 **Depends on:** 116
 **Owner:** Mauro
