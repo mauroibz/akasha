@@ -541,7 +541,7 @@ class LibraryService:
                 marks = changes["progress_marks"]
                 entry.progress_marks = json.dumps(marks) if marks is not None else None
             if "score" in changes:
-                entry.score_provisional = 0
+                entry.score_provisional = int(bool(changes.get("score_provisional")))
             if "formats" in changes:
                 self._set_formats(session, entry.id, changes["formats"])
             if "shelf_ids" in changes:

@@ -1061,6 +1061,17 @@
             ],
             "title": "Score"
           },
+          "score_provisional": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Provisional"
+          },
           "shelf_ids": {
             "anyOf": [
               {

@@ -1632,6 +1632,8 @@ export interface components {
       reread_count?: number | null;
       /** Score */
       score?: number | null;
+      /** Score Provisional */
+      score_provisional?: boolean | null;
       /** Shelf Ids */
       shelf_ids?: number[] | null;
       status?: components["schemas"]["EntryStatus"] | null;

@@ -425,7 +425,12 @@ export async function patchEntry(
       | "progress"
       | "progress_marks"
     >
-  > & { shelf_ids?: number[]; formats?: EntryFormat[] },
+  > & {
+    shelf_ids?: number[];
+    formats?: EntryFormat[];
+    /** Qualifies `score`: write it back as provisional (Sprint 109). */
+    score_provisional?: boolean;
+  },
 ): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
     method: "PATCH",

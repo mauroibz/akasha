@@ -413,11 +413,19 @@ class EntryPatch(BaseModel):
     shelf_ids: list[int] | None = None
     #: Replaces the set, the way `shelf_ids` does; `[]` clears it.
     formats: list[str] | None = Field(default=None, max_length=20)
+    #: Qualifies the score sent with it: `true` writes it back as provisional, which
+    #: is what an undo of a provisional score needs (Sprint 109). Any score sent
+    #: without it is the owner's own and confirms it, as before.
+    score_provisional: bool | None = None
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":
         if "status" in self.model_fields_set and self.status is None:
             raise ValueError("status cannot be null")
+        if "score_provisional" in self.model_fields_set and (
+            "score" not in self.model_fields_set or self.score is None
+        ):
+            raise ValueError("score_provisional qualifies a score; send one with it")
         return self
 
 

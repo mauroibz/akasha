@@ -4,7 +4,13 @@ import { toast } from "sonner";
 import { patchEntry } from "@/api/library";
 import type { LibraryEntry, LibraryPage } from "@/api/library";
 
-export type EntryChanges = Partial<Pick<LibraryEntry, "score" | "status">>;
+export type EntryChanges = Partial<Pick<LibraryEntry, "score" | "status">> & {
+  /** Sent with a score to write it back as provisional, as an undo does (Sprint 109). */
+  score_provisional?: boolean;
+};
+
+/** What a saved change replaced, and whether the change was itself an undo. */
+export type SavedContext = { previous: LibraryEntry; undo: boolean };
 
 type Pages = { pages: LibraryPage[]; pageParams: unknown[] };
 
@@ -24,7 +30,11 @@ export function usePatchEntry({
   key: readonly unknown[];
   /** The row whose value reverted, so the page can mark it (DEC-028). */
   onRollback?: (entry: LibraryEntry) => void;
-  onSaved?: (saved: LibraryEntry, changes: EntryChanges) => void;
+  onSaved?: (
+    saved: LibraryEntry,
+    changes: EntryChanges,
+    context: SavedContext,
+  ) => void;
 }) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -34,6 +44,8 @@ export function usePatchEntry({
     }: {
       entry: LibraryEntry;
       changes: EntryChanges;
+      /** Set when this write puts back an earlier one, so no second undo is offered. */
+      undo?: boolean;
     }) => patchEntry(entry.id, changes),
     onMutate: async ({ entry, changes }) => {
       await queryClient.cancelQueries({ queryKey: key });
@@ -53,7 +65,7 @@ export function usePatchEntry({
                       score_provisional:
                         changes.score === undefined
                           ? row.score_provisional
-                          : false,
+                          : (changes.score_provisional ?? false),
                     }
                   : row,
               ),
@@ -69,6 +81,7 @@ export function usePatchEntry({
         description: "The previous value was restored.",
       });
     },
-    onSuccess: (saved, { changes }) => onSaved?.(saved, changes),
+    onSuccess: (saved, { entry, changes, undo }) =>
+      onSaved?.(saved, changes, { previous: entry, undo: Boolean(undo) }),
   });
 }

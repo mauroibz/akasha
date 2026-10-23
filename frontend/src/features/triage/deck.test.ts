@@ -104,4 +104,13 @@ describe("the deck", () => {
       status: "unsorted",
     });
   });
+
+  it("an undo puts a provisional score back as provisional (Sprint 109)", () => {
+    const row = entry(1, { score: 6, score_provisional: true });
+    expect(undoChanges(row, { status: "read", score: 9 })).toEqual({
+      status: "unsorted",
+      score: 6,
+      score_provisional: true,
+    });
+  });
 });

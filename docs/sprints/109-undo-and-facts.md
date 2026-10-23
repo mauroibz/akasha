@@ -1,7 +1,7 @@
 # Sprint 109 — Undo on the card, and facts that fill themselves
 
 **Sprint:** 109
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 49
 **Depends on:** 108
 **Owner:** Mauro

@@ -77,7 +77,10 @@ import {
   type PinnedShelf,
 } from "@/features/library/library";
 import { queryKeys } from "@/api/keys";
-import { usePatchEntry } from "@/features/library/usePatchEntry";
+import {
+  usePatchEntry,
+  type EntryChanges,
+} from "@/features/library/usePatchEntry";
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCommandBar } from "@/features/command/commandBar";
@@ -364,12 +367,14 @@ export function HomePage() {
     // Visual state only: no text, no role, no second live region, so the
     // failure is still announced exactly once (DEC-028).
     onRollback: (entry) => setRollbackId(entry.id),
-    onSaved: (saved, changes) => {
+    onSaved: (saved, changes, { previous, undo }) => {
       if (
+        !undo &&
         changes.status !== undefined &&
         isAbandoned(saved.item.type, saved.status, itemTypes.data)
       )
         setAsking(saved);
+      if (!undo) offerUndo(saved, changes, previous);
       const activeKeyChanged =
         (changes.score !== undefined && filters.sort === "score") ||
         (changes.status !== undefined && filters.statuses.length > 0);
@@ -396,6 +401,37 @@ export function HomePage() {
         );
     },
   });
+
+  /**
+   * A card's change, named, with the way back (Sprint 109, DEC-176). The undo puts
+   * back only what this change touched, and a provisional score as provisional,
+   * through the same optimistic write, so the card turns back at once.
+   */
+  function offerUndo(
+    saved: LibraryEntry,
+    changes: EntryChanges,
+    previous: LibraryEntry,
+  ) {
+    const title = saved.item.title;
+    const message =
+      changes.score !== undefined
+        ? `Scored ${title} ${saved.score ?? "—"}`
+        : `${title} moved to ${statusLabelFor(saved.item.type, itemTypes.data, saved.status)}`;
+    const back: EntryChanges = {};
+    if (changes.status !== undefined) back.status = previous.status;
+    if (changes.score !== undefined) {
+      back.score = previous.score;
+      if (previous.score !== null && previous.score_provisional)
+        back.score_provisional = true;
+    }
+    toast(message, {
+      action: {
+        label: "Undo",
+        onClick: () =>
+          mutation.mutate({ entry: saved, changes: back, undo: true }),
+      },
+    });
+  }
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

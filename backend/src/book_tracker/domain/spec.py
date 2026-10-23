@@ -131,6 +131,7 @@ NEUTRAL_ENTRY_VALUES = frozenset(
         "add_formats",
         "remove_formats",
         "clear_provisional",
+        "score_provisional",
     }
 )
 

@@ -1717,3 +1717,76 @@ test("the active-filters row shows one chip per set filter, including the insigh
     expect(last).toContain("key=creators");
   });
 });
+
+test("a card's score change can be undone, provisional and all (Sprint 109)", async () => {
+  const provisional = {
+    ...populated,
+    items: [{ ...populated.items[0], score_provisional: true }],
+  };
+  const bodies: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return new Response(
+          JSON.stringify({
+            ...provisional.items[0],
+            ...body,
+            score_provisional: body.score_provisional === true,
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(provisional), { status: 200 });
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: /score for rayuela: 9/i }),
+  );
+  await user.click(screen.getByRole("button", { name: "Score 7" }));
+  const toast = await findToast(/Rayuela/);
+  expect(toast).toHaveTextContent("Scored Rayuela 7");
+  await user.click(within(toast).getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(bodies).toHaveLength(2));
+  expect(bodies[1]).toEqual({ score: 9, score_provisional: true });
+  const row = screen.getByRole("article", { name: "Rayuela" });
+  await waitFor(() => expect(row).toHaveAttribute("data-provisional", "true"));
+  expect(
+    screen.getByRole("button", { name: /score for rayuela: 9/i }),
+  ).toBeVisible();
+});
+
+test("a card's status change can be undone (Sprint 109)", async () => {
+  const bodies: unknown[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return new Response(
+          JSON.stringify({ ...populated.items[0], ...body }),
+          { status: 200 },
+        );
+      }
+      // The registry is an array; the list response would make it something else.
+      if (String(request).startsWith("/api/item-types"))
+        return new Response("[]", { status: 200 });
+      return new Response(JSON.stringify(populated), { status: 200 });
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  await user.click(within(row).getByRole("combobox"));
+  await user.click(await screen.findByRole("option", { name: /Reading/ }));
+  await waitFor(() => expect(bodies).toHaveLength(1));
+  const toast = await findToast(/Rayuela moved to/);
+  await user.click(within(toast).getByRole("button", { name: "Undo" }));
+  await waitFor(() => expect(bodies).toHaveLength(2));
+  expect(bodies).toEqual([{ status: "reading" }, { status: "read" }]);
+});

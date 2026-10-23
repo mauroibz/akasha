@@ -177,9 +177,15 @@ export function undoChanges(
   const changes: {
     status: EntryStatus;
     score?: number | null;
+    score_provisional?: boolean;
     shelf_ids?: number[];
   } = { status: entry.status };
-  if ("score" in filed) changes.score = entry.score;
+  if ("score" in filed) {
+    changes.score = entry.score;
+    // A filed score confirms the import's guess; the undo makes it a guess again.
+    if (entry.score !== null && entry.score_provisional)
+      changes.score_provisional = true;
+  }
   if ("shelf_ids" in filed)
     changes.shelf_ids = entry.shelves.map((shelf) => shelf.id);
   return changes;
