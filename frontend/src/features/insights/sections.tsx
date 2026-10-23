@@ -182,6 +182,15 @@ export function RatingSection({
               >
                 Put your {modal}s in order
               </Link>
+              <span aria-hidden="true" className="text-muted-foreground">
+                {" · "}
+              </span>
+              <Link
+                to={`/tiers/${type}`}
+                className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+              >
+                See them as tiers
+              </Link>
             </p>
           )}
         </div>

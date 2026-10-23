@@ -73,6 +73,9 @@ const RankPage = lazy(async () => ({
 const RankDeckPage = lazy(async () => ({
   default: (await import("@/pages/RankDeckPage")).RankDeckPage,
 }));
+const TiersPage = lazy(async () => ({
+  default: (await import("@/pages/TiersPage")).TiersPage,
+}));
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
 }));
@@ -177,6 +180,8 @@ function PrivateRoutes({
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/lent" element={<LentPage />} />
             <Route path="/rank" element={<RankPage />} />
+            <Route path="/tiers" element={<TiersPage />} />
+            <Route path="/tiers/:type" element={<TiersPage />} />
             <Route path="/rank/:type/:score" element={<RankDeckPage />} />
             <Route path="/deck" element={<ChoresPage />} />
             <Route path="/deck/planned" element={<PlannedDeckPage />} />

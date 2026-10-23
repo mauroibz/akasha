@@ -70,6 +70,16 @@ export function RankPage() {
           ))}
         </ul>
       )}
+      {type && (
+        <p className="mt-6 text-sm">
+          <Link
+            to={`/tiers/${type}`}
+            className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+          >
+            See every score as tiers
+          </Link>
+        </p>
+      )}
       {distribution.data && scores.length === 0 && (
         <p className="mt-6 text-muted-foreground">
           No score is shared by two yet, so there is nothing to put in order.

@@ -1201,5 +1201,13 @@ for (const scheme of ["light", "dark"] as const) {
       page.getByRole("heading", { name: "Which did you like more?" }),
     ).toBeVisible();
     await expectNoSeriousViolations(page, `rank deck (${scheme})`);
+    await page.goto("/tiers/book");
+    await page.getByRole("group", { name: "8", exact: true }).waitFor();
+    await expectNoSeriousViolations(page, `tiers (${scheme})`);
+    await page.getByRole("button", { name: "Stoner" }).click();
+    await expectNoSeriousViolations(
+      page,
+      `tiers, a cover picked up (${scheme})`,
+    );
   });
 }

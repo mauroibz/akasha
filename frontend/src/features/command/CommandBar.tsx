@@ -9,6 +9,7 @@ import {
   Handshake,
   ListChecks,
   ListOrdered,
+  Rows3,
   Inbox,
   LibraryBig,
   Bookmark,
@@ -225,6 +226,13 @@ export function CommandBar({
         words: "rank order scores tier compare choose two best",
         icon: <ListOrdered />,
         run: () => go("/rank"),
+      },
+      {
+        id: "tiers",
+        label: "Tiers",
+        words: "tiers tier list board scores rows rearrange",
+        icon: <Rows3 />,
+        run: () => go("/tiers"),
       },
       {
         id: "lent",
