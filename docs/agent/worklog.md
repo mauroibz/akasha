@@ -6584,3 +6584,19 @@ accessibility, progress-marks, add-detail, library, command-bar, editorial. Walk
 error on every page in the walkthrough; existing, harmless, recorded.
 
 **Next.** Sprint 112.
+
+## 2026-10-23 — Sprint 112: the deck for any chore
+
+**Done.** The deck became a shell (`features/deck/Deck.tsx`); the inbox is its first chore.
+`/deck` lists chores; *Still want this?* and *Find a cover* run on it. `cover=missing` on the
+list.
+
+**Verified and how.** Inbox deck suites unchanged and green after the extraction; new Vitest
+and Playwright specs; accessibility on all three new screens; walkthrough with
+`frontend/e2e/scratchpad/walk112.mjs` and `walk112b.mjs` on live Open Library.
+
+**Found.** Open Library candidates that do not load or are thumbnails failed with 422 when
+chosen; now dropped. "Nothing filed this time.." fixed. A `make check` failure slipped past a
+`&&` after `tail` once; the commit was amended within the session.
+
+**Next.** Sprint 113, duplicates on the deck.
