@@ -23,7 +23,13 @@ export async function stubHouse(page: Page) {
       type: "book",
       title: "Rayuela",
       outline: [],
-      metadata: { creators: ["Julio Cortázar"] },
+      // An unbroken URL, as Wikipedia-sourced descriptions carry: it once set the
+      // phone layout's single column wider than the screen (fixed in Sprint 111).
+      metadata: {
+        creators: ["Julio Cortázar"],
+        description:
+          "Fuente: https://es.wikipedia.org/wiki/Rayuela_(novela_de_Julio_Cort%C3%A1zar)",
+      },
     },
   });
   let loans: Array<Record<string, unknown>> = [];

@@ -170,9 +170,9 @@ function Fact({
   children: React.ReactNode;
 }) {
   return (
-    <div data-fact={name}>
+    <div data-fact={name} className="min-w-0">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd>{children}</dd>
+      <dd className="break-words">{children}</dd>
     </div>
   );
 }
@@ -405,7 +405,7 @@ export function DetailPage() {
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
       <BackToLibrary to={backTo} label={backLabel} />
-      <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
+      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
         <aside>
           <div style={{ viewTransitionName: coverTransitionName(entry.id) }}>
             <CoverImage
@@ -707,7 +707,7 @@ export function DetailPage() {
               return value === "—" ? null : (
                 <div key={field.name} className="mt-4">
                   <p className="text-xs text-muted-foreground">{field.label}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-foreground">
+                  <p className="mt-1 whitespace-pre-wrap break-words text-foreground">
                     {value}
                   </p>
                 </div>
