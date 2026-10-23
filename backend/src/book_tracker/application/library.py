@@ -1188,6 +1188,7 @@ class LibraryService:
         value: str | None = None,
         location: str | None = None,
         lent: bool = False,
+        missing_cover: bool = False,
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
@@ -1205,6 +1206,7 @@ class LibraryService:
                 "value": value or "",
                 "location": location or "",
                 "lent": lent,
+                "missing_cover": missing_cover,
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -1260,12 +1262,16 @@ class LibraryService:
         value: str | None = None,
         location: str | None = None,
         lent: bool = False,
+        missing_cover: bool = False,
     ) -> Any:
         query = (
             select(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
+        if missing_cover:
+            # What the deck's *Find a cover* goes through (Sprint 112).
+            query = query.where(or_(ItemRow.cover_path.is_(None), ItemRow.cover_path == ""))
         if location:
             query = query.where(EntryRow.location == location)
         if lent:
@@ -1353,6 +1359,7 @@ class LibraryService:
         value: str | None = None,
         location: str | None = None,
         lent: bool = False,
+        missing_cover: bool = False,
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -1372,7 +1379,16 @@ class LibraryService:
         expression = sort_expressions[sort]
         bucket = case((expression.is_(None), 1), else_=0)
         filter_key = self._filter_key(
-            statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+            statuses,
+            shelves,
+            q,
+            formats,
+            types,
+            key,
+            value,
+            location=location,
+            lent=lent,
+            missing_cover=missing_cover,
         )
         state = None
         if after:
@@ -1382,7 +1398,16 @@ class LibraryService:
                 raise LibraryError("invalid_cursor", str(error), status_code=400) from error
 
         query = self._filtered_entries(
-            statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+            statuses,
+            shelves,
+            q,
+            formats,
+            types,
+            key,
+            value,
+            location=location,
+            lent=lent,
+            missing_cover=missing_cover,
         )
         if state is not None:
             id_comparison = (
@@ -1413,7 +1438,16 @@ class LibraryService:
             entries = entries[:limit]
             total_query = select(func.count()).select_from(
                 self._filtered_entries(
-                    statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+                    statuses,
+                    shelves,
+                    q,
+                    formats,
+                    types,
+                    key,
+                    value,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
                 )
                 .order_by(None)
                 .subquery()
@@ -1428,7 +1462,7 @@ class LibraryService:
             # domain-agnostic; `status_counts_by_type` is already split by type, so a
             # tab that is *not* selected still has a live count to show.
             facet_base = self._filtered_entries(
-                [], shelves, q, formats, location=location, lent=lent
+                [], shelves, q, formats, location=location, lent=lent, missing_cover=missing_cover
             ).subquery()
             # Grouped by the item's type as well as the status, because a status two
             # domains share is not one number on a screen that lists them separately:
@@ -1449,7 +1483,14 @@ class LibraryService:
             # filter: offering "Physical 312" while the library is showing records is
             # an answer to a question nobody asked.
             format_base = self._filtered_entries(
-                statuses, shelves, q, (), types, location=location, lent=lent
+                statuses,
+                shelves,
+                q,
+                (),
+                types,
+                location=location,
+                lent=lent,
+                missing_cover=missing_cover,
             ).subquery()
             format_rows = session.execute(
                 select(EntryFormatRow.format, func.count())

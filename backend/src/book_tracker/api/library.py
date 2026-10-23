@@ -578,6 +578,8 @@ def list_entries(
     location: str | None = None,
     #: Only what is out on loan now.
     lent: bool = False,
+    #: `missing`: only what has no cover, for the deck's *Find a cover* (Sprint 112).
+    cover: Literal["missing"] | None = None,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
@@ -599,6 +601,7 @@ def list_entries(
             value=value,
             location=location,
             lent=lent,
+            missing_cover=cover == "missing",
             q=q,
             sort=sort,
             order=order,

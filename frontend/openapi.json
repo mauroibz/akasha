@@ -4947,6 +4947,23 @@
           },
           {
             "in": "query",
+            "name": "cover",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "missing",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cover"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {

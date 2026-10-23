@@ -7,6 +7,7 @@ import {
   ChartBar,
   Download,
   Handshake,
+  ListChecks,
   Inbox,
   LibraryBig,
   Bookmark,
@@ -208,6 +209,14 @@ export function CommandBar({
         words: "diary journal finished history month year",
         icon: <BookOpen />,
         run: () => go("/diary"),
+      },
+      {
+        id: "chores",
+        label: "Chores",
+        words:
+          "chores deck tidy clean pile covers still want planned one at a time",
+        icon: <ListChecks />,
+        run: () => go("/deck"),
       },
       {
         id: "lent",

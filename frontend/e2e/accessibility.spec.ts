@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
+import { stubChores } from "./chores-fixture";
 import { stubHouse } from "./house-fixture";
 import { stubSeries } from "./progress-fixture";
 
@@ -1116,5 +1117,31 @@ for (const scheme of ["light", "dark"] as const) {
     await page.goto("/lent");
     await expect(page.getByRole("heading", { name: "Lent out" })).toBeVisible();
     await expectNoSeriousViolations(page, `lent out (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the chores and their decks have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubChores(page);
+    await page.goto("/deck");
+    await expect(page.getByRole("list", { name: "Chores" })).toBeVisible();
+    await expectNoSeriousViolations(page, `chores (${scheme})`);
+    await page.goto("/deck/planned");
+    await expect(page.getByTestId("deck-title")).toHaveText("Stoner");
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `still want this (${scheme})`);
+    await page.goto("/deck/covers");
+    await expect(
+      page.getByRole("button", { name: "The 1965 edition's cover" }),
+    ).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `find a cover (${scheme})`);
   });
 }

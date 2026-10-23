@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
+import { Link } from "react-router-dom";
+
 import { ExportPanel } from "@/features/export/ExportPanel";
 import {
   readThemeChoice,
@@ -122,6 +124,17 @@ export function SettingsPage() {
         and the amber dot look the same in both.
       </p>
       <ExportPanel embedded />
+      {/* The deck's chores (Sprint 112): tidying is a data job, so it is offered
+          beside the export, as well as from the command bar. */}
+      <p className="mt-6 text-sm text-muted-foreground">
+        Tidy up one card at a time: the planned pile, covers, the inbox.{" "}
+        <Link
+          to="/deck"
+          className="font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+        >
+          Chores
+        </Link>
+      </p>
     </main>
   );
 }

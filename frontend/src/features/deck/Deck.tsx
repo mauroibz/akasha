@@ -35,8 +35,11 @@ export interface DeckSource<Card> {
 export interface DeckControls<Draft> {
   draft: Draft;
   setDraft: (change: Partial<Draft>) => void;
-  /** Decide the card: `file` is the chore's own answer, `later` passes it. */
-  commit: (direction: DeckDirection) => void;
+  /**
+   * Decide the card: `file` is the chore's own answer, `later` passes it. A change
+   * applies to the draft first, so a second answer ("Let go") is one tap.
+   */
+  commit: (direction: DeckDirection, change?: Partial<Draft>) => void;
 }
 
 /** One decided card, as the end of the round lists it. */
@@ -67,6 +70,7 @@ export function Deck<Card, Draft>({
   entryOf,
   passedStorageKey,
   initialDraft,
+  canFile,
   stamp,
   file,
   unfile,
@@ -75,6 +79,7 @@ export function Deck<Card, Draft>({
   renderEnd,
   cardFace,
   filedNoun = "filed",
+  failure,
 }: {
   /** The eyebrow over the progress bar: "Inbox", "Still want this?". */
   label: string;
@@ -90,6 +95,8 @@ export function Deck<Card, Draft>({
   /** Session storage for passes, so a reload keeps them at the back. */
   passedStorageKey?: string;
   initialDraft: (card: Card) => Draft;
+  /** Whether *File* has anything to write; when not, a swipe right passes instead. */
+  canFile?: (card: Card, draft: Draft) => boolean;
   /** What *File* would do, stamped on the card as it leans right. */
   stamp: (card: Card, draft: Draft) => string;
   file: (card: Card, draft: Draft) => Promise<unknown>;
@@ -112,6 +119,8 @@ export function Deck<Card, Draft>({
   cardFace?: (card: Card) => ReactNode;
   /** "filed", "kept": how the count in the top bar names a decided card. */
   filedNoun?: string;
+  /** What a failed filing says, when "could not be filed" is not the chore's word. */
+  failure?: string;
 }) {
   const presets = useMotionPresets();
   const itemTypes = useItemTypes();
@@ -185,13 +194,20 @@ export function Deck<Card, Draft>({
     });
   };
 
-  const commit = (direction: DeckDirection, fromX = 0) => {
+  const commit = (
+    direction: DeckDirection,
+    fromX = 0,
+    change?: Partial<Draft>,
+  ) => {
     if (!current || !draft) return;
     const card = current;
+    const decided = change ? { ...draft, ...change } : draft;
+    if (direction === "file" && canFile && !canFile(card, decided))
+      direction = "later";
     const key = keyOf(card);
     setFlipped(false);
     if (direction === "file") {
-      const request = file(card, draft).catch(() => {
+      const request = file(card, decided).catch(() => {
         // Back on top of the deck, as it was left.
         forget(card);
         setHistory((stack) =>
@@ -200,19 +216,28 @@ export function Deck<Card, Draft>({
               !(action.kind === "filed" && keyOf(action.card) === key),
           ),
         );
-        toast.error(`“${entryOf(card).item.title}” could not be ${filedNoun}`, {
-          description: "It is back on top of the deck.",
-        });
+        toast.error(
+          failure ?? `“${entryOf(card).item.title}” could not be ${filedNoun}`,
+          {
+            description: "It is back on top of the deck.",
+          },
+        );
       });
       inFlight.current.set(key, request);
-      setFiled((map) => new Map(map).set(key, { card, draft }));
-      setHistory((stack) => [...stack, { kind: "filed", card, draft }]);
+      setFiled((map) => new Map(map).set(key, { card, draft: decided }));
+      setHistory((stack) => [
+        ...stack,
+        { kind: "filed", card, draft: decided },
+      ]);
     } else {
       setPassed((ids) => [...ids.filter((id) => id !== key), key]);
       setPassedNow((count) => count + 1);
-      setHistory((stack) => [...stack, { kind: "passed", card, draft }]);
+      setHistory((stack) => [
+        ...stack,
+        { kind: "passed", card, draft: decided },
+      ]);
     }
-    setDrafts((map) => new Map(map).set(key, draft));
+    setDrafts((map) => new Map(map).set(key, decided));
     if (!presets.reduced) {
       ghostKey.current += 1;
       setGhosts((list) => [
@@ -222,7 +247,7 @@ export function Deck<Card, Draft>({
           entry: entryOf(card),
           direction,
           fromX,
-          stamp: direction === "file" ? stamp(card, draft) : "Later",
+          stamp: direction === "file" ? stamp(card, decided) : "Later",
         },
       ]);
     }
@@ -290,18 +315,25 @@ export function Deck<Card, Draft>({
         void undo();
         return;
       }
-      if (!current || !draft) return;
+      if (!current || !controls) return;
       if (event.key === "i") {
         event.preventDefault();
         setFlipped((value) => !value);
         return;
       }
-      if (onKey?.(event, current, { draft, setDraft, commit }))
-        event.preventDefault();
+      if (onKey?.(event, current, controls)) event.preventDefault();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   });
+
+  const controls: DeckControls<Draft> | null = draft
+    ? {
+        draft,
+        setDraft,
+        commit: (direction, change) => commit(direction, 0, change),
+      }
+    : null;
 
   // A new card is always shown face up.
   const currentKey = current ? keyOf(current) : null;
@@ -409,7 +441,7 @@ export function Deck<Card, Draft>({
             <Loading label="Fetching more cards…" className="m-auto" />
           )}
 
-          {current && draft && (
+          {current && controls && (
             <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2.5 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:gap-12 md:px-10 md:pb-10 md:pt-8">
               {/* The stack: the card, and the next two standing behind it. */}
               <div className="flex min-h-0 flex-1 items-center justify-center md:h-full">
@@ -440,7 +472,7 @@ export function Deck<Card, Draft>({
                     <DeckCard
                       entry={entryOf(current)}
                       types={itemTypes.data}
-                      stampLabel={stamp(current, draft)}
+                      stampLabel={stamp(current, controls.draft)}
                       flipped={flipped}
                       onFlip={() => setFlipped((value) => !value)}
                       onSwipe={commit}
@@ -463,7 +495,7 @@ export function Deck<Card, Draft>({
                   ))}
                 </div>
               </div>
-              {renderControls(current, { draft, setDraft, commit })}
+              {renderControls(current, controls)}
             </div>
           )}
         </DialogPrimitive.Content>

@@ -55,6 +55,15 @@ const TriagePage = lazy(async () => ({
 const TriageDeckPage = lazy(async () => ({
   default: (await import("@/pages/TriageDeckPage")).TriageDeckPage,
 }));
+const ChoresPage = lazy(async () => ({
+  default: (await import("@/pages/ChoresPage")).ChoresPage,
+}));
+const PlannedDeckPage = lazy(async () => ({
+  default: (await import("@/pages/PlannedDeckPage")).PlannedDeckPage,
+}));
+const CoversDeckPage = lazy(async () => ({
+  default: (await import("@/pages/CoversDeckPage")).CoversDeckPage,
+}));
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
 }));
@@ -158,6 +167,9 @@ function PrivateRoutes({
             <Route path="/share" element={<SharePage />} />
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/lent" element={<LentPage />} />
+            <Route path="/deck" element={<ChoresPage />} />
+            <Route path="/deck/planned" element={<PlannedDeckPage />} />
+            <Route path="/deck/covers" element={<CoversDeckPage />} />
             <Route
               path="/people"
               element={

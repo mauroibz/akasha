@@ -239,6 +239,8 @@ export interface LibraryFilters {
   location?: string;
   /** Only what is out on loan now. */
   lent?: boolean;
+  /** `missing`: only what has no cover (Sprint 112's *Find a cover*). */
+  cover?: "missing";
   /**
    * How to *say* `value`, which is normalized — case folded, diacritics
    * stripped — because that is what groups a ranking row. "julio cortazar" is
@@ -271,6 +273,7 @@ export function libraryQueryString(
   }
   if (filters.location) params.set("location", filters.location);
   if (filters.lent) params.set("lent", "true");
+  if (filters.cover) params.set("cover", filters.cover);
   if (cursor) params.set("after", cursor);
   return params.toString();
 }

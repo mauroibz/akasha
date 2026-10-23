@@ -3393,6 +3393,7 @@ export interface operations {
         value?: string | null;
         location?: string | null;
         lent?: boolean;
+        cover?: "missing" | null;
         sort?:
           | "date_added"
           | "score"
