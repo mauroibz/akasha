@@ -34,9 +34,12 @@ export function DeckCard({
   flipped,
   onFlip,
   onSwipe,
+  face,
 }: {
   entry: LibraryEntry;
   types: ItemType[] | undefined;
+  /** A front other than the entry's cover (Sprint 112): two covers side by side. */
+  face?: React.ReactNode;
   /** What *File* would set, stamped on the card as it leans right. */
   stampLabel: string;
   flipped: boolean;
@@ -142,7 +145,9 @@ export function DeckCard({
             aria-hidden={flipped}
             className="absolute inset-0 overflow-hidden rounded-2xl bg-surface-raised shadow-2xl ring-1 ring-border [backface-visibility:hidden]"
           >
-            {entry.item.cover_url ? (
+            {face ? (
+              face
+            ) : entry.item.cover_url ? (
               <CoverImage
                 src={entry.item.cover_url}
                 alt={`Cover of ${entry.item.title}`}
