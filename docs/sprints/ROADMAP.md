@@ -2,7 +2,7 @@
 
 **Plan revision:** 49
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 113, the fifth of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** 114, the sixth of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -233,7 +233,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [110](110-where-things-are-underneath.md) | Where things are, and who has them: location and loans, the API | 109 | completed |
 | [111](111-where-things-are-on-screen.md) | Where things are, on screen: the detail rows, what is lent out, filters | 110 | completed |
 | [112](112-the-deck-for-any-chore.md) | The deck for any chore: still want this, find a cover | 111 | completed |
-| [113](113-duplicates-in-the-deck.md) | Duplicates in the deck: pick which to keep, merge without loss | 112 | planned |
+| [113](113-duplicates-in-the-deck.md) | Duplicates in the deck: pick which to keep, merge without loss | 112 | completed |
 | [114](114-score-history-underneath.md) | The score history underneath: every change, dated, with why | 113 | planned |
 | [115](115-score-history-on-screen.md) | The score history on screen, Start again, and "Still an 8?" | 114 | planned |
 | [116](116-rank-inside-a-score.md) | A rank inside a score, chosen in pairs | 115 | planned |

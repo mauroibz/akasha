@@ -6600,3 +6600,17 @@ chosen; now dropped. "Nothing filed this time.." fixed. A `make check` failure s
 `&&` after `tail` once; the commit was amended within the session.
 
 **Next.** Sprint 113, duplicates on the deck.
+
+## 2026-10-23 — Sprint 113: duplicates in the deck
+
+**Done.** `/api/duplicates` (stored data, `work_key` plus first creator), dismissals
+(migration 0029), the merge, `/deck/duplicates`, and the chore on `/deck`. DEC-177.
+
+**Verified and how.** Backend 111 across duplicates, isolation, API, migrations; Vitest and
+Playwright for the deck; walkthrough `frontend/e2e/scratchpad/walk113.mjs` merging two real
+copies of *Ficciones*.
+
+**Found.** Nothing broken. Open Library's search for "rayuela cortazar" returns studies of the
+novel by other authors; the creator rule correctly keeps them apart.
+
+**Next.** Sprint 114, the score history underneath.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 49,
-  "project_status": "in_progress",
-  "active_sprint": "113",
-  "active_sprint_file": "docs/sprints/113-duplicates-in-the-deck.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "112",
+  "project_status": "ready",
+  "active_sprint": "114",
+  "active_sprint_file": "docs/sprints/114-score-history-underneath.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "113",
   "completed_sprints": [
     "001",
     "002",
@@ -118,8 +118,9 @@
     "109",
     "110",
     "111",
-    "112"
+    "112",
+    "113"
   ],
-  "started_at": "2026-10-23T20:06:39-03:00",
-  "updated_at": "2026-10-23T20:06:39-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T20:13:03-03:00"
 }

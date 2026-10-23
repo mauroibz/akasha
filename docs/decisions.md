@@ -7042,3 +7042,16 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      creator, same series, the same title across libraries), accepted or dismissed. Migration 0032.
 - Consequences: five migrations (0028–0032). No network call is added to any page render. The resurfacing
   milestone (3) waits on the owner's choice of mockup and is the next planning step.
+
+## DEC-177 — A merge keeps both notes (Sprint 113)
+
+- Date: 2026-10-23
+- Status: accepted
+- Context: DEC-176 says the kept entry keeps every value it has and fills empty ones from the
+  other. Notes are the one field where both are often filled and neither is a mistake.
+- Decision: when both entries carry notes, the kept entry's notes come first and the other's
+  follow after a blank line; identical notes are kept once. Every other field follows DEC-176:
+  the kept value stands. Two open loans are refused (409 `both_lent`) rather than one closed
+  on the owner's behalf. The merged-away item is left for the prune sweep (DEC-158).
+- Consequences: nothing the owner wrote is lost by a merge, and a merge cannot be undone, so
+  the deck says what will happen before it does it.

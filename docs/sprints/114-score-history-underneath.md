@@ -1,7 +1,7 @@
 # Sprint 114 — The score history, underneath
 
 **Sprint:** 114
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 49
 **Depends on:** 113
 **Owner:** Mauro
