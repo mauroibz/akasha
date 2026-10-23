@@ -6989,3 +6989,56 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      not set *Started* on the next tap.
   4. **Only dates the domain has**, read from `entry_fields`. Status is not changed: lighting
      the last episode does not mark a series completed.
+
+## DEC-176 — The house and the history: Sprints 109–119
+
+- Date: 2026-10-23
+- Status: accepted
+- Context: after 2.7.0 the owner brainstormed seven directions and five smaller improvements,
+  sorted them with an agent, and answered on 2026-10-23. Recorded here as the owner chose:
+  - **Commonplace book and notes (1):** not now. A Markdown notes editor is a v3 candidate, as
+    a "freeform text" domain with its own editor, after a design session of its own.
+  - **Each reading its own (2):** the owner does not care about a reread count but does about
+    how a score changes. Chosen: a **score history**, each change saved with its date and
+    *why* it changed, "a reread or just time"; a score changed with no reread is history too.
+    Finishing something again asks "Still an 8?".
+  - **Bringing things back (3):** the proposal (a line at the top of the library, a monthly
+    letter) is rejected. Four alternatives are mocked for the owner to choose from; nothing is
+    built until one is approved.
+  - **One work across libraries (4):** linking works is rejected; shelves should do that.
+    Chosen: **suggested shelves** given more weight, and a **timeline in the Diary**.
+  - **Calibrate scores (5):** chosen both halves: **a rank inside a score**, built by choosing
+    between two items in the deck, which never changes a score; and **a tier board**, where
+    moving an item to another score row is a proposal applied only on confirmation.
+  - **Homelab sources (6):** not applicable to the owner; recorded as GitHub issue #31.
+  - **The library matches the house (7):** chosen as proposed: where each thing is, and who has
+    it on loan.
+  - **Smaller:** undo after a status or score change from a library card; the detail page hides
+    empty facts and offers *Fill from provider*; the deck reused for other chores; duplicates
+    found and merged **by choosing in the deck which one to keep**. Export in Settings already
+    exists (Sprint 090).
+- Decision: eleven sprints, `FINAL_SPRINT` 108 → 119, plan revision 49.
+  1. **109 — Undo on the card, and facts that fill themselves.** No migration.
+  2. **110–111 — Where things are, and who has them.** One location per entry (free text, the
+     owner's earlier values offered back) and a loan record per entry (who, when lent, when
+     back). Per entry, not per format: one copy per entry is the common case and a format is a
+     vocabulary value, not a copy. Migration 0028.
+  3. **112 — The deck, for any chore.** The inbox deck's shell takes any queue: *Still want
+     this?* over the planned pile, and *Find a cover* over entries without one.
+  4. **113 — Duplicates, in the deck.** Candidates found from stored data only; a card shows
+     both; the owner picks which to keep or says they differ (remembered). The kept entry keeps
+     every value it has, fills empty ones from the other, gains its shelves, formats, location
+     and loans; the other is deleted. Migration 0029 for the "not duplicates" answers.
+  5. **114–115 — The score history.** A `score_events` table written by triggers, so no write
+     path (import, bulk, merge, undo) can skip it; *why* is `reread` or `time`. The detail page
+     shows it; *Start again* on a finished entry begins another pass, and finishing it asks
+     "Still an 8?". `StatusSpec.finished` is declared so no shared layer names "read".
+     Migration 0030.
+  6. **116–117 — Ranks and tiers.** `entries.score_rank` orders entries inside one score, set by
+     a pairs deck; the tier board shows a domain's scored items in rows and applies score moves
+     only on confirmation, recorded as `time`. Migration 0031.
+  7. **118–119 — The Diary as a timeline, and suggested shelves.** An *All years* view of the
+     Diary that includes score changes as events; shelves proposed from stored data (same
+     creator, same series, the same title across libraries), accepted or dismissed. Migration 0032.
+- Consequences: five migrations (0028–0032). No network call is added to any page render. The resurfacing
+  milestone (3) waits on the owner's choice of mockup and is the next planning step.

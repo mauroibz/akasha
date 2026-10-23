@@ -2,6 +2,11 @@
 
 ## Where the project stands
 
+**2026-10-23:** the owner sorted a brainstorm into a new line (DEC-176): Sprints 109–119,
+the house (location, loans), the deck for chores and duplicates, the score history, ranks and
+tiers, the Diary timeline and suggested shelves. **109 is active (ready).** The resurfacing idea
+waits on the owner's choice of mockup; homelab sync is GitHub issue #31.
+
 **2026-10-22:** Sprints 107–108 (DEC-171–175: episode and chapter marks, the progress row as
 the tracker, the drop question, Started and Finished filled by the first and last light)
 shipped as **v2.7.0** (tagged, pushed, GitHub Release). The project state is `complete`; no
@@ -44,7 +49,7 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. The board upgrade to 2.7.0 is the owner's unless SSH access is given:
+Run Sprints 109–119 in order. The board upgrade to 2.7.0 is the owner's unless SSH access is given:
 `AKASHA_VERSION=2.7.0` in the board's `.env`, `./render-compose.sh`, then
 `docker compose pull && docker compose up -d` (migration 0027 runs with its pre-migration
 backup). Known and left: at 390px one book's detail page scrolls 19px sideways from its

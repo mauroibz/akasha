@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 47,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 49,
+  "project_status": "ready",
+  "active_sprint": "109",
+  "active_sprint_file": "docs/sprints/109-undo-and-facts.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "108",
   "completed_sprints": [
     "001",
@@ -117,5 +117,5 @@
     "108"
   ],
   "started_at": "",
-  "updated_at": "2026-10-22T11:32:51-03:00"
+  "updated_at": "2026-10-23T19:15:06-03:00"
 }
