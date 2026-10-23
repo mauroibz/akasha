@@ -1,7 +1,7 @@
 # Sprint 112 — The deck, for any chore
 
 **Sprint:** 112
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 49
 **Depends on:** 111
 **Owner:** Mauro

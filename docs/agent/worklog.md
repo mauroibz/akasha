@@ -6569,3 +6569,18 @@ cursor key, and the JSON export.
 neighbouring suites; `make check`; 0028 run on a copy of the Sprint 109 walkthrough database.
 
 **Next.** Sprint 111, the screens.
+
+## 2026-10-23 — Sprint 111: location and loans, on screen
+
+**Done.** *Where* and *Lent* rows on the detail page, `/lent`, the place and lent filters, the
+command bar's answer and *Lent out* command. Fixed the recorded phone sideways scroll on the
+detail page (a long URL in a description).
+
+**Verified and how.** `vitest related` 271, `make check`, Playwright 85 across lent,
+accessibility, progress-marks, add-detail, library, command-bar, editorial. Walkthrough with
+`frontend/e2e/scratchpad/walk111.mjs` on a fresh backend at 1280 Paper and 390 Ink.
+
+**Found.** The overflow above. `/api/auth/me` answers 404 with auth off and prints a console
+error on every page in the walkthrough; existing, harmless, recorded.
+
+**Next.** Sprint 112.

@@ -1,7 +1,7 @@
 # Sprint 111 — Where things are, and who has them: on screen
 
 **Sprint:** 111
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 110
 **Owner:** Mauro
@@ -48,4 +48,32 @@ Reminders, loan due dates, borrowing from someone else.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `39356d9`, with `fca2bb8` fixing a recorded defect the walkthrough met.
+Verified per DEC-167: `vitest related` (27 files, 271 tests), `make check`, Playwright `lent`
+(new), `accessibility` (two new checks, light and dark: the lend form, the lent row, `/lent`),
+`progress-marks`, `add-detail`, `library`, `command-bar`, `editorial` (85 passed). Walkthrough
+against a fresh backend with live Open Library: Solaris and Rayuela from search, an album by
+hand, at 1280 (Paper) and 390 (Ink).
+
+1. *Where* and *Lent* on the detail page; each change one request (Vitest; walkthrough: "Living
+   room, shelf 2", lent to Sofi on 30 Aug, "7 weeks").
+2. `/lent` lists open loans longest out first; *It's back* removes the row (Vitest, Playwright).
+3. The library's Filters gain *Anywhere / a place* (shown once a place exists) and *Lent out*;
+   chips clear them (Vitest; walkthrough: two cards under the place).
+4. Accessibility passes on the detail page rows and `/lent`; 390px fits (Playwright).
+5. The command bar shows "Julio Cortázar · Living room, shelf 2 · Lent to Sofi" on a library hit,
+   and *Lent out* goes to `/lent`.
+
+Found during the walkthrough and fixed (`fca2bb8`): the phone detail page scrolled sideways
+(13px on Rayuela; the 19px recorded in 2.7). The single grid column sized to its content, and
+a description ending in a Wikipedia URL set it. The column is `minmax(0, 1fr)` and long words
+wrap; the lent spec's stub carries such a URL and failed without the fix.
+
+Deviations and notes:
+
+- TDD order: the `/lent` page and its test were written together; the test was then run green.
+  The others were observed failing first.
+- The command bar shows the place on a library hit; it does not search places themselves
+  ("hall" finds nothing unless a title matches). Searching locations would mean adding them to
+  the FTS index; not done.
+- A test that holds every unknown request open learned the new `/api/locations` request.

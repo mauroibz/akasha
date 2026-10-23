@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 49,
-  "project_status": "in_progress",
-  "active_sprint": "111",
-  "active_sprint_file": "docs/sprints/111-where-things-are-on-screen.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "110",
+  "project_status": "ready",
+  "active_sprint": "112",
+  "active_sprint_file": "docs/sprints/112-the-deck-for-any-chore.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "111",
   "completed_sprints": [
     "001",
     "002",
@@ -116,8 +116,9 @@
     "107",
     "108",
     "109",
-    "110"
+    "110",
+    "111"
   ],
-  "started_at": "2026-10-23T19:37:39-03:00",
-  "updated_at": "2026-10-23T19:37:39-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T19:50:55-03:00"
 }
