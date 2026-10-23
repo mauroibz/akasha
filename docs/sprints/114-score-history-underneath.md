@@ -1,7 +1,7 @@
 # Sprint 114 — The score history, underneath
 
 **Sprint:** 114
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 113
 **Owner:** Mauro
@@ -49,4 +49,26 @@ Screens (115).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `b4b492f`. Verified per DEC-167:
+`test_score_history.py` (6, observed failing first) and the suites over every score write path
+(conformance, isolation, API, item types, export, migrations, bulk, duplicates, the Goodreads,
+generic, list, MyAnimeList, Letterboxd and Calibre imports, flat entry contract, refile,
+persistence, prune, insights, diary, goals: 657 passed); `make check`. Migration 0030 run on a
+copy of the Sprint 113 walkthrough database: one scored entry, one backfilled row, foreign keys
+clean.
+
+1. Card, opinion dialog, bulk, import and merge record exactly the rows their score changes
+   imply: the triggers fire on any `UPDATE OF score` that changes it, and on an insert with a
+   score.
+2. A write without a score change records nothing, unless it carries a reason, which is a
+   confirmation ("still a 9") and recorded as such.
+3. Migration up and down on temporary files; the backfill equals the scored entries.
+
+Deviations and notes:
+
+- **Import undo writes history.** An import's undo that puts an older score back is a change,
+  and is recorded as `time`. That is what happened; nothing hides it.
+- A merge moves the other copy's rows to the kept entry (the owner's history of the work),
+  rather than letting them go with it.
+- Dates mix shapes: backfilled rows carry the entry's date (`2021-06-01` or a timestamp), later
+  rows a UTC timestamp. Both sort as text.

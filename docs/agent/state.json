@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 49,
-  "project_status": "in_progress",
-  "active_sprint": "114",
-  "active_sprint_file": "docs/sprints/114-score-history-underneath.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "113",
+  "project_status": "ready",
+  "active_sprint": "115",
+  "active_sprint_file": "docs/sprints/115-score-history-on-screen.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "114",
   "completed_sprints": [
     "001",
     "002",
@@ -119,8 +119,9 @@
     "110",
     "111",
     "112",
-    "113"
+    "113",
+    "114"
   ],
-  "started_at": "2026-10-23T20:13:18-03:00",
-  "updated_at": "2026-10-23T20:13:18-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T20:17:48-03:00"
 }

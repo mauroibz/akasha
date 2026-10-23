@@ -6614,3 +6614,17 @@ copies of *Ficciones*.
 novel by other authors; the creator rule correctly keeps them apart.
 
 **Next.** Sprint 114, the score history underneath.
+
+## 2026-10-23 — Sprint 114: the score history, underneath
+
+**Done.** Migration 0030 (`score_events`, two triggers, the backfill), `score_reason` and
+`score_note` on PATCH, `/entries/{id}/score-history`, merge and export carry it,
+`StatusSpec.finished`.
+
+**Verified and how.** Six new tests observed failing first; 657 across every suite that writes
+scores; 0030 on a real database copy.
+
+**Found.** A second time, `make check | tail && git commit` committed past a lint failure; the
+commit was amended within the session. Checks now run under `set -o pipefail`.
+
+**Next.** Sprint 115, the history on screen and "Still an 8?".

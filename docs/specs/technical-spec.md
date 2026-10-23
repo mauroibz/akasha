@@ -194,6 +194,17 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
   characters, trimmed, blank stored as `NULL`. Both are shared across every domain and are
   not domain declarations
 
+`score_events` (migration `0030`, Sprint 114, DEC-176)
+
+- one row per change of an entry's score: `score`, `previous`, `reason` (NULL for a first
+  score, `time`, or `reread`), `note`, `recorded_at`; `ON DELETE CASCADE` from `entries`
+- written by the triggers `score_events_insert` and `score_events_update` on `entries`, so
+  every write path leaves a row; the application only labels the row its write caused, or
+  adds a confirmation row for a score sent unchanged with a reason
+- the backfill dates each scored entry's first row by `date_finished`, else `date_added`
+- `StatusSpec.finished` marks the status that means done (book `read`, anime and series
+  `completed`, movie `watched`); at most one per domain, and choosable
+
 `shelves` and `entry_shelves`
 
 - as in product spec, with normalized unique slug per user, and `user_id` a foreign key to `users` with restrict-on-delete (migration `0018`), defaulted to the seeded user like `entries`
