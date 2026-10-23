@@ -348,7 +348,7 @@ export function TriageDeckPage() {
             title={clear ? "Inbox clear" : "That’s the deck"}
             summary={`${
               filed.length === 0
-                ? "Nothing filed this time."
+                ? "Nothing filed this time"
                 : `${filed.length} filed`
             }${passedNow > 0 ? ` · ${passedNow} left for later` : ""}${
               clear && filed.length > 0 ? ". Every one has a place." : "."

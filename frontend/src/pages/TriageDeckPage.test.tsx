@@ -188,6 +188,16 @@ describe("TriageDeckPage", () => {
     expect(patches(calls).map((call) => call.url)).toEqual(["/api/entries/2"]);
   });
 
+  it("ends a round of passes in one sentence with one full stop", async () => {
+    stubApi([entry(1, "Tenth of December")]);
+    renderDeck();
+    await screen.findByRole("heading", { name: "Tenth of December" });
+    await userEvent.click(screen.getByRole("button", { name: /later/i }));
+    expect(
+      await screen.findByText("Nothing filed this time · 1 left for later."),
+    ).toBeVisible();
+  });
+
   it("undoes a filed card: it comes back and is put back as it was", async () => {
     const calls = stubApi();
     renderDeck();
