@@ -105,10 +105,13 @@ export function RatingSection({
   number,
   counts,
   unrated,
+  type,
 }: {
   number: number;
   counts: number[];
   unrated: number;
+  /** The domain, for the way into ordering the most common score (Sprint 116). */
+  type?: string;
 }) {
   const sentence = ratingSentence(counts);
   const modal = modalScore(counts);
@@ -167,6 +170,18 @@ export function RatingSection({
           {unrated > 0 && (
             <p className="mt-4 text-sm text-muted-foreground">
               {unrated.toLocaleString()} unrated, counted everywhere but here.
+            </p>
+          )}
+          {/* Insights says where most scores land; this is something to do about it
+              that never changes a score (Sprint 116, DEC-176). */}
+          {type && counts[modal - 1] >= 2 && (
+            <p className="mt-2 text-sm">
+              <Link
+                to={`/rank/${type}/${modal}`}
+                className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+              >
+                Put your {modal}s in order
+              </Link>
             </p>
           )}
         </div>

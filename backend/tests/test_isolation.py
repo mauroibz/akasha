@@ -91,6 +91,8 @@ ROUTE_POLICY = {
     # Sprint 113: pairs are read from the requester's own entries; every write names
     # two entry ids and answers 404 for anyone else's.
     ("GET", "/api/duplicates"): "private-collection",
+    # Sprint 116: names entry ids, so anyone else's answer 404.
+    ("PUT", "/api/entries/rank"): "private-id",
     ("POST", "/api/duplicates/dismiss"): "private-id",
     ("DELETE", "/api/duplicates/dismiss"): "private-id",
     ("POST", "/api/duplicates/merge"): "private-id",
@@ -334,6 +336,7 @@ PRIVATE_PROBES = (
     ("PATCH", "/api/loans/{loan_id}", {"returned_on": "2026-05-01"}, None),
     ("DELETE", "/api/loans/{loan_id}", None, None),
     ("POST", "/api/duplicates/dismiss", {"a": "ENTRY", "b": "SECOND_ENTRY"}, None),
+    ("PUT", "/api/entries/rank", {"entry_ids": ["ENTRY"]}, None),
     ("DELETE", "/api/duplicates/dismiss", {"a": "ENTRY", "b": "SECOND_ENTRY"}, None),
     ("POST", "/api/duplicates/merge", {"keep": "SECOND_ENTRY", "drop": "ENTRY"}, None),
     ("PATCH", "/api/entries/bulk", {"entry_ids": ["ENTRY"], "set": {"score": 5}}, None),

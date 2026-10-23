@@ -225,6 +225,7 @@ _ENTRY_COLUMNS = (
     EntryRow.progress,
     EntryRow.progress_marks,
     EntryRow.location,
+    EntryRow.score_rank,
 )
 
 
@@ -331,6 +332,8 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 "location": entry.location,
                 "loans": loans.get(entry.id, []),
                 "score_history": scores.get(entry.id, []),
+                # Its place among the entries sharing its score (Sprint 116).
+                "score_rank": entry.score_rank,
             }
 
 

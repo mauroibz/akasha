@@ -318,6 +318,26 @@ export interface paths {
     patch: operations["bulk_entries_api_entries_bulk_patch"];
     trace?: never;
   };
+  "/api/entries/rank": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Rank Entries
+     * @description Put entries that share a score in order, best first (Sprint 116, DEC-176).
+     */
+    put: operations["rank_entries_api_entries_rank_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/entries/{entry_id}": {
     parameters: {
       query?: never;
@@ -1872,6 +1892,8 @@ export interface components {
       score: number | null;
       /** Score Provisional */
       score_provisional: boolean;
+      /** Score Rank */
+      score_rank?: number | null;
       /** Shelves */
       shelves: components["schemas"]["ShelfResponse"][];
       status: components["schemas"]["EntryStatus"];
@@ -2649,6 +2671,11 @@ export interface components {
        * @enum {string}
        */
       state: "working" | "degraded" | "down";
+    };
+    /** RankBody */
+    RankBody: {
+      /** Entry Ids */
+      entry_ids: number[];
     };
     /** RefileBody */
     RefileBody: {
@@ -3744,6 +3771,7 @@ export interface operations {
         location?: string | null;
         lent?: boolean;
         cover?: "missing" | null;
+        score?: number | null;
         sort?:
           | "date_added"
           | "score"
@@ -4008,6 +4036,66 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["AffectedResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  rank_entries_api_entries_rank_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RankBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EntryResponse"][];
         };
       };
       /** @description Unauthorized */

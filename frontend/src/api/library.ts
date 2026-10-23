@@ -204,6 +204,8 @@ export interface LibraryEntry {
   formats: EntryFormat[];
   /** Where it is kept, in the owner's words (Sprint 110). */
   location?: string | null;
+  /** Place among the entries sharing its score, 1 the best (Sprint 116). */
+  score_rank?: number | null;
   /** The loan that is out now, if any. */
   loan?: Loan | null;
 }
@@ -243,6 +245,8 @@ export interface LibraryFilters {
   lent?: boolean;
   /** `missing`: only what has no cover (Sprint 112's *Find a cover*). */
   cover?: "missing";
+  /** Only entries with exactly this score (Sprint 116's ranking). */
+  score?: number;
   /**
    * How to *say* `value`, which is normalized — case folded, diacritics
    * stripped — because that is what groups a ranking row. "julio cortazar" is
@@ -276,6 +280,7 @@ export function libraryQueryString(
   if (filters.location) params.set("location", filters.location);
   if (filters.lent) params.set("lent", "true");
   if (filters.cover) params.set("cover", filters.cover);
+  if (filters.score) params.set("score", String(filters.score));
   if (cursor) params.set("after", cursor);
   return params.toString();
 }
@@ -925,4 +930,16 @@ export async function getScoreHistory(
   if (!response.ok)
     throw await apiFailure(response, "The score history could not be loaded");
   return response.json() as Promise<ScoreEvent[]>;
+}
+
+/** Put entries that share a score in this order, best first (Sprint 116). */
+export async function rankEntries(entryIds: number[]): Promise<LibraryEntry[]> {
+  const response = await request("/api/entries/rank", {
+    method: "PUT",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ entry_ids: entryIds }),
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The order could not be saved");
+  return response.json() as Promise<LibraryEntry[]>;
 }

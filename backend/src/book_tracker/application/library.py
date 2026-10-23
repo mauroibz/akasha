@@ -72,6 +72,9 @@ from book_tracker.infrastructure.models import (
     ShelfRow,
 )
 
+#: The room a score leaves for ranks inside it in the library's score sort (Sprint 116).
+SCORE_RANK_SPAN = 1_000_000
+
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -303,6 +306,7 @@ class LibraryService:
             "score_provisional": bool(entry.score_provisional),
             "suggested_status": entry.suggested_status,
             "location": entry.location,
+            "score_rank": entry.score_rank,
             "loan": self._open_loan(session, entry.id),
             "item": self._item_dict(session, item),
             "shelves": self._shelves_for_entry(session, entry.id),
@@ -573,6 +577,9 @@ class LibraryService:
                 )
             entry.updated_at = _now()
             session.flush()
+            if "score" in changes:
+                # A trigger sets the rank aside when the score changes (Sprint 116).
+                session.refresh(entry, ["score_rank"])
             if changes.get("score_reason") or changes.get("score_note"):
                 self._label_score_event(session, entry, last_event, changes)
             return self._entry_dict(session, entry)
@@ -989,6 +996,31 @@ class LibraryService:
                 .order_by(func.count().desc(), EntryRow.location.collate("NOCASE"))
             ).all()
             return [{"location": location, "count": count} for location, count in rows]
+
+    def rank_entries(self, entry_ids: Sequence[int]) -> list[dict[str, Any]]:
+        """Put entries that share a score in this order, 1 the best (Sprint 116).
+
+        One score and one library only, every entry the owner's, each once. Scores are
+        never touched; the entries of that score left out keep the place they had.
+        """
+        if not entry_ids or len(set(entry_ids)) != len(entry_ids):
+            raise LibraryError(
+                "invalid_rank", "Name each entry once to put them in order", status_code=422
+            )
+        with self._write() as session:
+            entries = [self._entry(session, entry_id) for entry_id in entry_ids]
+            kinds = {(self._item(session, entry.item_id).type, entry.score) for entry in entries}
+            if len(kinds) != 1 or next(iter(kinds))[1] is None:
+                raise LibraryError(
+                    "invalid_rank",
+                    "Only entries with the same score in one library can be put in order",
+                    status_code=422,
+                )
+            for place, entry in enumerate(entries, start=1):
+                entry.score_rank = place
+                entry.updated_at = _now()
+            session.flush()
+            return [self._entry_dict(session, entry) for entry in entries]
 
     # -- Duplicates (Sprint 113, DEC-176) ------------------------------------------
 
@@ -1419,6 +1451,7 @@ class LibraryService:
         location: str | None = None,
         lent: bool = False,
         missing_cover: bool = False,
+        exact_score: int | None = None,
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
@@ -1437,6 +1470,7 @@ class LibraryService:
                 "location": location or "",
                 "lent": lent,
                 "missing_cover": missing_cover,
+                "score": exact_score,
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -1493,12 +1527,15 @@ class LibraryService:
         location: str | None = None,
         lent: bool = False,
         missing_cover: bool = False,
+        exact_score: int | None = None,
     ) -> Any:
         query = (
             select(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
+        if exact_score is not None:
+            query = query.where(EntryRow.score == exact_score)
         if missing_cover:
             # What the deck's *Find a cover* goes through (Sprint 112).
             query = query.where(or_(ItemRow.cover_path.is_(None), ItemRow.cover_path == ""))
@@ -1590,6 +1627,7 @@ class LibraryService:
         location: str | None = None,
         lent: bool = False,
         missing_cover: bool = False,
+        exact_score: int | None = None,
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -1597,7 +1635,11 @@ class LibraryService:
     ) -> dict[str, Any]:
         sort_expressions = {
             "date_added": EntryRow.date_added,
-            "score": EntryRow.score,
+            # Score, then the place inside it (Sprint 116): one number, so the keyset
+            # cursor stays a single comparison. A rank is at most a few hundred, so
+            # subtracting it never crosses into the next score; unplaced comes last.
+            "score": EntryRow.score * SCORE_RANK_SPAN
+            - func.coalesce(EntryRow.score_rank, SCORE_RANK_SPAN - 1),
             "title": ItemRow.title_normalized,
             # Ordering reads the creator sort name; the `q` filter above stays on
             # `creator_primary_normalized`, because search matches the name as it is
@@ -1619,6 +1661,7 @@ class LibraryService:
             location=location,
             lent=lent,
             missing_cover=missing_cover,
+            exact_score=exact_score,
         )
         state = None
         if after:
@@ -1638,6 +1681,7 @@ class LibraryService:
             location=location,
             lent=lent,
             missing_cover=missing_cover,
+            exact_score=exact_score,
         )
         if state is not None:
             id_comparison = (
@@ -1678,6 +1722,7 @@ class LibraryService:
                     location=location,
                     lent=lent,
                     missing_cover=missing_cover,
+                    exact_score=exact_score,
                 )
                 .order_by(None)
                 .subquery()
@@ -1692,7 +1737,14 @@ class LibraryService:
             # domain-agnostic; `status_counts_by_type` is already split by type, so a
             # tab that is *not* selected still has a live count to show.
             facet_base = self._filtered_entries(
-                [], shelves, q, formats, location=location, lent=lent, missing_cover=missing_cover
+                [],
+                shelves,
+                q,
+                formats,
+                location=location,
+                lent=lent,
+                missing_cover=missing_cover,
+                exact_score=exact_score,
             ).subquery()
             # Grouped by the item's type as well as the status, because a status two
             # domains share is not one number on a screen that lists them separately:
@@ -1721,6 +1773,7 @@ class LibraryService:
                 location=location,
                 lent=lent,
                 missing_cover=missing_cover,
+                exact_score=exact_score,
             ).subquery()
             format_rows = session.execute(
                 select(EntryFormatRow.format, func.count())
@@ -1733,7 +1786,10 @@ class LibraryService:
                 item = self._item(session, last.item_id)
                 values: dict[str, Any] = {
                     "date_added": last.date_added,
-                    "score": last.score,
+                    "score": None
+                    if last.score is None
+                    else last.score * SCORE_RANK_SPAN
+                    - (last.score_rank if last.score_rank is not None else SCORE_RANK_SPAN - 1),
                     # Read back the stored projection rather than recomputing it:
                     # the cursor is compared against that column in SQL, so any
                     # divergence between the two would silently skip or repeat a

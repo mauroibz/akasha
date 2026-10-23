@@ -1302,6 +1302,17 @@
             "title": "Score Provisional",
             "type": "boolean"
           },
+          "score_rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Rank"
+          },
           "shelves": {
             "items": {
               "$ref": "#/components/schemas/ShelfResponse"
@@ -3449,6 +3460,23 @@
         "title": "ProviderStatus",
         "type": "object"
       },
+      "RankBody": {
+        "properties": {
+          "entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 1000,
+            "title": "Entry Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entry_ids"
+        ],
+        "title": "RankBody",
+        "type": "object"
+      },
       "RefileBody": {
         "properties": {
           "source": {
@@ -5358,6 +5386,24 @@
           },
           {
             "in": "query",
+            "name": "score",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 10,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Score"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
@@ -5739,6 +5785,79 @@
           }
         },
         "summary": "Bulk Entries"
+      }
+    },
+    "/api/entries/rank": {
+      "put": {
+        "description": "Put entries that share a score in order, best first (Sprint 116, DEC-176).",
+        "operationId": "rank_entries_api_entries_rank_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RankBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryResponse"
+                  },
+                  "title": "Response Rank Entries Api Entries Rank Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Rank Entries"
       }
     },
     "/api/entries/{entry_id}": {

@@ -8,6 +8,7 @@ import {
   Download,
   Handshake,
   ListChecks,
+  ListOrdered,
   Inbox,
   LibraryBig,
   Bookmark,
@@ -217,6 +218,13 @@ export function CommandBar({
           "chores deck tidy clean pile covers still want planned one at a time",
         icon: <ListChecks />,
         run: () => go("/deck"),
+      },
+      {
+        id: "rank",
+        label: "Put your scores in order",
+        words: "rank order scores tier compare choose two best",
+        icon: <ListOrdered />,
+        run: () => go("/rank"),
       },
       {
         id: "lent",

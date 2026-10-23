@@ -158,6 +158,7 @@ export function InsightsPage() {
         number={number}
         counts={data.counts}
         unrated={data.unrated_count}
+        type={type}
       />
     ));
   }

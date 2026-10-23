@@ -119,6 +119,9 @@ class EntryRow(Base):
     suggested_status: Mapped[str | None]
     #: Where the owner keeps it, in their own words, or NULL (Sprint 110, DEC-176).
     location: Mapped[str | None] = mapped_column(default=None)
+    #: Place among the entries sharing this score, 1 the best, NULL not placed (Sprint
+    #: 116). Set aside by a trigger when the score changes.
+    score_rank: Mapped[int | None] = mapped_column(default=None)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 

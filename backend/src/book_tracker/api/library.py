@@ -261,6 +261,8 @@ class EntryResponse(BaseModel):
     formats: list[str]
     #: Where the owner keeps it, in their own words, or `None` (Sprint 110).
     location: str | None = None
+    #: Place among the entries sharing this score, 1 the best (Sprint 116).
+    score_rank: int | None = None
     #: The loan that is out now, if any; the history is `/entries/{id}/loans`.
     loan: LoanResponse | None = None
 
@@ -600,6 +602,8 @@ def list_entries(
     lent: bool = False,
     #: `missing`: only what has no cover, for the deck's *Find a cover* (Sprint 112).
     cover: Literal["missing"] | None = None,
+    #: Only entries with exactly this score (Sprint 116's ranking deck).
+    score: int | None = Query(default=None, ge=1, le=10),
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
@@ -622,6 +626,7 @@ def list_entries(
             location=location,
             lent=lent,
             missing_cover=cover == "missing",
+            exact_score=score,
             q=q,
             sort=sort,
             order=order,
@@ -897,6 +902,16 @@ class PairBody(BaseModel):
 class MergeBody(BaseModel):
     keep: int
     drop: int
+
+
+class RankBody(BaseModel):
+    entry_ids: list[int] = Field(max_length=1000)
+
+
+@router.put("/entries/rank", response_model=list[EntryResponse], responses=ERRORS)
+def rank_entries(body: RankBody, library: Library) -> list[EntryResponse]:
+    """Put entries that share a score in order, best first (Sprint 116, DEC-176)."""
+    return [EntryResponse.model_validate(row) for row in library.rank_entries(body.entry_ids)]
 
 
 @router.get("/duplicates", response_model=list[DuplicatePairResponse])

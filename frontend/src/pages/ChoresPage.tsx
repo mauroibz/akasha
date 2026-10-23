@@ -1,5 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Copy, Image, Inbox, ListChecks } from "lucide-react";
+import {
+  ArrowRight,
+  Copy,
+  Image,
+  Inbox,
+  ListChecks,
+  ListOrdered,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { getDuplicates } from "@/api/duplicates";
@@ -61,6 +68,13 @@ export function ChoresPage() {
       lede: "Everything without a cover, with editions to choose from.",
       icon: <Image aria-hidden="true" />,
       count: coverless.data,
+    },
+    {
+      to: "/rank",
+      title: "Put your scores in order",
+      lede: "Two at a time, inside one score. No score ever changes.",
+      icon: <ListOrdered aria-hidden="true" />,
+      count: undefined,
     },
     {
       to: "/deck/duplicates",

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 50,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "116",
   "active_sprint_file": "docs/sprints/116-rank-inside-a-score.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "115",
   "completed_sprints": [
     "001",
@@ -123,6 +123,6 @@
     "114",
     "115"
   ],
-  "started_at": "",
-  "updated_at": "2026-10-23T20:26:42-03:00"
+  "started_at": "2026-10-23T20:27:05-03:00",
+  "updated_at": "2026-10-23T20:27:05-03:00"
 }

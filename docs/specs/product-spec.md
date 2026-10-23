@@ -646,6 +646,8 @@ PATCH  /api/loans/{id}                 → record the return or correct a loan
 DELETE /api/loans/{id}
 GET    /api/loans?open=true            → what is out, longest out first, with its entry
 GET    /api/locations                  → the places written on entries, most used first
+PUT    /api/entries/rank               → {entry_ids}: put entries sharing one score in this
+                                          order, best first; scores never change
 GET    /api/duplicates                 → pairs that look like one work twice (same domain,
                                           title without edition notes, first creator)
 POST   /api/duplicates/dismiss         → {a, b}: these differ, never offer them again

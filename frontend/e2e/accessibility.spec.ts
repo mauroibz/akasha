@@ -4,6 +4,7 @@ import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
 import { stubChores } from "./chores-fixture";
 import { stubHouse } from "./house-fixture";
+import { stubRank } from "./rank-fixture";
 import { stubRescore } from "./rescore-fixture";
 import { stubSeries } from "./progress-fixture";
 
@@ -1181,5 +1182,24 @@ for (const scheme of ["light", "dark"] as const) {
       .poll(() => page.evaluate(() => document.getAnimations().length))
       .toBe(0);
     await expectNoSeriousViolations(page, `still an 8 (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`ordering a score has no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubRank(page);
+    await page.goto("/rank");
+    await expect(
+      page.getByRole("list", { name: "Scores to put in order" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `rank picker (${scheme})`);
+    await page.goto("/rank/book/8");
+    await expect(
+      page.getByRole("heading", { name: "Which did you like more?" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `rank deck (${scheme})`);
   });
 }
