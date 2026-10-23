@@ -13,9 +13,10 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
-import type { FieldSpec, LibraryEntry } from "@/api/library";
+import type { FieldSpec, FillResult, LibraryEntry } from "@/api/library";
 import {
   deleteEntry,
+  fillItem,
   getEntry,
   getItemTypes,
   patchEntry,
@@ -227,6 +228,30 @@ function PropertyRow({
   );
 }
 
+/** "a", "a and b", "a, b and c". */
+function listed(words: string[]): string {
+  if (words.length < 2) return words.join("");
+  return `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
+}
+
+/**
+ * What a fill did, in a sentence (Sprint 109): the fields it wrote by the domain's
+ * own names for them, or why it wrote none.
+ */
+function fillMessage(result: FillResult, fields: FieldSpec[]): string {
+  if (result.filled.length) {
+    const names = result.filled.map(
+      (name) =>
+        fields.find((field) => field.name === name)?.label.toLowerCase() ??
+        name,
+    );
+    return `Filled ${listed(names)}`;
+  }
+  if (result.queued) return "Looking it up; this fills in the background";
+  if (result.provider) return `Nothing new from ${result.provider}`;
+  return "There is nothing to look this up by yet. Add an identifier in Edit metadata.";
+}
+
 export function DetailPage() {
   const entryId = Number(useParams().entryId);
   const cache = useQueryClient();
@@ -268,6 +293,18 @@ export function DetailPage() {
     retry: false,
     staleTime: Infinity,
   });
+  const fill = useMutation({
+    mutationFn: (itemId: number) => fillItem(itemId),
+    onSuccess: (result) => {
+      setError("");
+      toast(fillMessage(result, fieldsOf(result.item.type)));
+      void cache.invalidateQueries({ queryKey: queryKeys.entry(entryId) });
+      void cache.invalidateQueries({ queryKey: queryKeys.library.all });
+    },
+    onError: (value: Error) => setError(value.message),
+  });
+  const fieldsOf = (type: string) =>
+    itemTypes.data?.find((candidate) => candidate.id === type)?.fields ?? [];
   const update = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => {
@@ -304,6 +341,15 @@ export function DetailPage() {
       field.name !== "creators",
   );
   const blockFields = fields.filter((field) => field.type === "long_text");
+  // Facts the item has, and how many it lacks: an empty field is a count and an
+  // offer to fill it, not a row of dashes (Sprint 109).
+  const isEmpty = (field: FieldSpec) =>
+    formatFact(item.metadata[field.name], field) === "—";
+  const shownFields = inlineFields.filter((field) => !isEmpty(field));
+  const missing = [...inlineFields, ...blockFields]
+    .filter(isEmpty)
+    .map((field) => field.label.toLowerCase());
+  const identifiers = Object.entries(item.identifiers);
   // An ordered list of structured rows is neither a fact nor a paragraph, so it
   // gets its own region rather than being joined into one line (a tracklist). The
   // field the progress tracker draws its parts from is drawn there instead.
@@ -604,32 +650,53 @@ export function DetailPage() {
             headingId="edition-facts-heading"
           >
             <dl className="grid grid-cols-2 gap-4">
-              {inlineFields.map((field) => (
+              {shownFields.map((field) => (
                 <Fact key={field.name} name={field.name} label={field.label}>
                   {formatFact(item.metadata[field.name], field)}
                 </Fact>
               ))}
-              <Fact name="identifiers" label="Identifiers">
-                {Object.entries(item.identifiers).map(([k, v]) => (
-                  <span key={k} className="block text-sm">
-                    {k}: {v}
-                  </span>
-                ))}
-                {!Object.keys(item.identifiers).length && "—"}
-              </Fact>
-              <Fact name="sources" label="Sources">
-                {item.sources.map((s) => (
-                  <span
-                    key={`${s.source}:${s.source_id}`}
-                    className="block text-sm"
-                  >
-                    {s.source}
-                    {s.is_primary ? " (primary)" : ""}
-                  </span>
-                ))}
-                {!item.sources.length && "—"}
-              </Fact>
+              {identifiers.length > 0 && (
+                <Fact name="identifiers" label="Identifiers">
+                  {identifiers.map(([k, v]) => (
+                    <span key={k} className="block text-sm">
+                      {k}: {v}
+                    </span>
+                  ))}
+                </Fact>
+              )}
+              {item.sources.length > 0 && (
+                <Fact name="sources" label="Sources">
+                  {item.sources.map((s) => (
+                    <span
+                      key={`${s.source}:${s.source_id}`}
+                      className="block text-sm"
+                    >
+                      {s.source}
+                      {s.is_primary ? " (primary)" : ""}
+                    </span>
+                  ))}
+                </Fact>
+              )}
             </dl>
+            {missing.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                <p className="text-sm text-muted-foreground">
+                  Missing:{" "}
+                  {missing.length > 3
+                    ? `${missing.slice(0, 2).join(", ")} and ${missing.length - 2} more`
+                    : listed(missing)}
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full px-4"
+                  disabled={fill.isPending}
+                  onClick={() => fill.mutate(item.id)}
+                >
+                  {fill.isPending ? "Filling…" : "Fill from provider"}
+                </Button>
+              </div>
+            )}
             {blockFields.map((field) => {
               const value = formatFact(item.metadata[field.name], field);
               return value === "—" ? null : (

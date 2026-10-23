@@ -640,6 +640,8 @@ DELETE /api/entries/{id}
 GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction
 POST   /api/items/{id}/refresh         → re-pull from source, OVERWRITES edits
+POST   /api/items/{id}/fill            → fill only empty fields from the source, or
+                                          queue enrichment when there is no source
 GET    /api/items/{id}/cover           → the stored cover image
 GET    /api/items/{id}/cover-candidates → alternative covers for choosing
 POST   /api/items/{id}/cover           → upload replacement cover

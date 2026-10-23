@@ -49,7 +49,15 @@ PROVIDER_LABELS = {
     "wikidata": "Wikidata",
     "wikidata-series": "Wikidata",
     "tvmaze": "TVmaze",
+    "musicbrainz": "MusicBrainz",
+    "cinemeta": "Cinemeta",
+    "cinemeta-series": "Cinemeta",
 }
+
+
+def provider_label(name: str) -> str:
+    """How a person reads a provider's name: in a job's reason, or after a fill."""
+    return PROVIDER_LABELS.get(name, name)
 
 
 def _label(name: str) -> str:
@@ -531,7 +539,11 @@ class EnrichmentHandler:
 
 
 def enqueue_enrichment_backfill(
-    engine: Engine, *, batch_id: str | None = None, item_ids: Collection[int] | None = None
+    engine: Engine,
+    *,
+    batch_id: str | None = None,
+    item_ids: Collection[int] | None = None,
+    requested: bool = False,
 ) -> int:
     """Queue enrichment for persisted items a provider lookup could still improve.
 
@@ -542,6 +554,11 @@ def enqueue_enrichment_backfill(
     `item_ids` restricts the scan. An importer passes the rows its own batch touched, so
     a four-row import does not attribute seven jobs — three of them for books it never
     saw — to its batch and its progress display.
+
+    `requested` is the owner asking about these items by name (*Fill from provider*,
+    Sprint 109): the domain's idea of "complete" no longer decides, because a field
+    added since (a book's `chapters`) is one the owner can see is empty and the
+    handler still fills only what is.
     """
     if item_ids is not None and not item_ids:
         return 0
@@ -553,7 +570,7 @@ def enqueue_enrichment_backfill(
         with Session(engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
         owner = batch.user_id if batch is not None else None
-    rows = _backfillable_items(engine, item_ids)
+    rows = _backfillable_items(engine, item_ids, requested=requested)
     repository = JobRepository(engine)
     for item_id, kind, value in rows:
         repository.enqueue(
@@ -565,8 +582,24 @@ def enqueue_enrichment_backfill(
     return len(rows)
 
 
+def enrichment_pending(engine: Engine, item_id: int) -> bool:
+    """Whether a lookup for this item is already queued or running (Sprint 109)."""
+    with engine.connect() as connection:
+        return (
+            connection.execute(
+                text(
+                    "SELECT 1 FROM jobs WHERE kind = 'enrich_item' "
+                    "AND state IN ('queued', 'running') "
+                    "AND json_extract(payload, '$.item_id') = :item LIMIT 1"
+                ),
+                {"item": item_id},
+            ).first()
+            is not None
+        )
+
+
 def _backfillable_items(
-    engine: Engine, item_ids: Collection[int] | None = None
+    engine: Engine, item_ids: Collection[int] | None = None, *, requested: bool = False
 ) -> list[tuple[int, str, str]]:
     """Every item worth a lookup, asked once per enriching domain.
 
@@ -619,6 +652,8 @@ def _backfillable_items(
         conditions.insert(
             0, "NOT EXISTS (SELECT 1 FROM item_sources WHERE item_sources.item_id = items.id)"
         )
+        if requested:
+            conditions, incomplete = ["1 = 1"], []
         scope = ""
         if item_ids is not None:
             # Bound and parameterised rather than interpolated.

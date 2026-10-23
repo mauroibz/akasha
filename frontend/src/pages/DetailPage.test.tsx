@@ -1254,4 +1254,111 @@ describe("DetailPage", () => {
     await user.click(screen.getByRole("button", { name: /edit opinion/i }));
     expect(screen.queryByLabelText(/episodes watched/i)).toBeNull();
   });
+
+  describe("Edition facts that fill themselves (Sprint 109)", () => {
+    function routes(fill: unknown, posted: string[]) {
+      mockApi(
+        async (input, init) => {
+          const url = String(input);
+          if (url === "/api/item-types")
+            return new Response(JSON.stringify(itemTypes));
+          if (url === "/api/items/3/fill" && init?.method === "POST") {
+            posted.push(url);
+            return new Response(JSON.stringify(fill));
+          }
+        },
+        { fallback: entry },
+      );
+    }
+
+    it("lists only the facts it has, and says how many are missing", async () => {
+      routes({}, []);
+      renderPage();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      const facts = screen.getByRole("region", { name: "Edition facts" });
+      expect(facts.querySelector("[data-fact='series']")).toBeNull();
+      expect(
+        facts.querySelector("[data-fact='publisher'] dd"),
+      ).toHaveTextContent("Sudamericana");
+      expect(within(facts).getByText("Missing: series")).toBeVisible();
+      expect(
+        within(facts).getByRole("button", { name: "Fill from provider" }),
+      ).toBeVisible();
+    });
+
+    it("fills without asking and says what it filled", async () => {
+      const posted: string[] = [];
+      routes(
+        {
+          item: {
+            ...entry.item,
+            metadata: { ...entry.item.metadata, series: "S" },
+          },
+          filled: ["series", "cover"],
+          provider: "Open Library",
+          queued: 0,
+        },
+        posted,
+      );
+      renderPage();
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole("button", { name: "Fill from provider" }),
+      );
+      expect(await findToast("Filled series and cover")).toBeInTheDocument();
+      expect(posted).toEqual(["/api/items/3/fill"]);
+      // Nothing was overwritten, so nothing asked to be confirmed.
+      expect(screen.queryByRole("alertdialog")).toBeNull();
+    });
+
+    it("says when the provider had nothing new, and when it queued a lookup", async () => {
+      routes(
+        { item: entry.item, filled: [], provider: "Open Library", queued: 0 },
+        [],
+      );
+      const first = renderPage();
+      const user = userEvent.setup();
+      await user.click(
+        await screen.findByRole("button", { name: "Fill from provider" }),
+      );
+      expect(
+        await findToast("Nothing new from Open Library"),
+      ).toBeInTheDocument();
+      first.unmount();
+      vi.restoreAllMocks();
+
+      routes({ item: entry.item, filled: [], provider: null, queued: 1 }, []);
+      renderPage();
+      await user.click(
+        await screen.findByRole("button", { name: "Fill from provider" }),
+      );
+      expect(
+        await findToast("Looking it up; this fills in the background"),
+      ).toBeInTheDocument();
+    });
+
+    it("offers no fill when nothing is missing", async () => {
+      mockApi(
+        async (input) => {
+          if (String(input) === "/api/item-types")
+            return new Response(JSON.stringify(itemTypes));
+        },
+        {
+          fallback: {
+            ...entry,
+            item: {
+              ...entry.item,
+              metadata: { ...entry.item.metadata, series: "Complete" },
+            },
+          },
+        },
+      );
+      renderPage();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      expect(
+        screen.queryByRole("button", { name: "Fill from provider" }),
+      ).toBeNull();
+      expect(screen.queryByText(/missing/)).toBeNull();
+    });
+  });
 });

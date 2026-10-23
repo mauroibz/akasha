@@ -784,6 +784,34 @@ class LibraryService:
             session.flush()
             return self._item_dict(session, item)
 
+    def fill_empty_provider_fields(
+        self, item_id: int, values: Mapping[str, Any]
+    ) -> tuple[dict[str, Any], list[str]]:
+        """Write a provider's values only where the item has none (Sprint 109).
+
+        The non-destructive sibling of `overwrite_provider_fields`: a value already
+        there, whether a provider's or the owner's correction, is never replaced, so
+        this needs no confirmation. Returns the item and the names it filled.
+        """
+        empty: tuple[Any, ...] = (None, "", [], {})
+        filled: list[str] = []
+        with self._write() as session:
+            item = self._item(session, item_id)
+            for field in ("subtitle", "year"):
+                if getattr(item, field) in empty and values.get(field) not in empty:
+                    setattr(item, field, values[field])
+                    filled.append(field)
+            metadata = json.loads(item.metadata_json)
+            for key, value in values.get("metadata", {}).items():
+                if value not in empty and metadata.get(key) in empty:
+                    metadata[key] = value
+                    filled.append(key)
+            if filled:
+                item.metadata_json = json.dumps(metadata, ensure_ascii=False)
+                item.updated_at = _now()
+                session.flush()
+            return self._item_dict(session, item), filled
+
     def list_shelves(self) -> list[dict[str, Any]]:
         with Session(self.engine) as session:
             count_subq = (

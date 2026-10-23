@@ -1475,6 +1475,42 @@
         "title": "FieldSpecResponse",
         "type": "object"
       },
+      "FillResponse": {
+        "properties": {
+          "filled": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Filled",
+            "type": "array"
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemResponse"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "queued": {
+            "default": 0,
+            "title": "Queued",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item",
+          "filled"
+        ],
+        "title": "FillResponse",
+        "type": "object"
+      },
       "FormatSpecResponse": {
         "properties": {
           "label": {
@@ -8324,6 +8360,76 @@
           }
         },
         "summary": "Fetch Cover"
+      }
+    },
+    "/api/items/{item_id}/fill": {
+      "post": {
+        "description": "Fill the item's empty fields from its provider, and nothing else (Sprint 109).\n\n`refresh_item` overwrites behind a confirmation; this never replaces a value, so\nit asks for none. An item with no provider source (an import that matched on an\nISBN alone) has nothing to fetch from directly, so its domain's enrichment is\nqueued for it instead, which fills the same way in the background.",
+        "operationId": "fill_item_api_items__item_id__fill_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FillResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Fill Item"
       }
     },
     "/api/items/{item_id}/outline": {

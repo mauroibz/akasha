@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import logging
 from datetime import date
+from functools import partial
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
@@ -12,6 +13,11 @@ from pydantic import BaseModel, Field, model_validator
 
 from book_tracker.api.identity import CurrentUser
 from book_tracker.application.add import AddService
+from book_tracker.application.enrichment import (
+    enqueue_enrichment_backfill,
+    enrichment_pending,
+    provider_label,
+)
 from book_tracker.application.library import (
     LibraryError,
     LibraryService,
@@ -1255,6 +1261,71 @@ async def refresh_item(
     if await _install_cover_from_payload(request, payload, item_id, user):
         refreshed = await off_loop(library.get_item, item_id)
     return ItemResponse.model_validate(refreshed)
+
+
+class FillResponse(BaseModel):
+    item: ItemResponse
+    #: The names of the fields this fill wrote; empty when the provider had nothing new.
+    filled: list[str]
+    #: Which provider answered, as a person reads its name, when one was asked.
+    provider: str | None = None
+    #: Background lookups queued instead, for an item with no provider source.
+    queued: int = 0
+
+
+@router.post("/items/{item_id}/fill", response_model=FillResponse, responses=ERRORS)
+async def fill_item(item_id: int, request: Request, user: CurrentUser) -> FillResponse:
+    """Fill the item's empty fields from its provider, and nothing else (Sprint 109).
+
+    `refresh_item` overwrites behind a confirmation; this never replaces a value, so
+    it asks for none. An item with no provider source (an import that matched on an
+    ISBN alone) has nothing to fetch from directly, so its domain's enrichment is
+    queued for it instead, which fills the same way in the background.
+    """
+    library = library_for(request, user)
+    try:
+        provider, source_id = await off_loop(_primary_provider, request, library, item_id)
+    except LibraryError as error:
+        # No source to fetch from, or one this deployment has no provider for (a
+        # hand-entered item's own `manual` source): the domain's enrichment is the
+        # other way a provider can be asked about it.
+        if error.code not in ("refresh_unavailable", "provider_disabled"):
+            raise
+
+        queued = await off_loop(
+            partial(
+                enqueue_enrichment_backfill,
+                request.app.state.engine,
+                item_ids=[item_id],
+                requested=True,
+            )
+        )
+        # A lookup already waiting answers the same request, so it counts.
+        if not queued and await off_loop(enrichment_pending, request.app.state.engine, item_id):
+            queued = 1
+        item = await off_loop(library.get_item, item_id)
+        return FillResponse(item=ItemResponse.model_validate(item), filled=[], queued=queued)
+    payload = await _fetch_from_provider(provider, source_id)
+    metadata = dict(payload.metadata)
+    metadata["creators"] = list(payload.creators)
+    domain = DOMAINS.get(str(getattr(provider, "item_type", "")))
+    if payload.language is not None and domain is not None and declares_field(domain, "language"):
+        metadata["language"] = payload.language
+    item, filled = await off_loop(
+        library.fill_empty_provider_fields,
+        item_id,
+        {"subtitle": payload.subtitle, "year": payload.year, "metadata": metadata},
+    )
+    if not item.get("cover_url") and await _install_cover_from_payload(
+        request, payload, item_id, user
+    ):
+        item = await off_loop(library.get_item, item_id)
+        filled.append("cover")
+    return FillResponse(
+        item=ItemResponse.model_validate(item),
+        filled=filled,
+        provider=provider_label(provider.name),
+    )
 
 
 @router.post(

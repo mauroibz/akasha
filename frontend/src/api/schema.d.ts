@@ -1050,6 +1050,31 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/items/{item_id}/fill": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Fill Item
+     * @description Fill the item's empty fields from its provider, and nothing else (Sprint 109).
+     *
+     *     `refresh_item` overwrites behind a confirmation; this never replaces a value, so
+     *     it asks for none. An item with no provider source (an import that matched on an
+     *     ISBN alone) has nothing to fetch from directly, so its domain's enrichment is
+     *     queued for it instead, which fills the same way in the background.
+     */
+    post: operations["fill_item_api_items__item_id__fill_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/items/{item_id}/outline": {
     parameters: {
       query?: never;
@@ -1778,6 +1803,19 @@ export interface components {
       name: string;
       /** Type */
       type: string;
+    };
+    /** FillResponse */
+    FillResponse: {
+      /** Filled */
+      filled: string[];
+      item: components["schemas"]["ItemResponse"];
+      /** Provider */
+      provider?: string | null;
+      /**
+       * Queued
+       * @default 0
+       */
+      queued: number;
     };
     /** FormatSpecResponse */
     FormatSpecResponse: {
@@ -5884,6 +5922,64 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ItemResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  fill_item_api_items__item_id__fill_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["FillResponse"];
         };
       };
       /** @description Unauthorized */

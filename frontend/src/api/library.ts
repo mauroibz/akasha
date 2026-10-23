@@ -589,6 +589,35 @@ export async function patchItem(
  * rather than one canned sentence for every cause — a provider outage, a disabled
  * provider, and an item with no provider source all want a different next step.
  */
+/** What `POST /api/items/{id}/fill` answers (Sprint 109). */
+export type FillResult = {
+  item: LibraryEntry["item"];
+  /** Field names written; `cover` when a cover was installed. */
+  filled: string[];
+  /** The provider asked, as a person reads its name. */
+  provider: string | null;
+  /** Background lookups queued, for an item with no provider to ask directly. */
+  queued: number;
+};
+
+/**
+ * Fill the item's empty fields from its provider, never replacing a value.
+ *
+ * The non-destructive sibling of `refreshItem`, so it asks for no confirmation.
+ */
+export async function fillItem(itemId: number): Promise<FillResult> {
+  const response = await request(`/api/items/${itemId}/fill`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw await readApiError(
+      response,
+      "The provider could not be reached; nothing was changed",
+    );
+  return response.json() as Promise<FillResult>;
+}
+
 export async function refreshItem(
   itemId: number,
 ): Promise<LibraryEntry["item"]> {
