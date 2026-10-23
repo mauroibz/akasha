@@ -6558,3 +6558,14 @@ its first lookup ran, and the backfill's completeness rule skips `chapters`; bot
 the missing fields replaced a bare count.
 
 **Next.** Sprint 110.
+
+## 2026-10-23 — Sprint 110: location and loans, underneath
+
+**Done.** Migration 0028 (`entries.location`, `loans` with one open loan per entry), the entry
+`location` and `loan`, six routes, `location`/`lent` filters in the list, bulk selection and
+cursor key, and the JSON export.
+
+**Verified and how.** Seven new tests observed failing first, then green; 225 across the
+neighbouring suites; `make check`; 0028 run on a copy of the Sprint 109 walkthrough database.
+
+**Next.** Sprint 111, the screens.

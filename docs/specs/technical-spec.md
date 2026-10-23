@@ -184,6 +184,16 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
   shelf is something the owner invents, a format is something the domain knows
 - writes are validated against the item's own domain and refused with 422 otherwise
 
+`loans` (migration `0028`, Sprint 110, DEC-176)
+
+- one row per time an entry was lent: `entry_id` (`ON DELETE CASCADE`), `person` (the
+  owner's text, not a user of the install), `lent_on`, nullable `returned_on`, nullable `note`
+- at most one open loan per entry (no `returned_on`), enforced by the partial unique index
+  `uq_loans_one_open`; a return before the loan date is refused with 422
+- `entries.location` (same migration) is one line of the owner's text, at most 120
+  characters, trimmed, blank stored as `NULL`. Both are shared across every domain and are
+  not domain declarations
+
 `shelves` and `entry_shelves`
 
 - as in product spec, with normalized unique slug per user, and `user_id` a foreign key to `users` with restrict-on-delete (migration `0018`), defaulted to the seeded user like `entries`
@@ -369,6 +379,11 @@ Do not hold a SQLite write lock during remote, parsing, or image work. `POST /ap
 Import and resync may fill only fields considered empty (`NULL`, empty string, empty list/object as defined per field). They never overwrite non-empty user-visible fields. Identifier unions may add a previously absent key only when all exact identities resolve to the same item. For multiple source rows creating one new entry within the same commit, source confidence may choose the initial value; once an entry exists, a conflicting incoming score/status/note/date is recorded only in the batch's `import_records`, never on the entry itself. A manual entry edit always wins and must not be reverted by later imports.
 
 Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the replacement first; on timeout, malformed data, or invalid payload, leave the item unchanged. In one short transaction, overwrite only provider-managed fields actually present in the successful response and add authoritative identifiers/source links. Omitted provider fields do not erase old values, and entry opinion fields are never touched. A manual-only item with no primary source returns a typed conflict.
+
+`POST /api/items/{id}/fill` (Sprint 109) is the owner's fill-empty: it fetches from the primary
+source and writes only empty fields, with no confirmation. An item with no usable primary source
+queues its own enrichment instead, whatever the domain's completeness rule says, and reports a
+lookup already waiting as queued.
 
 ### 6.5 Imports
 
@@ -677,6 +692,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - `GET /api/events` streams the current person's job changes as Server-Sent Events, and
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
+  /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
+  `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
 - `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
   most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
   month with per-domain counts (Sprint 098).

@@ -1,7 +1,7 @@
 # Sprint 110 — Where things are, and who has them: underneath
 
 **Sprint:** 110
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 109
 **Owner:** Mauro
@@ -71,4 +71,19 @@ Screens (111). Reminders or due dates on a loan. Per-format locations.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `91da6ef`. Verified per DEC-167: `test_location_and_loans.py` (7, each
+observed failing first) and the neighbouring suites (flat entry contract, bulk, export, saved
+views, refile, repositories, persistence, queries, pagination, migrations, isolation, library
+API, diary, prune: 225 passed); `make check` with OpenAPI and the frontend schema regenerated.
+Migration 0028 also run on a copy of a real 0027 database (two entries, values intact,
+`foreign_key_check` clean).
+
+1. Location round-trips, trims, clears on blank; 121 characters is 422.
+2. A second open loan is 409 `already_lent`; a return before the loan date is 422; deleting the
+   entry deletes its loans.
+3. `/api/loans`, `/api/locations` and `lent=true` show another user nothing (isolation suite;
+   the six routes carry policies and four id-addressed probes answer 404).
+4. Migration up and down on temporary SQLite files.
+
+Deviations: none in behaviour. The bulk `filter` selection learns `location` and `lent` too, so
+a filtered selection can never be wider than the list it was made from. No screen yet (111).
