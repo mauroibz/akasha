@@ -279,6 +279,24 @@ export interface paths {
     patch: operations["update_entry_api_entries__entry_id__patch"];
     trace?: never;
   };
+  "/api/entries/{entry_id}/loans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Entry Loans */
+    get: operations["entry_loans_api_entries__entry_id__loans_get"];
+    put?: never;
+    /** Lend Entry */
+    post: operations["lend_entry_api_entries__entry_id__loans_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/entries/{entry_id}/refile": {
     parameters: {
       query?: never;
@@ -1115,6 +1133,64 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/loans": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Loans
+     * @description The owner's loans with their entries, longest out first (Sprint 110).
+     */
+    get: operations["list_loans_api_loans_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/loans/{loan_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Loan */
+    delete: operations["delete_loan_api_loans__loan_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Loan */
+    patch: operations["update_loan_api_loans__loan_id__patch"];
+    trace?: never;
+  };
+  "/api/locations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Locations
+     * @description The places the owner has written, most used first (Sprint 110).
+     */
+    get: operations["list_locations_api_locations_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/now": {
     parameters: {
       query?: never;
@@ -1606,6 +1682,13 @@ export interface components {
     EntryFilter: {
       /** Format */
       format?: components["schemas"]["EntryFormat"][];
+      /**
+       * Lent
+       * @default false
+       */
+      lent: boolean;
+      /** Location */
+      location?: string | null;
       /** Q */
       q?: string | null;
       /** Shelf */
@@ -1645,6 +1728,8 @@ export interface components {
       date_started?: string | null;
       /** Formats */
       formats?: string[] | null;
+      /** Location */
+      location?: string | null;
       /** Notes */
       notes?: string | null;
       /** Progress */
@@ -1678,6 +1763,9 @@ export interface components {
       item: components["schemas"]["ItemResponse"];
       /** Item Id */
       item_id: number;
+      loan?: components["schemas"]["LoanResponse"] | null;
+      /** Location */
+      location?: string | null;
       /** Notes */
       notes: string | null;
       /** Progress */
@@ -2248,6 +2336,72 @@ export interface components {
       };
       /** State */
       state: string;
+    };
+    /** LoanCreateBody */
+    LoanCreateBody: {
+      /**
+       * Lent On
+       * Format: date
+       */
+      lent_on: string;
+      /** Note */
+      note?: string | null;
+      /** Person */
+      person: string;
+      /** Returned On */
+      returned_on?: string | null;
+    };
+    /** LoanPatch */
+    LoanPatch: {
+      /** Lent On */
+      lent_on?: string | null;
+      /** Note */
+      note?: string | null;
+      /** Person */
+      person?: string | null;
+      /** Returned On */
+      returned_on?: string | null;
+    };
+    /**
+     * LoanResponse
+     * @description Who has it, since when, and when it came back (Sprint 110, DEC-176).
+     */
+    LoanResponse: {
+      /** Entry Id */
+      entry_id: number;
+      /** Id */
+      id: number;
+      /** Lent On */
+      lent_on: string;
+      /** Note */
+      note: string | null;
+      /** Person */
+      person: string;
+      /** Returned On */
+      returned_on: string | null;
+    };
+    /** LoanWithEntryResponse */
+    LoanWithEntryResponse: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Entry Id */
+      entry_id: number;
+      /** Id */
+      id: number;
+      /** Lent On */
+      lent_on: string;
+      /** Note */
+      note: string | null;
+      /** Person */
+      person: string;
+      /** Returned On */
+      returned_on: string | null;
+    };
+    /** LocationResponse */
+    LocationResponse: {
+      /** Count */
+      count: number;
+      /** Location */
+      location: string;
     };
     /** LoginBody */
     LoginBody: {
@@ -3237,6 +3391,8 @@ export interface operations {
         q?: string | null;
         key?: string | null;
         value?: string | null;
+        location?: string | null;
+        lent?: boolean;
         sort?:
           | "date_added"
           | "score"
@@ -3668,6 +3824,126 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["EntryResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  entry_loans_api_entries__entry_id__loans_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoanResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  lend_entry_api_entries__entry_id__loans_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LoanCreateBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoanResponse"];
         };
       };
       /** @description Unauthorized */
@@ -6121,6 +6397,220 @@ export interface operations {
         };
       };
       /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  list_loans_api_loans_get: {
+    parameters: {
+      query?: {
+        open?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoanWithEntryResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  delete_loan_api_loans__loan_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        loan_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  update_loan_api_loans__loan_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        loan_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LoanPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LoanResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  list_locations_api_locations_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LocationResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
       409: {
         headers: {
           [name: string]: unknown;

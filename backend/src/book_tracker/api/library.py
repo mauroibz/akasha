@@ -223,6 +223,17 @@ class ItemResponse(BaseModel):
     sources: list[SourceResponse]
 
 
+class LoanResponse(BaseModel):
+    """Who has it, since when, and when it came back (Sprint 110, DEC-176)."""
+
+    id: int
+    entry_id: int
+    person: str
+    lent_on: str
+    returned_on: str | None
+    note: str | None
+
+
 class EntryResponse(BaseModel):
     id: int
     item_id: int
@@ -247,6 +258,10 @@ class EntryResponse(BaseModel):
     #: How you hold this copy, in the domain's declared order (DEC-059). Independent
     #: of status: a `wishlist` entry carrying `vinyl` is the pressing you mean to buy.
     formats: list[str]
+    #: Where the owner keeps it, in their own words, or `None` (Sprint 110).
+    location: str | None = None
+    #: The loan that is out now, if any; the history is `/entries/{id}/loans`.
+    loan: LoanResponse | None = None
 
 
 class FacetsResponse(BaseModel):
@@ -423,6 +438,8 @@ class EntryPatch(BaseModel):
     #: is what an undo of a provisional score needs (Sprint 109). Any score sent
     #: without it is the owner's own and confirms it, as before.
     score_provisional: bool | None = None
+    #: Where it is kept; blank or `null` clears it (Sprint 110).
+    location: str | None = Field(default=None, max_length=120)
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":
@@ -467,6 +484,38 @@ class EntryFilter(BaseModel):
     shelf: list[str] = Field(default_factory=list)
     format: list[EntryFormat] = Field(default_factory=list)
     q: str | None = None
+    location: str | None = None
+    lent: bool = False
+
+
+class LoanCreateBody(BaseModel):
+    person: str = Field(max_length=120)
+    lent_on: date
+    returned_on: date | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+
+class LoanPatch(BaseModel):
+    person: str | None = Field(default=None, max_length=120)
+    lent_on: date | None = None
+    returned_on: date | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def required_fields_when_present(self) -> "LoanPatch":
+        for name in ("person", "lent_on"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} cannot be null")
+        return self
+
+
+class LocationResponse(BaseModel):
+    location: str
+    count: int
+
+
+class LoanWithEntryResponse(LoanResponse):
+    entry: EntryResponse
 
 
 class BulkSet(BaseModel):
@@ -525,6 +574,10 @@ def list_entries(
     #: is not a filter that means anything.
     key: str | None = None,
     value: str | None = None,
+    #: Only what is kept here, exactly as written (Sprint 110).
+    location: str | None = None,
+    #: Only what is out on loan now.
+    lent: bool = False,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
@@ -544,6 +597,8 @@ def list_entries(
             types=[item.value for item in type or []],
             key=key,
             value=value,
+            location=location,
+            lent=lent,
             q=q,
             sort=sort,
             order=order,
@@ -801,6 +856,43 @@ def update_entry(entry_id: int, body: EntryPatch, library: Library) -> EntryResp
     return EntryResponse.model_validate(
         library.update_entry(entry_id, body.model_dump(mode="json", exclude_unset=True))
     )
+
+
+@router.get("/entries/{entry_id}/loans", response_model=list[LoanResponse], responses=ERRORS)
+def entry_loans(entry_id: int, library: Library) -> list[LoanResponse]:
+    return [LoanResponse.model_validate(row) for row in library.entry_loans(entry_id)]
+
+
+@router.post(
+    "/entries/{entry_id}/loans", status_code=201, response_model=LoanResponse, responses=ERRORS
+)
+def lend_entry(entry_id: int, body: LoanCreateBody, library: Library) -> LoanResponse:
+    return LoanResponse.model_validate(library.lend(entry_id, body.model_dump(mode="json")))
+
+
+@router.patch("/loans/{loan_id}", response_model=LoanResponse, responses=ERRORS)
+def update_loan(loan_id: int, body: LoanPatch, library: Library) -> LoanResponse:
+    return LoanResponse.model_validate(
+        library.update_loan(loan_id, body.model_dump(mode="json", exclude_unset=True))
+    )
+
+
+@router.delete("/loans/{loan_id}", status_code=204, responses=ERRORS)
+def delete_loan(loan_id: int, library: Library) -> Response:
+    library.delete_loan(loan_id)
+    return Response(status_code=204)
+
+
+@router.get("/loans", response_model=list[LoanWithEntryResponse])
+def list_loans(library: Library, open: bool = False) -> list[LoanWithEntryResponse]:
+    """The owner's loans with their entries, longest out first (Sprint 110)."""
+    return [LoanWithEntryResponse.model_validate(row) for row in library.loans(open_only=open)]
+
+
+@router.get("/locations", response_model=list[LocationResponse])
+def list_locations(library: Library) -> list[LocationResponse]:
+    """The places the owner has written, most used first (Sprint 110)."""
+    return [LocationResponse.model_validate(row) for row in library.locations()]
 
 
 @router.delete("/entries/{entry_id}", status_code=204)

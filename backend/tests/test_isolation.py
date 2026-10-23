@@ -81,6 +81,13 @@ ROUTE_POLICY = {
     ("PATCH", "/api/entries/{entry_id}"): "private-id",
     ("DELETE", "/api/entries/{entry_id}"): "private-id",
     ("POST", "/api/entries/{entry_id}/refile"): "private-id",
+    # Sprint 110: a loan is reached only through its owner's entry.
+    ("GET", "/api/entries/{entry_id}/loans"): "private-id",
+    ("POST", "/api/entries/{entry_id}/loans"): "private-id",
+    ("PATCH", "/api/loans/{loan_id}"): "private-id",
+    ("DELETE", "/api/loans/{loan_id}"): "private-id",
+    ("GET", "/api/loans"): "private-collection",
+    ("GET", "/api/locations"): "private-collection",
     ("GET", "/api/items/{item_id}"): "owned-shared-cache",
     ("PATCH", "/api/items/{item_id}"): "owned-shared-cache",
     ("GET", "/api/item-types"): "shared",
@@ -282,7 +289,11 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
     job_id = JobRepository(app.state.engine).enqueue(
         batch_id, "enrich_item", {"item_id": owned.item_id}, user_id=1
     )
+    loan_id = LibraryService(app.state.engine, 1).lend(
+        owned.entry_id, {"person": "Sofi", "lent_on": "2026-04-02"}
+    )["id"]
     return {
+        "loan_id": loan_id,
         "entry_id": owned.entry_id,
         "item_id": owned.item_id,
         "shelf_id": shelf,
@@ -310,6 +321,10 @@ PRIVATE_PROBES = (
     ("PATCH", "/api/entries/{second_entry_id}", {"shelf_ids": ["SHELF"]}, None),
     ("DELETE", "/api/entries/{entry_id}", None, None),
     ("POST", "/api/entries/{entry_id}/refile", {"source": "anilist", "source_id": "1"}, None),
+    ("GET", "/api/entries/{entry_id}/loans", None, None),
+    ("POST", "/api/entries/{entry_id}/loans", {"person": "probe", "lent_on": "2026-01-01"}, None),
+    ("PATCH", "/api/loans/{loan_id}", {"returned_on": "2026-05-01"}, None),
+    ("DELETE", "/api/loans/{loan_id}", None, None),
     ("PATCH", "/api/entries/bulk", {"entry_ids": ["ENTRY"], "set": {"score": 5}}, None),
     (
         "PATCH",
@@ -549,6 +564,11 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
                 "held"
             ] == 0
             assert (await second.get("/api/goals")).json() == []
+            # The admin's loan to Sofi (seeded) is the admin's alone (Sprint 110).
+            assert (await second.get("/api/loans")).json() == []
+            assert (await second.get("/api/locations")).json() == []
+            lent = await second.get("/api/entries", params={"lent": "true"})
+            assert lent.json()["items"] == []
             export = await second.get("/api/export")
             assert export.json()["entries"] == []
             second_preview = await second.post(

@@ -1,7 +1,7 @@
 # Sprint 110 — Where things are, and who has them: underneath
 
 **Sprint:** 110
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 49
 **Depends on:** 109
 **Owner:** Mauro

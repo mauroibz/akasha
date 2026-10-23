@@ -117,6 +117,25 @@ class EntryRow(Base):
     progress_marks: Mapped[str | None]
     score_provisional: Mapped[int]
     suggested_status: Mapped[str | None]
+    #: Where the owner keeps it, in their own words, or NULL (Sprint 110, DEC-176).
+    location: Mapped[str | None] = mapped_column(default=None)
+    created_at: Mapped[str]
+    updated_at: Mapped[str]
+
+
+class LoanRow(Base):
+    """Who has it, since when, and when it came back (Sprint 110, DEC-176).
+
+    At most one open loan (no `returned_on`) per entry; the rest are its history.
+    """
+
+    __tablename__ = "loans"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entry_id: Mapped[int] = mapped_column(ForeignKey("entries.id", ondelete="CASCADE"))
+    person: Mapped[str]
+    lent_on: Mapped[str]
+    returned_on: Mapped[str | None] = mapped_column(default=None)
+    note: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 

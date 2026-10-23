@@ -65,6 +65,7 @@ from book_tracker.infrastructure.models import (
     ItemIdentifierRow,
     ItemRow,
     ItemSourceRow,
+    LoanRow,
     ShelfRow,
 )
 
@@ -298,6 +299,8 @@ class LibraryService:
             "progress_marks": json.loads(entry.progress_marks) if entry.progress_marks else None,
             "score_provisional": bool(entry.score_provisional),
             "suggested_status": entry.suggested_status,
+            "location": entry.location,
+            "loan": self._open_loan(session, entry.id),
             "item": self._item_dict(session, item),
             "shelves": self._shelves_for_entry(session, entry.id),
             "formats": self._formats_for_entry(session, entry.id, domain),
@@ -537,6 +540,9 @@ class LibraryService:
                 # stored value instead of being mistaken for "not sent".
                 if field in changes:
                     setattr(entry, field, changes[field])
+            if "location" in changes:
+                # One line of the owner's own words; blank means "not recorded".
+                entry.location = (changes["location"] or "").strip() or None
             if "progress_marks" in changes:
                 marks = changes["progress_marks"]
                 entry.progress_marks = json.dumps(marks) if marks is not None else None
@@ -783,6 +789,137 @@ class LibraryService:
             item.updated_at = _now()
             session.flush()
             return self._item_dict(session, item)
+
+    @staticmethod
+    def _loan_dict(loan: LoanRow) -> dict[str, Any]:
+        return {
+            "id": loan.id,
+            "entry_id": loan.entry_id,
+            "person": loan.person,
+            "lent_on": loan.lent_on,
+            "returned_on": loan.returned_on,
+            "note": loan.note,
+        }
+
+    def _open_loan(self, session: Session, entry_id: int) -> dict[str, Any] | None:
+        loan = session.scalar(
+            select(LoanRow).where(LoanRow.entry_id == entry_id, LoanRow.returned_on.is_(None))
+        )
+        return self._loan_dict(loan) if loan is not None else None
+
+    def _loan(self, session: Session, loan_id: int) -> LoanRow:
+        """A loan reached through the owner's own entry, or a 404 like any other id."""
+        loan = session.scalar(
+            select(LoanRow)
+            .join(EntryRow, EntryRow.id == LoanRow.entry_id)
+            .where(LoanRow.id == loan_id, EntryRow.user_id == self.user_id)
+        )
+        if loan is None:
+            raise LibraryError("loan_not_found", "Loan was not found", status_code=404)
+        return loan
+
+    @staticmethod
+    def _checked_return(lent_on: str, returned_on: str | None) -> None:
+        if returned_on is not None and returned_on < lent_on:
+            raise LibraryError(
+                "invalid_loan", "A loan cannot come back before it went out", status_code=422
+            )
+
+    def lend(self, entry_id: int, values: Mapping[str, Any]) -> dict[str, Any]:
+        """Lend a thing (Sprint 110). One open loan at a time: lending what is already
+        out is refused, so the owner records the return first."""
+        person = str(values["person"]).strip()
+        if not person:
+            raise LibraryError("invalid_loan", "Say who has it", status_code=422)
+        with self._write() as session:
+            entry = self._entry(session, entry_id)
+            if self._open_loan(session, entry.id) is not None:
+                raise LibraryError("already_lent", "This is already lent; record its return first")
+            self._checked_return(values["lent_on"], values.get("returned_on"))
+            now = _now()
+            loan = LoanRow(
+                entry_id=entry.id,
+                person=person,
+                lent_on=values["lent_on"],
+                returned_on=values.get("returned_on"),
+                note=(values.get("note") or "").strip() or None,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(loan)
+            session.flush()
+            return self._loan_dict(loan)
+
+    def update_loan(self, loan_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
+        with self._write() as session:
+            loan = self._loan(session, loan_id)
+            if "person" in changes:
+                person = str(changes["person"] or "").strip()
+                if not person:
+                    raise LibraryError("invalid_loan", "Say who has it", status_code=422)
+                loan.person = person
+            for field in ("lent_on", "returned_on"):
+                if field in changes:
+                    setattr(loan, field, changes[field])
+            if "note" in changes:
+                loan.note = (changes["note"] or "").strip() or None
+            self._checked_return(loan.lent_on, loan.returned_on)
+            if loan.returned_on is None and session.scalar(
+                select(LoanRow.id).where(
+                    LoanRow.entry_id == loan.entry_id,
+                    LoanRow.returned_on.is_(None),
+                    LoanRow.id != loan.id,
+                )
+            ):
+                raise LibraryError("already_lent", "This is already lent; record its return first")
+            loan.updated_at = _now()
+            session.flush()
+            return self._loan_dict(loan)
+
+    def delete_loan(self, loan_id: int) -> None:
+        with self._write() as session:
+            session.delete(self._loan(session, loan_id))
+
+    def entry_loans(self, entry_id: int) -> list[dict[str, Any]]:
+        """Every loan of one entry, the latest first."""
+        with Session(self.engine) as session:
+            self._entry(session, entry_id)
+            rows = session.scalars(
+                select(LoanRow)
+                .where(LoanRow.entry_id == entry_id)
+                .order_by(LoanRow.lent_on.desc(), LoanRow.id.desc())
+            )
+            return [self._loan_dict(row) for row in rows]
+
+    def loans(self, *, open_only: bool = False) -> list[dict[str, Any]]:
+        """The owner's loans with their entries; what is out first goes out longest."""
+        with Session(self.engine) as session:
+            query = (
+                select(LoanRow)
+                .join(EntryRow, EntryRow.id == LoanRow.entry_id)
+                .where(EntryRow.user_id == self.user_id)
+                .order_by(LoanRow.lent_on, LoanRow.id)
+            )
+            if open_only:
+                query = query.where(LoanRow.returned_on.is_(None))
+            return [
+                {
+                    **self._loan_dict(loan),
+                    "entry": self._entry_dict(session, self._entry(session, loan.entry_id)),
+                }
+                for loan in session.scalars(query)
+            ]
+
+    def locations(self) -> list[dict[str, Any]]:
+        """The places the owner has used, most used first, for offering them back."""
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(EntryRow.location, func.count())
+                .where(EntryRow.user_id == self.user_id, EntryRow.location.is_not(None))
+                .group_by(EntryRow.location)
+                .order_by(func.count().desc(), EntryRow.location.collate("NOCASE"))
+            ).all()
+            return [{"location": location, "count": count} for location, count in rows]
 
     def fill_empty_provider_fields(
         self, item_id: int, values: Mapping[str, Any]
@@ -1049,6 +1186,8 @@ class LibraryService:
         types: Sequence[str] = (),
         key: str | None = None,
         value: str | None = None,
+        location: str | None = None,
+        lent: bool = False,
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
@@ -1064,6 +1203,8 @@ class LibraryService:
                 "types": sorted(types),
                 "key": key or "",
                 "value": value or "",
+                "location": location or "",
+                "lent": lent,
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -1117,12 +1258,21 @@ class LibraryService:
         types: Sequence[str] = (),
         key: str | None = None,
         value: str | None = None,
+        location: str | None = None,
+        lent: bool = False,
     ) -> Any:
         query = (
             select(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
+        if location:
+            query = query.where(EntryRow.location == location)
+        if lent:
+            # Out now: an open loan, not one that came back (Sprint 110).
+            query = query.where(
+                EntryRow.id.in_(select(LoanRow.entry_id).where(LoanRow.returned_on.is_(None)))
+            )
         if types:
             # Unlike shelves and formats, repeating this *widens*: a row has exactly
             # one type, so asking for two of them is a union rather than a narrowing.
@@ -1201,6 +1351,8 @@ class LibraryService:
         types: Sequence[str] = (),
         key: str | None = None,
         value: str | None = None,
+        location: str | None = None,
+        lent: bool = False,
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -1219,7 +1371,9 @@ class LibraryService:
         }
         expression = sort_expressions[sort]
         bucket = case((expression.is_(None), 1), else_=0)
-        filter_key = self._filter_key(statuses, shelves, q, formats, types, key, value)
+        filter_key = self._filter_key(
+            statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+        )
         state = None
         if after:
             try:
@@ -1227,7 +1381,9 @@ class LibraryService:
             except CursorError as error:
                 raise LibraryError("invalid_cursor", str(error), status_code=400) from error
 
-        query = self._filtered_entries(statuses, shelves, q, formats, types, key, value)
+        query = self._filtered_entries(
+            statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+        )
         if state is not None:
             id_comparison = (
                 EntryRow.id > state.entry_id if order == "asc" else EntryRow.id < state.entry_id
@@ -1256,7 +1412,9 @@ class LibraryService:
             has_more = len(entries) > limit
             entries = entries[:limit]
             total_query = select(func.count()).select_from(
-                self._filtered_entries(statuses, shelves, q, formats, types, key, value)
+                self._filtered_entries(
+                    statuses, shelves, q, formats, types, key, value, location=location, lent=lent
+                )
                 .order_by(None)
                 .subquery()
             )
@@ -1269,7 +1427,9 @@ class LibraryService:
             # narrowing it would make the badge disagree with `/triage`, which is
             # domain-agnostic; `status_counts_by_type` is already split by type, so a
             # tab that is *not* selected still has a live count to show.
-            facet_base = self._filtered_entries([], shelves, q, formats).subquery()
+            facet_base = self._filtered_entries(
+                [], shelves, q, formats, location=location, lent=lent
+            ).subquery()
             # Grouped by the item's type as well as the status, because a status two
             # domains share is not one number on a screen that lists them separately:
             # a wishlisted record counted under "Book · Wishlist" is a wrong answer
@@ -1288,7 +1448,9 @@ class LibraryService:
             # The format selector sits *under* the tab, so this one keeps the type
             # filter: offering "Physical 312" while the library is showing records is
             # an answer to a question nobody asked.
-            format_base = self._filtered_entries(statuses, shelves, q, (), types).subquery()
+            format_base = self._filtered_entries(
+                statuses, shelves, q, (), types, location=location, lent=lent
+            ).subquery()
             format_rows = session.execute(
                 select(EntryFormatRow.format, func.count())
                 .join(format_base, format_base.c.id == EntryFormatRow.entry_id)
@@ -1864,6 +2026,8 @@ class LibraryService:
             filters.get("shelf", []),
             filters.get("q"),
             filters.get("format", []),
+            location=filters.get("location"),
+            lent=bool(filters.get("lent")),
         )
         if excluded_entry_ids:
             unique_exclusions = set(excluded_entry_ids)

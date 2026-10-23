@@ -42,6 +42,7 @@ from book_tracker.infrastructure.models import (
     ItemIdentifierRow,
     ItemRow,
     ItemSourceRow,
+    LoanRow,
     ShelfRow,
 )
 
@@ -222,6 +223,7 @@ _ENTRY_COLUMNS = (
     EntryRow.reread_count,
     EntryRow.progress,
     EntryRow.progress_marks,
+    EntryRow.location,
 )
 
 
@@ -254,11 +256,31 @@ def _formats_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]
     return formats
 
 
+def _loans_for(session: Session, entry_ids: list[int]) -> dict[int, list[dict[str, Any]]]:
+    """Every loan, returned or out, oldest first: who had it is the owner's record."""
+    loans: dict[int, list[dict[str, Any]]] = {}
+    for loan in session.scalars(
+        select(LoanRow)
+        .where(LoanRow.entry_id.in_(entry_ids))
+        .order_by(LoanRow.entry_id, LoanRow.lent_on, LoanRow.id)
+    ):
+        loans.setdefault(loan.entry_id, []).append(
+            {
+                "person": loan.person,
+                "lent_on": loan.lent_on,
+                "returned_on": loan.returned_on,
+                "note": loan.note,
+            }
+        )
+    return loans
+
+
 def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
     for batch in _batches(session, _ENTRY_COLUMNS, user_id):
         entry_ids = [entry.id for entry in batch]
         shelves = _shelves_for(session, entry_ids)
         formats = _formats_for(session, entry_ids)
+        loans = _loans_for(session, entry_ids)
         for entry in batch:
             yield {
                 "id": entry.id,
@@ -283,6 +305,9 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 # and the name is what the owner typed.
                 "shelves": shelves.get(entry.id, []),
                 "formats": formats.get(entry.id, []),
+                # Where it is and who has had it (Sprint 110).
+                "location": entry.location,
+                "loans": loans.get(entry.id, []),
             }
 
 
