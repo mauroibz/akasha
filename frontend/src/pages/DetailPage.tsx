@@ -56,6 +56,7 @@ import { isAbandoned, localDay } from "@/features/progress/outline";
 import { askStill, isFinished, statusWith } from "@/features/rescore/rescore";
 import { ScoreHistoryRow } from "@/features/rescore/ScoreHistoryRow";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { OneQuestion } from "@/features/questions/OneQuestion";
 import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
@@ -285,6 +286,8 @@ export function DetailPage() {
   const [deleteError, setDeleteError] = useState("");
   // The entry just dropped, while the page asks how far it got (DEC-172).
   const [asking, setAsking] = useState<LibraryEntry | null>(null);
+  // Lending, from the actions while nothing is out (Sprint 124).
+  const [lending, setLending] = useState(false);
   // Finishing what is under way, in one sheet (Sprint 123).
   const [finishing, setFinishing] = useState(false);
   // Finished again with a score: "Still an 8?" (Sprint 115).
@@ -571,41 +574,58 @@ export function DetailPage() {
                 entryId={entry.id}
                 icon={<History aria-hidden="true" />}
               />
-              <PropertyRow
-                name="formats"
-                label="Format"
-                icon={<Shapes aria-hidden="true" />}
-                onEdit={() => setDialog("opinion")}
-              >
-                {(entry.formats ?? [])
-                  .map(
-                    (format) => formatLabels(itemTypes.data)[format] ?? format,
-                  )
-                  .join(", ") || "—"}
-              </PropertyRow>
-              <LocationRow entry={entry} icon={<MapPin aria-hidden="true" />} />
-              <LoanRow entry={entry} icon={<Handshake aria-hidden="true" />} />
-              {has("date_started") && (
+              {/* Only what is there (Sprint 124, DEC-179): an empty row is a
+                  question below, asked one at a time, not a dash to fill. */}
+              {(entry.formats ?? []).length > 0 && (
+                <PropertyRow
+                  name="formats"
+                  label="Format"
+                  icon={<Shapes aria-hidden="true" />}
+                  onEdit={() => setDialog("opinion")}
+                >
+                  {(entry.formats ?? [])
+                    .map(
+                      (format) =>
+                        formatLabels(itemTypes.data)[format] ?? format,
+                    )
+                    .join(", ")}
+                </PropertyRow>
+              )}
+              {entry.location && (
+                <LocationRow
+                  entry={entry}
+                  icon={<MapPin aria-hidden="true" />}
+                />
+              )}
+              <LoanRow
+                // A fresh row when *Lend…* opens it, so it starts lending.
+                key={lending ? "lending" : "idle"}
+                entry={entry}
+                icon={<Handshake aria-hidden="true" />}
+                startLending={lending}
+                onIdle={() => setLending(false)}
+              />
+              {has("date_started") && entry.date_started && (
                 <PropertyRow
                   name="started"
                   label={nameOf("date_started")}
                   icon={<CalendarPlus aria-hidden="true" />}
                   onEdit={() => setDialog("opinion")}
                 >
-                  {entry.date_started ?? "—"}
+                  {entry.date_started}
                 </PropertyRow>
               )}
-              {has("date_finished") && (
+              {has("date_finished") && entry.date_finished && (
                 <PropertyRow
                   name="finished"
                   label={nameOf("date_finished")}
                   icon={<CalendarCheck aria-hidden="true" />}
                   onEdit={() => setDialog("opinion")}
                 >
-                  {entry.date_finished ?? "—"}
+                  {entry.date_finished}
                 </PropertyRow>
               )}
-              {has("reread_count") && (
+              {has("reread_count") && entry.reread_count > 0 && (
                 <PropertyRow
                   name="rereads"
                   label={nameOf("reread_count")}
@@ -617,15 +637,19 @@ export function DetailPage() {
               )}
               {/* The progress row is the tracker: one control for one number
                   (DEC-171, the owner's note on the first look). */}
-              <ProgressTracker
-                entry={entry}
-                types={itemTypes.data}
-                icon={<Gauge aria-hidden="true" />}
-                onFinished={(saved) => {
-                  // The last light finishes the pass (DEC-175): with a score, ask.
-                  if (saved.score !== null) setStill({ entry: saved });
-                }}
-              />
+              {(inProgress ||
+                entry.progress !== null ||
+                entry.progress_marks) && (
+                <ProgressTracker
+                  entry={entry}
+                  types={itemTypes.data}
+                  icon={<Gauge aria-hidden="true" />}
+                  onFinished={(saved) => {
+                    // The last light finishes the pass (DEC-175): with a score, ask.
+                    if (saved.score !== null) setStill({ entry: saved });
+                  }}
+                />
+              )}
               {/* Editable where it is read. The owner's complaint was distance:
                   shelf membership lived inside a dialog named after something
                   else, and creating a shelf was a whole route. */}
@@ -646,6 +670,7 @@ export function DetailPage() {
                 />
               </PropertyRow>
             </dl>
+            <OneQuestion entry={entry} types={itemTypes.data} />
             {entry.notes && (
               // The note as a callout, marked with the arch (Sprint 092).
               <div className="mt-4 flex gap-3 rounded-lg bg-muted/60 p-4">
@@ -696,6 +721,15 @@ export function DetailPage() {
                   onClick={beginAgain}
                 >
                   Start again
+                </Button>
+              )}
+              {!entry.loan && !lending && (
+                <Button
+                  variant="outline"
+                  className="rounded-full px-5"
+                  onClick={() => setLending(true)}
+                >
+                  Lend…
                 </Button>
               )}
               <Button

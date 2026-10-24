@@ -208,6 +208,8 @@ export interface LibraryEntry {
   score_rank?: number | null;
   /** The loan that is out now, if any. */
   loan?: Loan | null;
+  /** Fields the owner does not remember, so they are not asked again (Sprint 124). */
+  unknown_fields?: string[];
 }
 
 export interface LibraryPage {
@@ -458,6 +460,8 @@ export async function patchEntry(
     /** Why the score sent is what it is (Sprint 114). */
     score_reason?: "reread" | "time";
     score_note?: string;
+    /** Replaces the fields the owner does not remember (Sprint 124). */
+    unknown_fields?: string[];
   },
 ): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {

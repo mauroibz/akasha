@@ -1172,6 +1172,21 @@
                 "type": "null"
               }
             ]
+          },
+          "unknown_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 8,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Fields"
           }
         },
         "title": "EntryPatch",
@@ -1332,6 +1347,14 @@
                 "type": "null"
               }
             ]
+          },
+          "unknown_fields": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown Fields",
+            "type": "array"
           }
         },
         "required": [

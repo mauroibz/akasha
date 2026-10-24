@@ -6,7 +6,7 @@ import type { EntryStatus, ItemType, LibraryEntry } from "@/api/library";
  * "read" or "watched".
  */
 
-type Flag = "finished" | "in_progress";
+type Flag = "finished" | "in_progress" | "planned";
 
 /** The status a domain declares with `flag`, or `null` when it has none. */
 export function statusWith(

@@ -12,14 +12,19 @@ test("a thing is placed, lent, listed as out, and comes back", async ({
   await stubHouse(page);
   await page.goto("/books/7");
 
+  // Nothing recorded yet: no row, a question (Sprint 124).
+  await expect(page.locator("[data-fact='location']")).toHaveCount(0);
+  const question = page.locator("[data-question]");
+  while ((await question.getAttribute("data-question")) !== "location")
+    await question.getByRole("button", { name: "Skip" }).click();
+  await question.getByRole("textbox", { name: "Where it is" }).fill("Hall");
+  await question.getByRole("button", { name: "Save" }).click();
   const where = page.locator("[data-fact='location']");
-  await where.getByRole("button", { name: "Change where it is" }).click();
-  await where.getByRole("combobox", { name: "Where it is" }).fill("Hall");
-  await where.getByRole("combobox", { name: "Where it is" }).press("Enter");
   await expect(where.locator("dd")).toContainText("Hall");
 
+  await expect(page.locator("[data-fact='loan']")).toHaveCount(0);
+  await page.getByRole("button", { name: "Lend…" }).click();
   const lent = page.locator("[data-fact='loan']");
-  await lent.getByRole("button", { name: "Lend…" }).click();
   await expect(lent.getByRole("textbox", { name: "Lent on" })).toHaveValue(
     today(),
   );
@@ -52,8 +57,8 @@ test.describe("on a phone", () => {
   }) => {
     await stubHouse(page);
     await page.goto("/books/7");
+    await page.getByRole("button", { name: "Lend…" }).click();
     const lent = page.locator("[data-fact='loan']");
-    await lent.getByRole("button", { name: "Lend…" }).click();
     await lent.getByRole("combobox", { name: "Who has it" }).fill("Sofi");
     await lent.getByRole("button", { name: "Lend", exact: true }).click();
     await expect(lent).toContainText("To Sofi");

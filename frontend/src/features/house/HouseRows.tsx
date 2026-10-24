@@ -146,12 +146,18 @@ export function LocationRow({
 export function LoanRow({
   entry,
   icon,
+  startLending = false,
+  onIdle,
 }: {
   entry: LibraryEntry;
   icon: React.ReactNode;
+  /** Opened from the page's *Lend…* (Sprint 124): the row appears to be filled. */
+  startLending?: boolean;
+  /** Called when the form closes without anything lent. */
+  onIdle?: () => void;
 }) {
   const listId = useId();
-  const [lending, setLending] = useState(false);
+  const [lending, setLending] = useState(startLending);
   const [person, setPerson] = useState("");
   const [lentOn, setLentOn] = useState(() => localDay(new Date()));
   const refresh = useRefresh(entry.id);
@@ -165,6 +171,7 @@ export function LoanRow({
     onSuccess: () => {
       setLending(false);
       setPerson("");
+      onIdle?.();
       refresh();
     },
   });
@@ -179,6 +186,8 @@ export function LoanRow({
   const past = loans.filter((loan) => loan.returned_on);
   const people = Array.from(new Set(loans.map((loan) => loan.person)));
   const failure = lend.error ?? back.error;
+  // Only what is there (Sprint 124): nothing out, never lent, not lending, no row.
+  if (!open && !lending && past.length === 0 && !failure) return null;
   return (
     <Row
       name="loan"
@@ -228,7 +237,10 @@ export function LoanRow({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  onClick={() => setLending(false)}
+                  onClick={() => {
+                    setLending(false);
+                    onIdle?.();
+                  }}
                 >
                   Cancel
                 </Button>
@@ -278,21 +290,10 @@ export function LoanRow({
           </span>
         </>
       ) : (
-        <>
-          <span className="text-muted-foreground">—</span>
-          {!lending && (
-            <button
-              type="button"
-              onClick={() => {
-                setLentOn(localDay(new Date()));
-                setLending(true);
-              }}
-              className={quietButton}
-            >
-              Lend…
-            </button>
-          )}
-        </>
+        // *Lend…* is the page's own action now (Sprint 124).
+        <span className="text-muted-foreground">
+          {lending ? "Who has it, and since when" : "Here"}
+        </span>
       )}
     </Row>
   );

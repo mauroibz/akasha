@@ -312,6 +312,7 @@ class LibraryService:
             "suggested_status": entry.suggested_status,
             "location": entry.location,
             "score_rank": entry.score_rank,
+            "unknown_fields": json.loads(entry.unknown_fields) if entry.unknown_fields else [],
             "loan": self._open_loan(session, entry.id),
             "item": self._item_dict(session, item),
             "shelves": self._shelves_for_entry(session, entry.id),
@@ -788,6 +789,8 @@ class LibraryService:
                 # Starting is when you know the start (Sprint 123, DEC-179): an empty
                 # date is filled with today, one already written is kept.
                 entry.date_started = date.today().isoformat()
+            if "unknown_fields" in changes:
+                entry.unknown_fields = self._unknown_fields(domain, changes["unknown_fields"])
             if "location" in changes:
                 # One line of the owner's own words; blank means "not recorded".
                 entry.location = (changes["location"] or "").strip() or None
@@ -823,6 +826,22 @@ class LibraryService:
             if changes.get("score_reason") or changes.get("score_note"):
                 self._label_score_event(session, entry, last_event, changes)
             return self._entry_dict(session, entry)
+
+    @staticmethod
+    def _unknown_fields(domain: Domain, fields: list[str]) -> str | None:
+        """The fields the owner does not remember, kept only where the domain has them
+        (Sprint 124): a film has no start date to forget."""
+        askable = {"location"} | (domain.entry_fields & {"date_started", "date_finished"})
+        if domain.formats:
+            askable.add("formats")
+        refused = sorted(set(fields) - askable)
+        if refused:
+            raise LibraryError(
+                "unknown_field_not_askable",
+                f"{domain.label} entries have no {', '.join(refused)} to forget",
+                status_code=422,
+            )
+        return json.dumps(sorted(set(fields))) if fields else None
 
     @staticmethod
     def _last_score_event(session: Session, entry_id: int) -> int:

@@ -122,6 +122,9 @@ class EntryRow(Base):
     #: Place among the entries sharing this score, 1 the best, NULL not placed (Sprint
     #: 116). Set aside by a trigger when the score changes.
     score_rank: Mapped[int | None] = mapped_column(default=None)
+    #: The fields the owner does not remember, as a JSON list, or NULL for none
+    #: (Sprint 124, DEC-179): the question about each is not asked again.
+    unknown_fields: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 

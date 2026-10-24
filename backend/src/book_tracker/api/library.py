@@ -264,6 +264,8 @@ class EntryResponse(BaseModel):
     location: str | None = None
     #: Place among the entries sharing this score, 1 the best (Sprint 116).
     score_rank: int | None = None
+    #: The fields the owner does not remember, so they are not asked again (Sprint 124).
+    unknown_fields: list[str] = []
     #: The loan that is out now, if any; the history is `/entries/{id}/loans`.
     loan: LoanResponse | None = None
 
@@ -448,6 +450,9 @@ class EntryPatch(BaseModel):
     #: this write records, or, with an unchanged score, records "still an 8".
     score_reason: Literal["reread", "time"] | None = None
     score_note: str | None = Field(default=None, max_length=280)
+    #: Replaces the set of fields the owner does not remember (Sprint 124); `[]`
+    #: clears it. Only `location`, `formats` and the domain's dates can be named.
+    unknown_fields: list[str] | None = Field(default=None, max_length=8)
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":

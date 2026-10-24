@@ -1130,8 +1130,10 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await stubHouse(page);
     await page.goto("/books/7");
+    await expect(page.locator("[data-question]")).toBeVisible();
+    await expectNoSeriousViolations(page, `one question (${scheme})`);
+    await page.getByRole("button", { name: "Lend…" }).click();
     const lent = page.locator("[data-fact='loan']");
-    await lent.getByRole("button", { name: "Lend…" }).click();
     await expect(
       lent.getByRole("combobox", { name: "Who has it" }),
     ).toBeVisible();

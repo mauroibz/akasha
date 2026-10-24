@@ -138,6 +138,7 @@ NEUTRAL_ENTRY_VALUES = frozenset(
         "location",
         "score_reason",
         "score_note",
+        "unknown_fields",
     }
 )
 

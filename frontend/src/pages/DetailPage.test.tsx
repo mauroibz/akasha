@@ -654,7 +654,9 @@ describe("DetailPage", () => {
         if (url === "/api/shelves") return new Response("[]");
         if (url === "/api/item-types") return new Response("[]");
       },
-      { fallback: entry },
+      {
+        fallback: { ...entry, date_started: "2026-01-02", reread_count: 1 },
+      },
     );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -664,6 +666,30 @@ describe("DetailPage", () => {
     expect(
       screen.getByRole("heading", { name: "Your reading data" }),
     ).toBeVisible();
+  });
+
+  it("shows only the rows that hold something (Sprint 124)", async () => {
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types") return new Response("[]");
+      },
+      { fallback: { ...entry, formats: [] } },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    for (const fact of [
+      "rereads",
+      "started",
+      "finished",
+      "formats",
+      "location",
+      "loan",
+    ])
+      expect(document.querySelector(`[data-fact='${fact}']`)).toBeNull();
+    for (const fact of ["status", "score", "shelves"])
+      expect(document.querySelector(`[data-fact='${fact}']`)).not.toBeNull();
   });
 
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
@@ -1407,20 +1433,21 @@ describe("DetailPage", () => {
       );
     }
 
-    it("sets where it is, from the row", async () => {
+    it("changes where it is, from the row", async () => {
       const calls: Array<{ url: string; method: string; body: unknown }> = [];
-      routes(calls);
+      routes(calls, { location: "Hall" });
       renderPage();
       const user = userEvent.setup();
       await screen.findByRole("heading", { name: "Rayuela" });
       const row = document.querySelector(
         "[data-fact='location']",
       ) as HTMLElement;
-      expect(row).toHaveTextContent("—");
+      expect(row).toHaveTextContent("Hall");
       await user.click(
         within(row).getByRole("button", { name: "Change where it is" }),
       );
       const field = within(row).getByRole("combobox", { name: "Where it is" });
+      await user.clear(field);
       await user.type(field, "Living room, shelf 2{Enter}");
       await waitFor(() =>
         expect(calls).toContainEqual({
@@ -1437,8 +1464,10 @@ describe("DetailPage", () => {
       const first = renderPage();
       const user = userEvent.setup();
       await screen.findByRole("heading", { name: "Rayuela" });
+      // Nothing out: no row, and the page's own *Lend…* opens one (Sprint 124).
+      expect(document.querySelector("[data-fact='loan']")).toBeNull();
+      await user.click(screen.getByRole("button", { name: "Lend…" }));
       const row = document.querySelector("[data-fact='loan']") as HTMLElement;
-      await user.click(within(row).getByRole("button", { name: "Lend…" }));
       await user.type(
         within(row).getByRole("combobox", { name: "Who has it" }),
         "Sofi",
@@ -1494,7 +1523,11 @@ describe("DetailPage", () => {
       ]);
       renderPage();
       await screen.findByRole("heading", { name: "Rayuela" });
-      const row = document.querySelector("[data-fact='loan']") as HTMLElement;
+      const row = await waitFor(() => {
+        const found = document.querySelector("[data-fact='loan']");
+        if (!found) throw new Error("no loan row yet");
+        return found as HTMLElement;
+      });
       expect(await within(row).findByText(/Juan/)).toBeVisible();
     });
   });

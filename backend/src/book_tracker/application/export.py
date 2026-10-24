@@ -226,6 +226,7 @@ _ENTRY_COLUMNS = (
     EntryRow.progress_marks,
     EntryRow.location,
     EntryRow.score_rank,
+    EntryRow.unknown_fields,
 )
 
 
@@ -334,6 +335,8 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 "score_history": scores.get(entry.id, []),
                 # Its place among the entries sharing its score (Sprint 116).
                 "score_rank": entry.score_rank,
+                # What the owner said they do not remember (Sprint 124).
+                "unknown_fields": json.loads(entry.unknown_fields) if entry.unknown_fields else [],
             }
 
 

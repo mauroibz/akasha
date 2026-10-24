@@ -1967,6 +1967,8 @@ export interface components {
       /** Shelf Ids */
       shelf_ids?: number[] | null;
       status?: components["schemas"]["EntryStatus"] | null;
+      /** Unknown Fields */
+      unknown_fields?: string[] | null;
     };
     /** EntryResponse */
     EntryResponse: {
@@ -2006,6 +2008,11 @@ export interface components {
       shelves: components["schemas"]["ShelfResponse"][];
       status: components["schemas"]["EntryStatus"];
       suggested_status: components["schemas"]["EntryStatus"] | null;
+      /**
+       * Unknown Fields
+       * @default []
+       */
+      unknown_fields: string[];
     };
     /**
      * EntryStatus
