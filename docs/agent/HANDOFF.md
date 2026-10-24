@@ -2,8 +2,8 @@
 
 ## Where the project stands
 
-**2026-10-24:** Sprints 109–127 are completed and committed on `main`, **unreleased on top of
-2.7.0**. The project state is `complete`; no sprint is planned. 109–121 are the house and the
+**2026-10-24:** Sprints 109–127 are completed and **released as v2.8.0** (tag
+`v2.8.0`, GitHub release from `docs/operations/release-notes-v2.8.md`). The project state is `complete`; no sprint is planned. 109–121 are the house and the
 history (DEC-176, DEC-178); 122–127 are the owner's first look at them in the running app
 (DEC-179, mockups *A second look*, approved as recommended). Migrations 0028–0033 are new.
 
@@ -25,8 +25,8 @@ Waiting on the owner:
 
 - A look at 122–127, especially Play's weight on a phone's first screen of Insights.
 - DEC-178's reading of the 02/03 mockup note (Sprint 121 is one commit, `8b61b07`).
-- A 2.8 release (version surfaces, release notes, `make smoke-container`, tag) when asked.
-  Six migrations (0028–0033) would run on the board, with the usual backup first.
+- Upgrading the board to 2.8.0 (`docs/operations/runbook.md`): six migrations (0028–0033)
+  run there, with the usual backup first.
 - Still open from before: trust-stated-status on import (DEC-165 point 3); real Hardcover,
   Simkl and StoryGraph exports (Sprint 099). Homelab sync is GitHub issue #31; the
   commonplace book is a v3 candidate.
@@ -38,7 +38,8 @@ Waiting on the owner:
   backend (recorded per sprint in the worklog and each Outcome).
 - Once for 122–127, on 2026-10-24: `make test` — backend 1792 passed, Vitest 549 passed;
   full Playwright — 214 passed, 2 skipped (live metadata, by design); `make check`.
-- Not run: `make smoke-container` (owed before a release).
+- Release gate for 2.8.0, 2026-10-24: the full suites above on the release tree's code, then
+  `make check` and `make smoke-container` after the version surfaces moved.
 
 ## Known and left
 
@@ -58,4 +59,4 @@ No sprint is planned. Run checks under `set -o pipefail`. Walkthroughs: `uv run 
 ../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
 fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
 owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e
-stubs `/api/loans?open=true` by default so it cannot leak into specs. The board runs 2.7.0.
+stubs `/api/loans?open=true` by default so it cannot leak into specs. The board runs 2.7.0 until the owner upgrades it.

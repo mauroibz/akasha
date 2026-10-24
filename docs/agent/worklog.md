@@ -6791,3 +6791,11 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   one tap to 12, slots, a goal of 30 as a bar; no sideways scroll at 390/1440.
 - Line verification: `make test` (1792 + 549), full Playwright (214 passed, 2 skipped).
 - Next: nothing planned; the owner's look at 122–127 and a 2.8 release when asked.
+
+## 2026-10-24 — Release v2.8.0
+
+- Done: version surfaces 2.7.0 → 2.8.0 (pyproject, uv.lock, main.py, package and lock,
+  openapi, compose, docs index); release notes `docs/operations/release-notes-v2.8.md`.
+- Verified: `make test` (1792 + 549) and full Playwright (214, 2 skipped) on the 122–127 code;
+  after the version move, `make check` and `make smoke-container` (passed).
+- Next: the owner upgrades the board.
