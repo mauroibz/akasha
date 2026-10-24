@@ -1007,7 +1007,9 @@ the owner's own books, each with its covers and shown only when it has something
 *Which 8 is your best 8?* (the rank deck, for the shown library's most shared score), *Is
 Tokio blues still a 10?* (the revisit deck), *The pile* (the planned deck) and *Fill in the
 gaps* (`/play/gaps`: finished books missing a date or a format, one at a time, with the
-detail page's questions). Upkeep is `/deck`, *Tidy up*: the inbox, covers and duplicates,
+detail page's questions). With two or more games, *Five minutes* leads (`/play/five`,
+Sprint 126): one round of up to five cards dealt from them all, each answer written as its
+game writes it, ending with what changed. Upkeep is `/deck`, *Tidy up*: the inbox, covers and duplicates,
 reached from Settings and the command bar.
 
 **`/import` — Import.** One prominent workflow tablist separates **1. Import** from

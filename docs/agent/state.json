@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 51,
-  "project_status": "in_progress",
-  "active_sprint": "126",
-  "active_sprint_file": "docs/sprints/126-five-minutes.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "125",
+  "project_status": "ready",
+  "active_sprint": "127",
+  "active_sprint_file": "docs/sprints/127-the-goal-in-the-diary.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "126",
   "completed_sprints": [
     "001",
     "002",
@@ -131,8 +131,9 @@
     "122",
     "123",
     "124",
-    "125"
+    "125",
+    "126"
   ],
-  "started_at": "2026-10-24T04:07:08-03:00",
-  "updated_at": "2026-10-24T04:07:08-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-24T04:13:30-03:00"
 }

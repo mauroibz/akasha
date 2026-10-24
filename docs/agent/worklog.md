@@ -6771,3 +6771,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   `make check`, Playwright play/chores/insights/a11y. Walkthrough `walk125.mjs` at 390/1440.
 - Noticed: on a phone Play fills most of the first screen of Insights.
 - Next: Sprint 126, five minutes.
+
+## 2026-10-24 — Sprint 126: Five minutes
+
+- Done: `/play/five`, a round of up to five mixed cards dealt once; *Five minutes* leads Play
+  with two or more games; deck exits follow their new homes.
+- Verified: Vitest (five, FivePage red first, Play), `vitest related` (79), `make check`,
+  Playwright play/chores/rescore/a11y. Walkthrough `walk126.mjs` at 390: a full round.
+- Found and fixed in the walkthrough: one pair answer wrote ranks for every book of that
+  score; now only the placed books and the two compared.
+- Next: Sprint 127, the goal in the Diary.
