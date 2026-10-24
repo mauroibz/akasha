@@ -6692,3 +6692,14 @@ accessibility; walkthrough `walk119.mjs` making a *Dune* shelf of a book and a f
 **Found.** The member cover URL used the entry id (fixed, tested).
 
 **Next.** Sprint 120, the year in review (DEC-178).
+
+## 2026-10-23 — Sprint 120: the year in review
+
+**Done.** `/api/diary/{year}/review`, `/diary/:year/review`, the Diary's link.
+
+**Verified and how.** Backend 78; Vitest 287 related; Playwright 52; walkthrough `walk120.mjs`.
+
+**Found.** Nothing broken; the review link needs a year with finishes, so a new year shows
+none until the owner picks a past one.
+
+**Next.** Sprint 121, the revisit deck.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 50,
-  "project_status": "in_progress",
-  "active_sprint": "120",
-  "active_sprint_file": "docs/sprints/120-the-year-in-review.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "119",
+  "project_status": "ready",
+  "active_sprint": "121",
+  "active_sprint_file": "docs/sprints/121-the-revisit-deck.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "120",
   "completed_sprints": [
     "001",
     "002",
@@ -125,8 +125,9 @@
     "116",
     "117",
     "118",
-    "119"
+    "119",
+    "120"
   ],
-  "started_at": "2026-10-23T21:00:27-03:00",
-  "updated_at": "2026-10-23T21:00:27-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T21:07:07-03:00"
 }
