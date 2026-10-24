@@ -6716,3 +6716,15 @@ keeping one old score and changing another on a fresh backend. Then, once for th
 **Found.** The eyebrow wrapped at 390px; shortened to *Revisit*.
 
 **Next.** Owner: read the mockups' 02/03 note against DEC-178; a 2.8 release when asked.
+
+## 2026-10-23 — The full suites after the 109–121 line
+
+**Done.** `make test` and the full Playwright run once over the whole line. Fixed what they
+found outside the sprints' sets: `test_app_shape.py`'s pinned routes (`1345575`) and the
+Settings *Chores* link's touch target (`d507930`).
+
+**Verified and how.** Backend 1787 passed; Vitest 524; Playwright 200 passed, 2 skipped.
+`rescore.spec.ts` failed once under load, then passed alone and in the following full run.
+Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's flags.
+
+**Next.** Owner: DEC-178's 02/03 reading; a 2.8 release when asked.

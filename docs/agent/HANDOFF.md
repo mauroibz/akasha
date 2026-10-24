@@ -36,7 +36,13 @@ Waiting on the owner:
 - Per sprint, as DEC-167 asks: the tests for the changed code, `make check`, the Playwright
   specs for each changed screen, and a walkthrough on a fresh `scripts/walkthrough.py`
   backend with live providers for every sprint that changed a screen (recorded per sprint).
-- Once for the whole line, on 2026-10-23: FULL_SUITE_RESULTS
+- Once for the whole line, on 2026-10-23: `make test` — backend 1787 passed, Vitest 524
+  passed; full Playwright — 200 passed, 2 skipped (live metadata, by design); `make check`.
+  The first full run found two things outside the sprints' per-change sets, both fixed: the
+  pinned route list (`1345575`) and the Settings *Chores* link's touch target (`d507930`).
+  `rescore.spec.ts` failed once under full parallel load and passed alone and in the next
+  full run; timing-sensitive, recorded, not marked flaky.
+- Not run: `make smoke-container` (owed before a release).
 
 ## Known and left
 
