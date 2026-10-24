@@ -76,6 +76,9 @@ const RankDeckPage = lazy(async () => ({
 const TiersPage = lazy(async () => ({
   default: (await import("@/pages/TiersPage")).TiersPage,
 }));
+const YearReviewPage = lazy(async () => ({
+  default: (await import("@/pages/YearReviewPage")).YearReviewPage,
+}));
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
 }));
@@ -178,6 +181,7 @@ function PrivateRoutes({
             {/* The phone's share sheet (Sprint 097): opens the command bar. */}
             <Route path="/share" element={<SharePage />} />
             <Route path="/diary" element={<DiaryPage />} />
+            <Route path="/diary/:year/review" element={<YearReviewPage />} />
             <Route path="/lent" element={<LentPage />} />
             <Route path="/rank" element={<RankPage />} />
             <Route path="/tiers" element={<TiersPage />} />

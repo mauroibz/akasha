@@ -138,6 +138,7 @@ ROUTE_POLICY = {
     ("GET", "/api/now"): "private-collection",
     ("GET", "/api/diary"): "private-collection",
     ("GET", "/api/diary/timeline"): "private-collection",
+    ("GET", "/api/diary/{year}/review"): "private-collection",
     ("GET", "/api/views"): "private-collection",
     ("POST", "/api/views"): "private-write",
     ("DELETE", "/api/views/{view_id}"): "private-id",

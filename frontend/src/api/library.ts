@@ -975,3 +975,38 @@ export async function getTimeline(
     throw await apiFailure(response, "The timeline could not be loaded");
   return response.json() as Promise<Timeline>;
 }
+
+/** One year read back across every library (Sprint 120, DEC-178). */
+export interface YearReview {
+  year: number;
+  finished: number;
+  counts: Record<string, number>;
+  best: Array<{ entry: LibraryEntry; score: number; at: string }>;
+  /** Index `i` counts the finishes scored `i + 1` then. */
+  scores: number[];
+  /** Index `i` counts the finishes in month `i + 1`. */
+  months: number[];
+  leader: { name: string; count: number } | null;
+  changes: Array<{
+    entry: LibraryEntry;
+    score: number | null;
+    previous: number | null;
+    reason: string | null;
+    note: string | null;
+    at: string;
+  }>;
+  quote: { text: string; title: string; entry_id: number; at: string } | null;
+}
+
+export async function getYearReview(
+  year: number,
+  signal?: AbortSignal,
+): Promise<YearReview> {
+  const response = await request(`/api/diary/${year}/review`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The year could not be read back");
+  return response.json() as Promise<YearReview>;
+}

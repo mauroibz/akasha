@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, model_validator
 
@@ -881,6 +882,57 @@ def diary_timeline(
 ) -> TimelineResponse:
     """Every finish and score change across years and libraries, newest first."""
     return TimelineResponse.model_validate(library.timeline(before=before, limit=limit))
+
+
+class ReviewBest(BaseModel):
+    entry: EntryResponse
+    score: int
+    at: str
+
+
+class ReviewChange(BaseModel):
+    entry: EntryResponse
+    score: int | None
+    previous: int | None
+    reason: str | None
+    note: str | None
+    at: str
+
+
+class ReviewLeader(BaseModel):
+    name: str
+    count: int
+
+
+class ReviewQuote(BaseModel):
+    text: str
+    title: str
+    entry_id: int
+    at: str
+
+
+class YearReviewResponse(BaseModel):
+    """One year read back across every library (Sprint 120, DEC-178)."""
+
+    year: int
+    finished: int
+    #: What was finished, per item type.
+    counts: dict[str, int]
+    best: list[ReviewBest]
+    #: Index `i` counts the finishes scored `i + 1` then.
+    scores: list[int] = Field(min_length=10, max_length=10)
+    #: Index `i` counts the finishes in month `i + 1`.
+    months: list[int] = Field(min_length=12, max_length=12)
+    leader: ReviewLeader | None
+    changes: list[ReviewChange]
+    quote: ReviewQuote | None
+
+
+@router.get("/diary/{year}/review", response_model=YearReviewResponse, responses=ERRORS)
+def year_review(
+    library: Library, year: Annotated[int, PathParam(ge=1000, le=9999)]
+) -> YearReviewResponse:
+    return YearReviewResponse.model_validate(library.year_review(year))
 
 
 @router.get("/diary", response_model=DiaryResponse, responses=ERRORS)

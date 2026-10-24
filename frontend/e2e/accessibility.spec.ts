@@ -3,7 +3,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
 import { stubChores } from "./chores-fixture";
-import { stubTimeline } from "./diary-fixture";
+import { stubReview, stubTimeline } from "./diary-fixture";
 import { stubHouse } from "./house-fixture";
 import { stubRank } from "./rank-fixture";
 import { stubRescore } from "./rescore-fixture";
@@ -1238,5 +1238,19 @@ for (const scheme of ["light", "dark"] as const) {
       page.getByRole("region", { name: "Suggested shelves" }),
     ).toBeVisible();
     await expectNoSeriousViolations(page, `suggested shelves (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the year in review has no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubReview(page);
+    await page.goto("/diary/2025/review");
+    await expect(
+      page.getByRole("heading", { name: "In your words" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `year in review (${scheme})`);
   });
 }

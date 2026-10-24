@@ -490,6 +490,105 @@ class LibraryService:
             bucket["entries"].append(self.get_entry(entry_id))
         return {"year": year, "years": years, "months": list(months.values())}
 
+    def year_review(self, year: int) -> dict[str, Any]:
+        """One year read back across every library (Sprint 120, DEC-178).
+
+        What was finished that year (a finish date in it, as the Diary reads), each
+        with the score it had then; the best of it; the scores; the months; the
+        creator returned to most; the scores changed that year and why; and a line the
+        owner wrote. Computed when asked, so a later change of a score shows here too.
+        """
+        prefix = f"{year:04d}-%"
+        with Session(self.engine) as session:
+            rows = session.execute(
+                text(
+                    "SELECT e.id, i.type, e.date_finished, i.creator_primary,"
+                    " i.creator_primary_normalized, e.notes,"
+                    " COALESCE((SELECT s.score FROM score_events s WHERE s.entry_id = e.id"
+                    "  AND s.recorded_at < date(e.date_finished, '+1 day')"
+                    "  ORDER BY s.recorded_at DESC, s.id DESC LIMIT 1), e.score)"
+                    " FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user AND e.date_finished LIKE :prefix"
+                    " ORDER BY e.date_finished, e.id"
+                ),
+                {"user": self.user_id, "prefix": prefix},
+            ).all()
+            changed = session.execute(
+                text(
+                    "SELECT s.entry_id, s.score, s.previous, s.reason, s.note, s.recorded_at"
+                    " FROM score_events s JOIN entries e ON e.id = s.entry_id"
+                    " WHERE e.user_id = :user AND s.previous IS NOT NULL"
+                    " AND s.recorded_at LIKE :prefix ORDER BY s.recorded_at, s.id"
+                ),
+                {"user": self.user_id, "prefix": prefix},
+            ).all()
+            entries: dict[int, dict[str, Any]] = {}
+
+            def entry(entry_id: int) -> dict[str, Any]:
+                if entry_id not in entries:
+                    entries[entry_id] = self._entry_dict(session, self._entry(session, entry_id))
+                return entries[entry_id]
+
+            counts: dict[str, int] = {}
+            scores = [0] * 10
+            months = [0] * 12
+            creators: dict[str, list[str]] = {}
+            for _entry_id, item_type, finished, creator, creator_key, _notes, score in rows:
+                counts[item_type] = counts.get(item_type, 0) + 1
+                if score is not None:
+                    scores[score - 1] += 1
+                month = finished[5:7]
+                if month.isdigit() and 1 <= int(month) <= 12:
+                    months[int(month) - 1] += 1
+                if creator_key:
+                    creators.setdefault(creator_key, []).append(creator)
+            best = sorted(
+                (row for row in rows if row[6] is not None),
+                key=lambda row: (-row[6], row[2], row[0]),
+            )[:5]
+            leader = max(creators.values(), key=len, default=[])
+            notes_said = [row for row in changed if row[4]]
+            quote = None
+            if notes_said:
+                said = notes_said[-1]
+                quote = {
+                    "text": said[4],
+                    "title": entry(said[0])["item"]["title"],
+                    "entry_id": said[0],
+                    "at": said[5],
+                }
+            else:
+                written = [row for row in rows if row[5] and row[5].strip()]
+                if written:
+                    last = written[-1]
+                    quote = {
+                        "text": last[5].strip(),
+                        "title": entry(last[0])["item"]["title"],
+                        "entry_id": last[0],
+                        "at": last[2],
+                    }
+            return {
+                "year": year,
+                "finished": len(rows),
+                "counts": counts,
+                "best": [{"entry": entry(row[0]), "score": row[6], "at": row[2]} for row in best],
+                "scores": scores,
+                "months": months,
+                "leader": {"name": leader[0], "count": len(leader)} if len(leader) > 1 else None,
+                "changes": [
+                    {
+                        "entry": entry(entry_id),
+                        "score": score,
+                        "previous": previous,
+                        "reason": reason,
+                        "note": note,
+                        "at": at,
+                    }
+                    for entry_id, score, previous, reason, note, at in changed
+                ],
+                "quote": quote,
+            }
+
     _TIMELINE_KEY = re.compile(r"^[0-9T:.\-Z]+\|[12]\|\d{10}$")
 
     def timeline(self, *, before: str | None = None, limit: int = 50) -> dict[str, Any]:

@@ -196,6 +196,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/diary/{year}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Year Review */
+    get: operations["year_review_api_diary__year__review_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/duplicates": {
     parameters: {
       query?: never;
@@ -2765,6 +2782,46 @@ export interface components {
       /** Overwrite */
       overwrite: boolean;
     };
+    /** ReviewBest */
+    ReviewBest: {
+      /** At */
+      at: string;
+      entry: components["schemas"]["EntryResponse"];
+      /** Score */
+      score: number;
+    };
+    /** ReviewChange */
+    ReviewChange: {
+      /** At */
+      at: string;
+      entry: components["schemas"]["EntryResponse"];
+      /** Note */
+      note: string | null;
+      /** Previous */
+      previous: number | null;
+      /** Reason */
+      reason: string | null;
+      /** Score */
+      score: number | null;
+    };
+    /** ReviewLeader */
+    ReviewLeader: {
+      /** Count */
+      count: number;
+      /** Name */
+      name: string;
+    };
+    /** ReviewQuote */
+    ReviewQuote: {
+      /** At */
+      at: string;
+      /** Entry Id */
+      entry_id: number;
+      /** Text */
+      text: string;
+      /** Title */
+      title: string;
+    };
     /**
      * RowSearchBody
      * @description The edited text a re-search should query, either half optional.
@@ -3127,6 +3184,30 @@ export interface components {
       shelf_count: number;
       /** Username */
       username: string;
+    };
+    /**
+     * YearReviewResponse
+     * @description One year read back across every library (Sprint 120, DEC-178).
+     */
+    YearReviewResponse: {
+      /** Best */
+      best: components["schemas"]["ReviewBest"][];
+      /** Changes */
+      changes: components["schemas"]["ReviewChange"][];
+      /** Counts */
+      counts: {
+        [key: string]: number;
+      };
+      /** Finished */
+      finished: number;
+      leader: components["schemas"]["ReviewLeader"] | null;
+      /** Months */
+      months: number[];
+      quote: components["schemas"]["ReviewQuote"] | null;
+      /** Scores */
+      scores: number[];
+      /** Year */
+      year: number;
     };
   };
   responses: never;
@@ -3634,6 +3715,64 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["TimelineResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  year_review_api_diary__year__review_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        year: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["YearReviewResponse"];
         };
       };
       /** @description Unauthorized */

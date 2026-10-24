@@ -54,6 +54,10 @@ describe("DiaryPage", () => {
     ).toBeVisible();
     expect(await screen.findByText("2 books, 1 movie")).toBeVisible();
     expect(screen.getByRole("button", { name: "Open Rayuela" })).toBeVisible();
+    // The year read back (Sprint 120).
+    expect(
+      screen.getByRole("link", { name: "Your 2026 in review" }),
+    ).toHaveAttribute("href", "/diary/2026/review");
     expect(screen.getByRole("button", { name: "2025" })).toHaveAttribute(
       "aria-pressed",
       "false",

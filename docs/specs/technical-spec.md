@@ -708,6 +708,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - `GET /api/events` streams the current person's job changes as Server-Sent Events, and
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- `GET /api/diary/{year}/review` (Sprint 120, DEC-178): the year's finishes across every
+  library with the score each had then, the best five, the scores and months, the creator
+  returned to most, the score changes that year, and one line the owner wrote.
 - `GET /api/diary/timeline?before=&limit=` (Sprint 118): every finish and every score change
   (not a first score) across years and libraries, newest first, keyset-paged on one text key
   (the date, the kind, the row).

@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { getGoals, type Goal } from "@/api/goals";
 import { queryKeys } from "@/api/keys";
@@ -153,58 +153,71 @@ export function DiaryPage() {
               page, or import from a source that records it.
             </EmptyState>
           ) : (
-            <ol className="mt-8 space-y-10">
-              {diary.data.months.map((month) => (
-                <li key={month.month} aria-labelledby={`month-${month.month}`}>
-                  <h2
-                    id={`month-${month.month}`}
-                    className="font-display text-2xl font-medium tracking-tight"
+            <>
+              <p className="mt-6">
+                <Link
+                  to={`/diary/${shown}/review`}
+                  className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+                >
+                  Your {shown} in review
+                </Link>
+              </p>
+              <ol className="mt-4 space-y-10">
+                {diary.data.months.map((month) => (
+                  <li
+                    key={month.month}
+                    aria-labelledby={`month-${month.month}`}
                   >
-                    {monthName(month.month)}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {Object.entries(month.counts)
-                      .map(([id, count]) => labelFor(id, count))
-                      .join(", ")}
-                  </p>
-                  {/* A month's only cover is drawn large, a busy month's at shelf
+                    <h2
+                      id={`month-${month.month}`}
+                      className="font-display text-2xl font-medium tracking-tight"
+                    >
+                      {monthName(month.month)}
+                    </h2>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {Object.entries(month.counts)
+                        .map(([id, count]) => labelFor(id, count))
+                        .join(", ")}
+                    </p>
+                    {/* A month's only cover is drawn large, a busy month's at shelf
                   size (Sprint 104, the owner's "play with cover sizing"). */}
-                  <ul
-                    className={cn(
-                      "mt-4 grid gap-4",
-                      month.entries.length === 1
-                        ? "max-w-[11rem] grid-cols-1 sm:max-w-[13rem]"
-                        : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-5",
-                    )}
-                  >
-                    {month.entries.map((entry) => (
-                      <li key={entry.id}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigateWithTransition(
-                              navigate,
-                              `/books/${entry.id}`,
-                            )
-                          }
-                          className="block w-full rounded-md text-left focus-ring"
-                          aria-label={`Open ${entry.item.title}`}
-                        >
-                          <CoverImage
-                            src={entry.item.cover_url}
-                            alt=""
-                            className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
-                          />
-                          <span className="mt-2 block truncate text-sm font-medium">
-                            {entry.item.title}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ol>
+                    <ul
+                      className={cn(
+                        "mt-4 grid gap-4",
+                        month.entries.length === 1
+                          ? "max-w-[11rem] grid-cols-1 sm:max-w-[13rem]"
+                          : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-5",
+                      )}
+                    >
+                      {month.entries.map((entry) => (
+                        <li key={entry.id}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              navigateWithTransition(
+                                navigate,
+                                `/books/${entry.id}`,
+                              )
+                            }
+                            className="block w-full rounded-md text-left focus-ring"
+                            aria-label={`Open ${entry.item.title}`}
+                          >
+                            <CoverImage
+                              src={entry.item.cover_url}
+                              alt=""
+                              className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
+                            />
+                            <span className="mt-2 block truncate text-sm font-medium">
+                              {entry.item.title}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
         </>
       )}

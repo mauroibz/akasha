@@ -3518,6 +3518,139 @@
         "title": "RefreshBody",
         "type": "object"
       },
+      "ReviewBest": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry",
+          "score",
+          "at"
+        ],
+        "title": "ReviewBest",
+        "type": "object"
+      },
+      "ReviewChange": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "entry",
+          "score",
+          "previous",
+          "reason",
+          "note",
+          "at"
+        ],
+        "title": "ReviewChange",
+        "type": "object"
+      },
+      "ReviewLeader": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "count"
+        ],
+        "title": "ReviewLeader",
+        "type": "object"
+      },
+      "ReviewQuote": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "title",
+          "entry_id",
+          "at"
+        ],
+        "title": "ReviewQuote",
+        "type": "object"
+      },
       "RowSearchBody": {
         "description": "The edited text a re-search should query, either half optional.\n\nAn omitted half keeps the row's current value \u2014 the owner edits what is\nwrong and leaves the rest alone.",
         "properties": {
@@ -4526,6 +4659,91 @@
         ],
         "title": "UserSummary",
         "type": "object"
+      },
+      "YearReviewResponse": {
+        "description": "One year read back across every library (Sprint 120, DEC-178).",
+        "properties": {
+          "best": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewBest"
+            },
+            "title": "Best",
+            "type": "array"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "finished": {
+            "title": "Finished",
+            "type": "integer"
+          },
+          "leader": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewLeader"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "months": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 12,
+            "minItems": 12,
+            "title": "Months",
+            "type": "array"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewQuote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scores": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 10,
+            "title": "Scores",
+            "type": "array"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "finished",
+          "counts",
+          "best",
+          "scores",
+          "months",
+          "leader",
+          "changes",
+          "quote"
+        ],
+        "title": "YearReviewResponse",
+        "type": "object"
       }
     }
   },
@@ -5163,6 +5381,77 @@
           }
         },
         "summary": "Diary Timeline"
+      }
+    },
+    "/api/diary/{year}/review": {
+      "get": {
+        "operationId": "year_review_api_diary__year__review_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "year",
+            "required": true,
+            "schema": {
+              "maximum": 9999,
+              "minimum": 1000,
+              "title": "Year",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YearReviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Year Review"
       }
     },
     "/api/duplicates": {

@@ -48,3 +48,51 @@ export async function stubTimeline(page: Page) {
     });
   });
 }
+
+/** A year read back, as Sprint 120's API answers it. */
+export async function stubReview(page: Page) {
+  const entry = (id: number, title: string, type = "book") => ({
+    ...rankEntry(id, title, null),
+    item: { ...rankEntry(id, title, null).item, type },
+  });
+  await page.route("**/api/item-types", (route) =>
+    route.fulfill({ json: [bookItemType, movieItemType] }),
+  );
+  await page.route("**/api/diary/2025/review", (route) =>
+    route.fulfill({
+      json: {
+        year: 2025,
+        finished: 6,
+        counts: { book: 4, movie: 2 },
+        best: [
+          { entry: entry(1, "The Dispossessed"), score: 10, at: "2025-03-02" },
+          {
+            entry: entry(2, "The Left Hand of Darkness"),
+            score: 9,
+            at: "2025-04-11",
+          },
+          { entry: entry(3, "Dune", "movie"), score: 9, at: "2025-10-22" },
+        ],
+        scores: [0, 0, 0, 0, 0, 1, 1, 1, 2, 1],
+        months: [0, 0, 2, 1, 0, 0, 0, 0, 0, 2, 1, 0],
+        leader: { name: "Ursula K. Le Guin", count: 3 },
+        changes: [
+          {
+            entry: entry(4, "Solaris"),
+            score: 9,
+            previous: 8,
+            reason: "reread",
+            note: "Kelvin stays",
+            at: "2025-05-01T10:00:00Z",
+          },
+        ],
+        quote: {
+          text: "Anarres stays with me.",
+          title: "The Dispossessed",
+          entry_id: 1,
+          at: "2025-03-02",
+        },
+      },
+    }),
+  );
+}
