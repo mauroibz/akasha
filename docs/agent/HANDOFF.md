@@ -4,7 +4,8 @@
 
 **2026-10-23:** the owner sorted a brainstorm after 2.7.0 (DEC-176) and approved two of four
 resurfacing mockups (DEC-178). Sprints 109–121 are completed and committed on `main`,
-**unreleased on top of 2.7.0**. The project state is `complete`; no sprint is planned.
+**unreleased on top of 2.7.0**. **2026-10-24:** the owner's first look planned 122–127 (DEC-179);
+Sprint 122 is ready.
 Migrations 0028–0032 are new (location and loans, duplicate dismissals, score events with
 triggers, score ranks, shelf-suggestion dismissals).
 

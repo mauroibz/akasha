@@ -7078,3 +7078,43 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
 - Consequences: no migration for 120. Sprint 121 needs no schema: a kept score is already a
   confirmation row in the history (DEC-176, Sprint 114), and the deck skips scores confirmed
   in the last year.
+
+## DEC-179 — A second look: lent out as a shelf, finishing, the reading data, play and the goal (Sprints 122–127)
+
+- Date: 2026-10-24
+- Status: accepted
+- Context: the owner looked at the 2.8 line in the running app on a copy of their library:
+  *"/lent has no clear access though the UI. i like how it works, but I think it should
+  appear a shelf instead of a new page."* The reading data "still has empty information and
+  shows mostly an empty card (format, where, started, finished, rereads, chapters read), which
+  feels overwhelming to complete. better flows for completing these should be thought of."
+  After *Start again* "there is no clear flow to mark it as completed". `/deck` "has no clear
+  UI entry point … it feels like cleanup or management, not a fun activity". And the gentle
+  goal "should be more featured in the diary instead of this small text prompt". Two were
+  clear; three were drawn as mockups (*A second look*: 1A–1C, 2A–2C, 3A–3C, each with a
+  recommendation). The owner on the mockups: *"love the proposals, build them"*, read as the
+  recommendations: 1A with 1C, 2A with 2C, 3A with 3B (3C's bar above 24).
+  The mockups: https://claude.ai/artifact/PF1pPtWvGdWHU78hh5RgcY.
+- Decision: `FINAL_SPRINT` 121 → 127, plan revision 51.
+  1. **122 — Lent out, on the shelves.** The open loans stand as the first ledge on Shelves,
+     with who has each; the list keeps its one-tap return and goes back to Shelves.
+  2. **123 — Finishing.** Anything under way has a *Finished* action on its page and in the
+     library's *Now* strip. It opens one sheet that asks when (today chosen), the score, and
+     the format, each skippable (mockup 1C); with a score already set, it is "Still an 8?".
+     Moving something to its under-way status fills an empty start date with today.
+  3. **124 — Only what is there, and one question.** The personal region shows the rows that
+     hold a value; below them, one question about the most useful gap, with quick answers and
+     *I don't remember*, which stops that question for that entry (mockup 1A).
+  4. **125 — Play, at the top of Insights.** Games named after your own books (which of your
+     8s is best, an old score, the pile, the gaps), each shown only when it has something to
+     ask; *Fill in the gaps* is a deck of its own. Covers and duplicates move to *Settings →
+     Tidy up*; `/deck` is no longer a page of chores (mockup 2A).
+  5. **126 — Five minutes.** One mixed round of five cards drawn from every game, ending with
+     what changed; the first card in Play (mockup 2C).
+  6. **127 — The goal in the Diary.** Without a goal the Diary opens with the year so far and
+     three suggested numbers, one tap to set one (3A); with one, a row of slots that the
+     year's covers fill (3B), and a bar above 24 (3C).
+- Not built: the daily question on the Library (2B), held back as the owner found the *On
+  this day* strip intrusive (DEC-178); a goal on the Library page.
+- Consequences: 124 needs a place to keep *I don't remember* per entry and field (migration
+  0033). No network call is added to any page render.

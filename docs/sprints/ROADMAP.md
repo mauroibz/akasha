@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 50
+**Plan revision:** 51
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** none. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
@@ -1870,6 +1870,20 @@ deck (DEC-178), and the commonplace book is a v3 candidate.
 - **[120 — The year in review](120-the-year-in-review.md)** (**completed**) and
   **[121 — The revisit deck](121-the-revisit-deck.md)**: the resurfacing options the owner
   approved from the mockups (DEC-178).
+
+## A second look — the 2.8 line, continued
+
+The owner's first look at 2.8 in the running app, recorded 2026-10-24 as **DEC-179**: lent
+out as a shelf, an obvious way to finish, a personal region that only shows what it has, the
+decks turned into play, and the goal at the head of the Diary. Mockups *A second look*,
+approved as recommended.
+
+- **[122 — Lent out, on the shelves](122-lent-out-on-the-shelves.md)** (**ready**).
+- **[123 — Finishing](123-finishing.md)**: a *Finished* action and one sheet (mockup 1C).
+- **[124 — Only what is there, and one question](124-only-what-is-there.md)** (mockup 1A).
+- **[125 — Play, at the top of Insights](125-play-in-insights.md)** (mockup 2A) and
+  **[126 — Five minutes](126-five-minutes.md)** (mockup 2C).
+- **[127 — The goal in the Diary](127-the-goal-in-the-diary.md)** (mockups 3A and 3B).
 
 ## Not scheduled
 

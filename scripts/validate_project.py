@@ -55,8 +55,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # DEC-165's production-grade line reopens it at 86 as 087-101; DEC-169 reopens it at 101
 # as 102-105; DEC-170's one-at-a-time inbox reopens it at 105 as 106; DEC-171's episode
 # and chapter marks reopen it at 106 as 107-108; DEC-176's house-and-history line reopens it
-# at 108 as 109-119; DEC-178's resurfacing sprints extend it to 121).
-FINAL_SPRINT = 121
+# at 108 as 109-119; DEC-178's resurfacing sprints extend it to 121; DEC-179's second look reopens it
+# at 121 as 122-127).
+FINAL_SPRINT = 127
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

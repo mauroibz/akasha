@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 50,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 51,
+  "project_status": "ready",
+  "active_sprint": "122",
+  "active_sprint_file": "docs/sprints/122-lent-out-on-the-shelves.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "121",
   "completed_sprints": [
     "001",
@@ -130,5 +130,5 @@
     "121"
   ],
   "started_at": "",
-  "updated_at": "2026-10-23T21:12:40-03:00"
+  "updated_at": "2026-10-24T03:33:16-03:00"
 }
