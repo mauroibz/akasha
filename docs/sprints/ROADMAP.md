@@ -2,7 +2,7 @@
 
 **Plan revision:** 50
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 119, the eleventh of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** 120, the twelfth of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -239,7 +239,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [116](116-rank-inside-a-score.md) | A rank inside a score, chosen in pairs | 115 | completed |
 | [117](117-the-tier-board.md) | The tier board: moves proposed, applied on confirmation | 116 | completed |
 | [118](118-the-diary-as-a-timeline.md) | The Diary as a timeline across years and libraries | 117 | completed |
-| [119](119-suggested-shelves.md) | Suggested shelves from what the library holds | 118 | planned |
+| [119](119-suggested-shelves.md) | Suggested shelves from what the library holds | 118 | completed |
 | [120](120-the-year-in-review.md) | The year in review, from the Diary | 119 | planned |
 | [121](121-the-revisit-deck.md) | The revisit deck: old scores, one card at a time | 120 | planned |
 

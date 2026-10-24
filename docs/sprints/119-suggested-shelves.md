@@ -1,7 +1,7 @@
 # Sprint 119 — Suggested shelves
 
 **Sprint:** 119
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 49
 **Depends on:** 118
 **Owner:** Mauro
@@ -39,4 +39,24 @@ spec, seen in the running app.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `9bf7e60`. Verified per DEC-167: `test_shelf_suggestions.py` (5; the
+cover case observed failing first) with isolation, API, migrations and the shelf room (114);
+`vitest related` (166); `make check`; Playwright `suggested-shelves` (new), `shelves`,
+`library` and `accessibility` (new checks, both themes). Walkthrough on a fresh backend with
+three live Le Guin novels, *Dune* the book (Open Library) and the 2021 film (Wikidata): both
+suggestions offered, *Dune* made into a shelf holding the book and the film.
+
+1. Proposals use stored data only (a test with no provider wired).
+2. A dismissed proposal never returns; accepting creates exactly its entries; a proposal a
+   shelf already holds is not offered.
+3. Accessibility and 390px fit; the ledge scrolls inside itself.
+
+Deviations and notes:
+
+- **Series reads a field named `series`.** It is a field's name, not a domain's (books declare
+  it today), so the shared layer still never asks which domain it holds.
+- **The inbox is left out**: an entry not yet filed is not yet the owner's library.
+- Found and fixed before the commit: a member's cover URL used the entry id where the item id
+  belongs (a test now covers it).
+- Accepting a suggestion whose name an existing shelf already uses answers the existing
+  `shelf_slug_conflict`; such a suggestion is not offered in the first place.

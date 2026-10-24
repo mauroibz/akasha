@@ -6680,3 +6680,15 @@ below contrast. Both fixed.
 **Found.** A finish showed today's score; it now shows the score it had then.
 
 **Next.** Sprint 119, suggested shelves.
+
+## 2026-10-23 — Sprint 119: suggested shelves
+
+**Done.** `/api/shelves/suggestions` (creator, series, work across libraries), accept and
+dismiss (migration 0032), the *Suggested* ledge on Shelves.
+
+**Verified and how.** Backend 114; Vitest 166 related; Playwright for shelves, suggestions and
+accessibility; walkthrough `walk119.mjs` making a *Dune* shelf of a book and a film.
+
+**Found.** The member cover URL used the entry id (fixed, tested).
+
+**Next.** Sprint 120, the year in review (DEC-178).

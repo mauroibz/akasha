@@ -1,7 +1,7 @@
 # Sprint 120 — The year in review
 
 **Sprint:** 120
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 50
 **Depends on:** 119
 **Owner:** Mauro
