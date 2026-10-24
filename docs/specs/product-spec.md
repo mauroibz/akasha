@@ -999,7 +999,16 @@ is explicit, and keyboard-first throughout.
   the last card. The end of a round shows what was filed and offers the passed cards
   again. Discard is not on the card.
 
-**`/shelves` — Shelf management.** List, rename, delete, counts.
+**`/shelves` — Shelf management.** List, rename, delete, counts. Open loans stand as the first
+ledge, *Lent out*, with who has had something longest; it opens `/lent` (Sprint 122).
+
+**Play, at the top of `/insights`** (Sprint 125, DEC-179). The decks asked as questions about
+the owner's own books, each with its covers and shown only when it has something to ask:
+*Which 8 is your best 8?* (the rank deck, for the shown library's most shared score), *Is
+Tokio blues still a 10?* (the revisit deck), *The pile* (the planned deck) and *Fill in the
+gaps* (`/play/gaps`: finished books missing a date or a format, one at a time, with the
+detail page's questions). Upkeep is `/deck`, *Tidy up*: the inbox, covers and duplicates,
+reached from Settings and the command bar.
 
 **`/import` — Import.** One prominent workflow tablist separates **1. Import** from
 **2. Triage** (above). The registered connector tabs are visibly subordinate to the

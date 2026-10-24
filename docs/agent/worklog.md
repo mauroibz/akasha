@@ -6762,3 +6762,12 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   Walkthrough `walk124.mjs` at 390: three answers saved, the forgotten one not asked again.
 - Noticed: a long place truncates beside *Change* at 390px (left).
 - Next: Sprint 125, play at the top of Insights.
+
+## 2026-10-24 — Sprint 125: Play, at the top of Insights
+
+- Done: Play (best score, old score, the pile, the gaps) on Insights; `/play/gaps` with
+  `GET /api/gaps`; `/deck` narrowed to *Tidy up*; Settings and the command bar follow.
+- Verified: pytest (gaps + route registries), Vitest (red first), `vitest related` (300),
+  `make check`, Playwright play/chores/insights/a11y. Walkthrough `walk125.mjs` at 390/1440.
+- Noticed: on a phone Play fills most of the first screen of Insights.
+- Next: Sprint 126, five minutes.

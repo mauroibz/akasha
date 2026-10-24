@@ -1,7 +1,7 @@
 # Sprint 126 — Five minutes
 
 **Sprint:** 126
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 51
 **Depends on:** 125
 **Owner:** Mauro

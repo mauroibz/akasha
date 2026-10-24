@@ -1,7 +1,7 @@
 # Sprint 125 — Play, at the top of Insights
 
 **Sprint:** 125
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 51
 **Depends on:** 124
 **Owner:** Mauro
@@ -33,4 +33,26 @@ specs for the changed screens, and the changed flow seen in the running app.
 
 ## Outcome
 
-Not started.
+Delivered 2026-10-24 in `dd54cb0`. Verified per DEC-167: `test_gaps.py` (observed failing first)
+with isolation, the documented routes and the app shape (both learn `GET /api/gaps`; shape
+fixture regenerated, six lines); `PlaySection.test.tsx` and `GapsPage.test.tsx` (red first),
+the Tidy up page test moved to its new contract; `vitest related` (300); `make check`;
+Playwright `play` (new: the games, a game opening its deck, the gaps flow, phone fit),
+`chores`, `insights` and the Play, gaps and Tidy up accessibility checks.
+Walkthrough on a fresh backend at 390 and 1440: seven books gave four games ("Which 8 is
+your best 8? · 3 books", "Is Tokio blues still a 10? · 2 old scores", "The pile · 2
+waiting", "Fill in the gaps · 2"), no sideways scroll; the gaps page asked Rayuela's finish
+date; `/deck` read *Tidy up* with the inbox, covers and duplicates and the line to the games.
+
+1. A game with nothing to ask is not drawn (Vitest).
+2. The gaps deck fills a field and respects *I don't remember* (API test, Playwright).
+3. Fits at 390px and 1440px; accessibility passes.
+
+Deviations and notes:
+
+- **The best-score game follows the library shown on Insights** and picks its most shared
+  score; the others are across every library, as their decks are.
+- **The pile game's line names when the oldest was added**, so a pile added in one import
+  reads "since October 2026".
+- **Seen:** on a phone the four games take most of the first screen before Insights' own
+  sentence. That is the placement asked for; worth the owner's look.

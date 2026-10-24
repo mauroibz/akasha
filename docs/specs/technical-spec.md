@@ -718,6 +718,9 @@ The product-spec route list is authoritative, with these refinements:
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
 - `GET /api/revisit` (Sprint 121, DEC-178): finished, scored entries whose latest score row is
   over a year old, oldest first, with when that score was given; a kept score rests a year.
+- `GET /api/gaps` (Sprint 125, DEC-179): entries in their domain's finished status missing a
+  finish date (where the domain has one) or a format (where it declares formats), skipping a
+  field named in `unknown_fields`; recently added first, with the total.
 - `GET /api/diary/{year}/review` (Sprint 120, DEC-178): the year's finishes across every
   library with the score each had then, the best five, the scores and months, the creator
   returned to most, the score changes that year, and one line the owner wrote.
