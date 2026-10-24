@@ -1,7 +1,7 @@
 # Sprint 123 — Finishing
 
 **Sprint:** 123
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 51
 **Depends on:** 122
 **Owner:** Mauro

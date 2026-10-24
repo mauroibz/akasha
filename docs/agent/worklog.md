@@ -6728,3 +6728,14 @@ Settings *Chores* link's touch target (`d507930`).
 Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's flags.
 
 **Next.** Owner: DEC-178's 02/03 reading; a 2.8 release when asked.
+
+## 2026-10-24 — Sprint 122: Lent out, on the shelves
+
+- Done: the owner's first look (DEC-179) planned 122–127 from the *A second look* mockups. 122
+  stands open loans as the first ledge on Shelves; the list returns to Shelves.
+- Verified: Vitest (Shelves, Lent; red first), `vitest related`, `make check`, Playwright
+  `lent`/`shelves`/`suggested-shelves`/accessibility. Walkthrough (`walk122.mjs`) on a fresh
+  backend at 390 and 1440: the ledge, a return from the list, the ledge gone after the last.
+- Noticed: the owner's check server runs on 8000 with a copy of their library
+  (scratchpad `check-data`); unstubbed e2e requests reach it. Loans are now stubbed by default.
+- Next: Sprint 123, finishing.
