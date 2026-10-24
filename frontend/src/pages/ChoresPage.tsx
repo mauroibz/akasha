@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Copy,
+  History,
   Image,
   Inbox,
   ListChecks,
@@ -10,7 +11,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { getDuplicates } from "@/api/duplicates";
-import { getInboxCount, getLibraryPage } from "@/api/library";
+import { getInboxCount, getLibraryPage, getRevisit } from "@/api/library";
 import { queryKeys } from "@/api/keys";
 import { PageHeader } from "@/components/PageHeader";
 import { coverlessFilters, plannedFilters } from "@/features/chores/chores";
@@ -42,6 +43,10 @@ export function ChoresPage() {
       ),
   });
 
+  const revisit = useQuery({
+    queryKey: ["chores", "revisit"],
+    queryFn: ({ signal }) => getRevisit(signal),
+  });
   const duplicates = useQuery({
     queryKey: ["chores", "duplicates"],
     queryFn: ({ signal }) => getDuplicates(signal),
@@ -68,6 +73,13 @@ export function ChoresPage() {
       lede: "Everything without a cover, with editions to choose from.",
       icon: <Image aria-hidden="true" />,
       count: coverless.data,
+    },
+    {
+      to: "/deck/revisit",
+      title: "Look at old scores again",
+      lede: "Still a 9? Keep it, or give the score it has now, and why.",
+      icon: <History aria-hidden="true" />,
+      count: revisit.data?.total,
     },
     {
       to: "/rank",

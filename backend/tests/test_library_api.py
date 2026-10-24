@@ -675,6 +675,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("POST", "/api/shelves/suggestions/accept"),
         ("POST", "/api/shelves/suggestions/dismiss"),
         ("GET", "/api/diary/timeline"),
+        ("GET", "/api/revisit"),
         ("GET", "/api/diary/{year}/review"),
         ("PUT", "/api/entries/rank"),
         ("POST", "/api/duplicates/dismiss"),

@@ -118,6 +118,33 @@ export async function stubChores(
       json: { affected: 1, ...choreEntry(1, "Stoner").item },
     });
   };
+  await page.route("**/api/revisit", (route) =>
+    route.fulfill({
+      json: {
+        cards: [
+          {
+            entry: {
+              ...choreEntry(1, "Stoner"),
+              status: "read",
+              score: 9,
+              notes:
+                "The quietest book I have read, and the one I think about most.",
+            },
+            scored_at: "2021-10-24",
+          },
+        ],
+        total: 1,
+      },
+    }),
+  );
+  await page.route("**/api/entries/1", (route) => {
+    calls.push({
+      method: route.request().method(),
+      url: "/api/entries/1",
+      body: route.request().postDataJSON(),
+    });
+    return route.fulfill({ json: { ...choreEntry(1, "Stoner"), score: 9 } });
+  });
   await page.route("**/api/duplicates", (route) =>
     route.fulfill({
       json: [

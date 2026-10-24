@@ -1346,6 +1346,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/revisit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Revisit */
+    get: operations["revisit_api_revisit_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/search": {
     parameters: {
       query?: never;
@@ -2821,6 +2838,22 @@ export interface components {
       text: string;
       /** Title */
       title: string;
+    };
+    /** RevisitCard */
+    RevisitCard: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Scored At */
+      scored_at: string | null;
+    };
+    /**
+     * RevisitResponse
+     * @description Old scores to look at again, oldest first (Sprint 121, DEC-178).
+     */
+    RevisitResponse: {
+      /** Cards */
+      cards: components["schemas"]["RevisitCard"][];
+      /** Total */
+      total: number;
     };
     /**
      * RowSearchBody
@@ -7489,6 +7522,53 @@ export interface operations {
         };
       };
       /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  revisit_api_revisit_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RevisitResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
       409: {
         headers: {
           [name: string]: unknown;

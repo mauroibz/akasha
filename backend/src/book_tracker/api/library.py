@@ -935,6 +935,24 @@ def year_review(
     return YearReviewResponse.model_validate(library.year_review(year))
 
 
+class RevisitCard(BaseModel):
+    entry: EntryResponse
+    #: When the score it has was given or last looked at, or `None` when unknown.
+    scored_at: str | None
+
+
+class RevisitResponse(BaseModel):
+    """Old scores to look at again, oldest first (Sprint 121, DEC-178)."""
+
+    cards: list[RevisitCard]
+    total: int
+
+
+@router.get("/revisit", response_model=RevisitResponse)
+def revisit(library: Library) -> RevisitResponse:
+    return RevisitResponse.model_validate(library.revisit())
+
+
 @router.get("/diary", response_model=DiaryResponse, responses=ERRORS)
 def diary(
     library: Library, year: Annotated[int | None, Query(ge=1000, le=9999)] = None

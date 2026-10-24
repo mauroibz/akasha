@@ -1,7 +1,7 @@
 # Sprint 121 — The revisit deck
 
 **Sprint:** 121
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 50
 **Depends on:** 120
 **Owner:** Mauro

@@ -69,6 +69,10 @@ for (const size of [
     const card = (await page.locator("[data-deck-card]").boundingBox())!;
     expect(card.y).toBeGreaterThanOrEqual(0);
 
+    await page.goto("/deck/revisit");
+    await expect(page.getByTestId("deck-title")).toHaveText("Stoner");
+    await expectOnScreen(page, ["Later", "Keep 9", "Score 10"]);
+
     await page.goto("/deck/covers");
     await expect(page.getByTestId("deck-title")).toHaveText("Stoner");
     await expect(
@@ -139,6 +143,22 @@ test("two editions are merged into the one kept", async ({ page }) => {
       method: "POST",
       url: "/api/duplicates/merge",
       body: { keep: 4, drop: 1 },
+    },
+  ]);
+});
+
+test("an old score kept is written as a look, with why", async ({ page }) => {
+  const calls: Array<{ method: string; url: string; body: unknown }> = [];
+  await stubChores(page, calls);
+  await page.goto("/deck/revisit");
+  await expect(page.getByRole("heading", { name: "Still a 9?" })).toBeVisible();
+  await page.getByRole("button", { name: "Keep 9" }).click();
+  await expect(page.getByText("Every old score looked at")).toBeVisible();
+  expect(calls).toEqual([
+    {
+      method: "PATCH",
+      url: "/api/entries/1",
+      body: { score: 9, score_reason: "time" },
     },
   ]);
 });

@@ -37,6 +37,8 @@ describe("ChoresPage (Sprint 112)", () => {
       if (url === "/api/item-types")
         return new Response(JSON.stringify([bookType]));
       if (url.includes("cover=missing")) return page(12);
+      if (url === "/api/revisit")
+        return new Response(JSON.stringify({ cards: [], total: 7 }));
       if (url === "/api/duplicates")
         return new Response(JSON.stringify([{}, {}]));
       if (url.includes("status=to_read")) return page(30);
@@ -60,6 +62,9 @@ describe("ChoresPage (Sprint 112)", () => {
     const covers = within(list).getByRole("link", { name: /Find a cover/ });
     expect(covers).toHaveAttribute("href", "/deck/covers");
     expect(await within(covers).findByText("12")).toBeVisible();
+    const revisit = within(list).getByRole("link", { name: /old scores/ });
+    expect(revisit).toHaveAttribute("href", "/deck/revisit");
+    expect(await within(revisit).findByText("7")).toBeVisible();
     const duplicates = within(list).getByRole("link", { name: /Duplicates/ });
     expect(duplicates).toHaveAttribute("href", "/deck/duplicates");
     expect(await within(duplicates).findByText("2")).toBeVisible();

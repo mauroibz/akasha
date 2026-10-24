@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
@@ -489,6 +489,59 @@ class LibraryService:
             bucket["counts"][item_type] = bucket["counts"].get(item_type, 0) + 1
             bucket["entries"].append(self.get_entry(entry_id))
         return {"year": year, "years": years, "months": list(months.values())}
+
+    #: How long a score looked at rests before it comes back (Sprint 121, DEC-178).
+    REVISIT_REST_DAYS = 365
+
+    def revisit(self, *, limit: int = 200) -> dict[str, Any]:
+        """Old scores to look at again, oldest first (Sprint 121, DEC-178).
+
+        Finished entries with a score (the status each domain declares `finished`),
+        whose latest score row is more than a year old. A score kept or changed is a
+        row (Sprint 114), so it rests for a year by itself; nothing else is stored.
+        """
+        finished = [
+            (domain.item_type, status.value)
+            for domain in DOMAINS.values()
+            for status in domain.statuses
+            if status.finished
+        ]
+        if not finished:
+            return {"cards": [], "total": 0}
+        cutoff = (datetime.now(UTC) - timedelta(days=self.REVISIT_REST_DAYS)).strftime("%Y-%m-%d")
+        pairs = " OR ".join(
+            f"(i.type = :type_{index} AND e.status = :status_{index})"
+            for index in range(len(finished))
+        )
+        parameters: dict[str, Any] = {"user": self.user_id, "cutoff": cutoff}
+        for index, (item_type, status) in enumerate(finished):
+            parameters[f"type_{index}"] = item_type
+            parameters[f"status_{index}"] = status
+        query = (
+            "SELECT e.id, (SELECT MAX(s.recorded_at) FROM score_events s"
+            " WHERE s.entry_id = e.id) AS scored_at"
+            " FROM entries e JOIN items i ON i.id = e.item_id"
+            f" WHERE e.user_id = :user AND e.score IS NOT NULL AND ({pairs})"
+        )
+        with Session(self.engine) as session:
+            rows = session.execute(
+                text(
+                    f"SELECT id, scored_at FROM ({query})"
+                    " WHERE scored_at IS NULL OR scored_at < :cutoff"
+                    " ORDER BY COALESCE(scored_at, ''), id"
+                ),
+                parameters,
+            ).all()
+            return {
+                "cards": [
+                    {
+                        "entry": self._entry_dict(session, self._entry(session, entry_id)),
+                        "scored_at": scored_at,
+                    }
+                    for entry_id, scored_at in rows[:limit]
+                ],
+                "total": len(rows),
+            }
 
     def year_review(self, year: int) -> dict[str, Any]:
         """One year read back across every library (Sprint 120, DEC-178).

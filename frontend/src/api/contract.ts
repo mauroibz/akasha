@@ -47,6 +47,7 @@ import type {
   Timeline,
   TimelineEvent,
   YearReview,
+  RevisitCard,
   Shelf,
   StatusSpec,
 } from "./library";
@@ -108,4 +109,5 @@ export type Contract = [
   Holds<NamesOnly<ShelfSuggestion, Schemas["ShelfSuggestionResponse"]>>,
   Holds<NamesOnly<TimelineEvent, Schemas["TimelineEvent"]>>,
   Holds<NamesOnly<YearReview, Schemas["YearReviewResponse"]>>,
+  Holds<NamesOnly<RevisitCard, Schemas["RevisitCard"]>>,
 ];

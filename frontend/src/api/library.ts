@@ -1010,3 +1010,22 @@ export async function getYearReview(
     throw await apiFailure(response, "The year could not be read back");
   return response.json() as Promise<YearReview>;
 }
+
+/** An old score to look at again (Sprint 121, DEC-178). */
+export interface RevisitCard {
+  entry: LibraryEntry;
+  /** When the score it has was given or last looked at. */
+  scored_at: string | null;
+}
+
+export async function getRevisit(
+  signal?: AbortSignal,
+): Promise<{ cards: RevisitCard[]; total: number }> {
+  const response = await request("/api/revisit", {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "Old scores could not be loaded");
+  return response.json() as Promise<{ cards: RevisitCard[]; total: number }>;
+}

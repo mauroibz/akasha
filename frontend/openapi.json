@@ -3651,6 +3651,52 @@
         "title": "ReviewQuote",
         "type": "object"
       },
+      "RevisitCard": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "scored_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored At"
+          }
+        },
+        "required": [
+          "entry",
+          "scored_at"
+        ],
+        "title": "RevisitCard",
+        "type": "object"
+      },
+      "RevisitResponse": {
+        "description": "Old scores to look at again, oldest first (Sprint 121, DEC-178).",
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/RevisitCard"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cards",
+          "total"
+        ],
+        "title": "RevisitResponse",
+        "type": "object"
+      },
       "RowSearchBody": {
         "description": "The edited text a re-search should query, either half optional.\n\nAn omitted half keeps the row's current value \u2014 the owner edits what is\nwrong and leaves the rest alone.",
         "properties": {
@@ -10488,6 +10534,54 @@
           }
         },
         "summary": "Now"
+      }
+    },
+    "/api/revisit": {
+      "get": {
+        "operationId": "revisit_api_revisit_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevisitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Revisit"
       }
     },
     "/api/search": {
