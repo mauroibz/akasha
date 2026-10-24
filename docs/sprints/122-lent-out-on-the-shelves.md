@@ -1,7 +1,7 @@
 # Sprint 122 — Lent out, on the shelves
 
 **Sprint:** 122
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 51
 **Depends on:** 121
 **Owner:** Mauro

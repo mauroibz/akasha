@@ -13,8 +13,9 @@ export interface PageHeaderProps {
   count?: ReactNode;
   lede?: ReactNode;
   actions?: ReactNode;
-  /** Renders the one "← Library" control above the header (finding 8). */
-  back?: boolean;
+  /** Renders the one "← Library" control above the header (finding 8); a place
+   * names somewhere else to return to (Sprint 122: *Lent out* returns to Shelves). */
+  back?: boolean | { to: string; label: string };
   className?: string;
 }
 
@@ -40,7 +41,12 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <header className={cn("border-b border-border pb-6", className)}>
-      {back && <BackToLibrary className="mb-4" />}
+      {back && (
+        <BackToLibrary
+          className="mb-4"
+          {...(typeof back === "object" ? back : {})}
+        />
+      )}
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className={icon ? "flex items-center gap-4" : undefined}>
           {icon}

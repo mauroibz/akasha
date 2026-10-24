@@ -82,9 +82,15 @@ const shelves = [
   },
 ];
 
-function stubApi(rows: unknown[] = shelves, types: unknown[] = [bookType]) {
+function stubApi(
+  rows: unknown[] = shelves,
+  types: unknown[] = [bookType],
+  loans: unknown[] = [],
+) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/loans"))
+      return new Response(JSON.stringify(loans));
     if (url === "/api/item-types") return new Response(JSON.stringify(types));
     if (url === "/api/shelves") return new Response(JSON.stringify(rows));
     if (init?.method === "POST" && url === "/api/shelves")
@@ -92,6 +98,57 @@ function stubApi(rows: unknown[] = shelves, types: unknown[] = [bookType]) {
     return new Response("[]");
   });
 }
+
+const loan = (id: number, person: string, title: string, lentOn: string) => ({
+  id,
+  entry_id: id + 100,
+  person,
+  lent_on: lentOn,
+  returned_on: null,
+  note: null,
+  entry: {
+    id: id + 100,
+    status: "read",
+    score: 9,
+    item: { id, type: "book", title, year: 1963, cover_url: null },
+  },
+});
+
+describe("ShelvesPage: what is lent out (Sprint 122)", () => {
+  it("stands open loans as the first ledge, with who has the longest out", async () => {
+    stubApi(
+      shelves,
+      [bookType],
+      [
+        loan(1, "Sofi", "Rayuela", "2026-04-02"),
+        loan(2, "Juan", "Ficciones", "2026-09-01"),
+      ],
+    );
+    renderPage();
+    const ledge = (await waitFor(() => {
+      const row = document.querySelector('[data-shelf-row="lent"]');
+      expect(row).not.toBeNull();
+      return row;
+    })) as HTMLElement;
+    expect(
+      within(ledge).getByRole("link", { name: "Lent out" }),
+    ).toHaveAttribute("href", "/lent");
+    expect(ledge).toHaveTextContent(/2 things · Rayuela has been with Sofi/);
+    expect(
+      within(ledge).getByRole("link", { name: "Rayuela, 1963, scored 9" }),
+    ).toHaveAttribute("href", "/books/101");
+    // First, above every shelf of the owner's.
+    const rows = [...document.querySelectorAll("[data-shelf-row]")];
+    expect(rows[0]).toBe(ledge);
+  });
+
+  it("draws nothing when nothing is out", async () => {
+    stubApi();
+    renderPage();
+    await screen.findByRole("link", { name: "Favorites" });
+    expect(document.querySelector('[data-shelf-row="lent"]')).toBeNull();
+  });
+});
 
 describe("ShelvesPage", () => {
   it("reads the room back in a sentence, and each shelf in a line", async () => {

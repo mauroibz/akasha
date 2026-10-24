@@ -729,10 +729,32 @@ test("the shelves room has no serious accessibility violations", async ({
       ],
     }),
   );
+  // With something lent out, its ledge stands first (Sprint 122).
+  await page.route("**/api/loans?open=true", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          entry_id: 9,
+          person: "Sofi",
+          lent_on: "2026-04-02",
+          returned_on: null,
+          note: null,
+          entry: {
+            id: 9,
+            status: "read",
+            score: 9,
+            item: { id: 9, type: "book", title: "Rayuela", year: 1963 },
+          },
+        },
+      ],
+    }),
+  );
   await page.goto("/shelves");
   await expect(
     page.getByRole("link", { name: "Mixed", exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Lent out" })).toBeVisible();
   await expectNoSeriousViolations(page, "shelves (board)");
 });
 

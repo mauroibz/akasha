@@ -27,12 +27,21 @@ test("a thing is placed, lent, listed as out, and comes back", async ({
   await lent.getByRole("button", { name: "Lend", exact: true }).click();
   await expect(lent).toContainText("To Sofi");
 
-  await lent.getByRole("link", { name: "All lent" }).click();
+  await expect(lent.getByRole("link", { name: "All lent" })).toBeVisible();
+
+  // What is out stands on the shelves (Sprint 122), and opens the list.
+  await page.goto("/shelves");
+  const ledge = page.locator("[data-shelf-row='lent']");
+  await expect(ledge).toContainText("Rayuela has been with Sofi since today");
+  await ledge.getByRole("link", { name: "Lent out" }).click();
   await expect(page.getByRole("heading", { name: "Lent out" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "← Shelves" })).toBeVisible();
   const row = page.getByRole("listitem").filter({ hasText: "Rayuela" });
   await expect(row).toContainText("Sofi");
   await row.getByRole("button", { name: "Rayuela is back" }).click();
   await expect(page.getByText("Nothing is lent out")).toBeVisible();
+  await page.getByRole("link", { name: "← Shelves" }).click();
+  await expect(page.locator("[data-shelf-row='lent']")).toHaveCount(0);
 });
 
 test.describe("on a phone", () => {
@@ -48,6 +57,11 @@ test.describe("on a phone", () => {
     await lent.getByRole("combobox", { name: "Who has it" }).fill("Sofi");
     await lent.getByRole("button", { name: "Lend", exact: true }).click();
     await expect(lent).toContainText("To Sofi");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(390);
+    await page.goto("/shelves");
+    await expect(page.locator("[data-shelf-row='lent']")).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBeLessThanOrEqual(390);

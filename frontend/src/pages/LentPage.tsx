@@ -12,8 +12,8 @@ import { localDay } from "@/features/progress/outline";
 
 /**
  * What is out (Sprint 111, DEC-176): a quiet list, longest out first, each with who
- * has it and since when, and one tap for its return. Reached from the command bar
- * and from a detail page's *Lent* row, not from the main navigation.
+ * has it and since when, and one tap for its return. Opened from its ledge on
+ * Shelves (Sprint 122), the command bar and a detail page's *Lent* row.
  */
 export function LentPage() {
   const queryClient = useQueryClient();
@@ -35,7 +35,7 @@ export function LentPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
       <PageHeader
-        back
+        back={{ to: "/shelves", label: "Shelves" }}
         title="Lent out"
         lede="What other people have, and since when."
         count={rows.length || undefined}

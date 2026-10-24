@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
+import { getLoans, type LoanWithEntry } from "@/api/loans";
 import { createShelf, getShelves, type ShelfWithCount } from "@/api/shelves";
 import { queryKeys } from "@/api/keys";
 import type { ItemType } from "@/api/library";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/skeleton";
 import { spelled } from "@/features/insights/prose";
 import { countLabel, domainsFrom } from "@/features/library/labels";
+import { howLong } from "@/features/house/house";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { OpeningCover } from "@/features/shelves/OpeningCover";
 import { cn } from "@/lib/utils";
@@ -56,6 +58,15 @@ export function ShelvesPage() {
     queryFn: getShelves,
     retry: false,
   });
+
+  // What is out stands as a ledge of its own (Sprint 122, DEC-179): the owner
+  // found the list behind the command bar, not on the shelves where it belongs.
+  const loans = useQuery({
+    queryKey: queryKeys.loans,
+    queryFn: ({ signal }) => getLoans(true, signal),
+    retry: false,
+  });
+  const lent = Array.isArray(loans.data) ? loans.data : [];
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -272,6 +283,7 @@ export function ShelvesPage() {
       )}
 
       <ol className="mt-6">
+        {lent.length > 0 && <LentRow loans={lent} />}
         {room.map((shelf) => (
           <ShelfRow
             key={shelf.id}
@@ -351,17 +363,54 @@ function fits(index: number, lead: boolean): string | false {
   return "hidden";
 }
 
+/**
+ * The open loans as a ledge (Sprint 122): longest out first, as the list orders
+ * them, and the line names who has had something longest.
+ */
+function LentRow({ loans }: { loans: LoanWithEntry[] }) {
+  const longest = loans[0];
+  const shelf: ShelfWithCount = {
+    id: 0,
+    name: "Lent out",
+    slug: "lent",
+    entry_count: loans.length,
+    preview: loans.slice(0, 8).map((loan) => ({
+      entry_id: loan.entry.id,
+      title: loan.entry.item.title,
+      year: loan.entry.item.year ?? null,
+      score: loan.entry.score ?? null,
+      cover_url: loan.entry.item.cover_url ?? null,
+    })),
+  };
+  const since = howLong(longest.lent_on, new Date());
+  return (
+    <ShelfRow
+      shelf={shelf}
+      types={undefined}
+      lead={false}
+      href="/lent"
+      kind="With other people"
+      line={`${loans.length} ${loans.length === 1 ? "thing" : "things"} · ${longest.entry.item.title} has been with ${longest.person} ${since === "since today" ? "since today" : `for ${since}`}`}
+    />
+  );
+}
+
 function ShelfRow({
   shelf,
   types,
   lead,
+  href = `/shelves/${encodeURIComponent(shelf.slug)}`,
+  kind,
+  line,
 }: {
   shelf: ShelfWithCount;
   types: ItemType[] | undefined;
   lead: boolean;
+  href?: string;
+  kind?: string;
+  line?: string;
 }) {
   const preview = shelf.preview ?? [];
-  const href = `/shelves/${encodeURIComponent(shelf.slug)}`;
   return (
     <li
       data-shelf-row={shelf.slug}
@@ -369,7 +418,7 @@ function ShelfRow({
     >
       <div className="md:pb-6">
         <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">
-          {kindOf(shelf, types)}
+          {kind ?? kindOf(shelf, types)}
         </div>
         <h2
           className={cn(
@@ -382,7 +431,7 @@ function ShelfRow({
           </Link>
         </h2>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          {lineOf(shelf, types)}
+          {line ?? lineOf(shelf, types)}
         </p>
       </div>
       <div className="min-w-0">

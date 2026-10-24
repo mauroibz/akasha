@@ -58,6 +58,10 @@ export const test = base.extend<{
       );
       // Sprint 098: nothing under way, and an empty diary, unless a spec says so.
       await page.route("**/api/now", (route) => route.fulfill({ json: [] }));
+      // Shelves asks what is lent out (Sprint 122).
+      await page.route("**/api/loans?open=true", (route) =>
+        route.fulfill({ json: [] }),
+      );
       await page.route("**/api/diary**", (route) =>
         route.fulfill({ json: { year: 2026, years: [], months: [] } }),
       );

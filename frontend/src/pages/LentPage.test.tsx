@@ -41,6 +41,14 @@ function renderPage() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("LentPage (Sprint 111)", () => {
+  it("goes back to the shelves it stands on (Sprint 122)", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("[]"));
+    renderPage();
+    expect(
+      await screen.findByRole("link", { name: "← Shelves" }),
+    ).toHaveAttribute("href", "/shelves");
+  });
+
   it("lists what is out, longest out first, and takes one back", async () => {
     let out = [
       loan(1, "Sofi", "Rayuela", "2026-04-02"),
