@@ -191,6 +191,24 @@
    ]
   ],
   [
+   "/api/diary/timeline",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/diary/{year}/review",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/revisit",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/diary",
    [
     "GET"
@@ -212,6 +230,78 @@
    "/api/entries/{entry_id}",
    [
     "PATCH"
+   ]
+  ],
+  [
+   "/api/entries/rank",
+   [
+    "PUT"
+   ]
+  ],
+  [
+   "/api/duplicates",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/duplicates/dismiss",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/duplicates/dismiss",
+   [
+    "DELETE"
+   ]
+  ],
+  [
+   "/api/duplicates/merge",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/entries/{entry_id}/score-history",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/entries/{entry_id}/loans",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/entries/{entry_id}/loans",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/loans/{loan_id}",
+   [
+    "PATCH"
+   ]
+  ],
+  [
+   "/api/loans/{loan_id}",
+   [
+    "DELETE"
+   ]
+  ],
+  [
+   "/api/loans",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/locations",
+   [
+    "GET"
    ]
   ],
   [
@@ -293,6 +383,12 @@
    ]
   ],
   [
+   "/api/items/{item_id}/fill",
+   [
+    "POST"
+   ]
+  ],
+  [
    "/api/items/{item_id}/outline",
    [
     "POST"
@@ -300,6 +396,24 @@
   ],
   [
    "/api/items/{item_id}/cover/fetch",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/shelves/suggestions",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/shelves/suggestions/accept",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/shelves/suggestions/dismiss",
    [
     "POST"
    ]
