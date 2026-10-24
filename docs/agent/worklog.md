@@ -6752,3 +6752,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   DetailPage wiring; reapplied and re-verified. The reading-data panel is still all dashes
   (Sprint 124's subject).
 - Next: Sprint 124, only what is there and one question.
+
+## 2026-10-24 — Sprint 124: Only what is there, and one question
+
+- Done: empty rows hidden; one question card (finish date, format, place, start); *I don't
+  remember* kept in `entries.unknown_fields` (migration 0033); *Lend…* among the actions.
+- Verified: pytest (349 incl. new), Vitest (red first; four detail tests moved to the new
+  contract), `vitest related` (308), `make check`, Playwright over the detail-page specs (96).
+  Walkthrough `walk124.mjs` at 390: three answers saved, the forgotten one not asked again.
+- Noticed: a long place truncates beside *Change* at 390px (left).
+- Next: Sprint 125, play at the top of Insights.

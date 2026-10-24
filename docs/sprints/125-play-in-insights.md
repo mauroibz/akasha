@@ -1,7 +1,7 @@
 # Sprint 125 — Play, at the top of Insights
 
 **Sprint:** 125
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 51
 **Depends on:** 124
 **Owner:** Mauro

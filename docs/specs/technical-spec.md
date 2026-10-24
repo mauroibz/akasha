@@ -194,6 +194,14 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
   characters, trimmed, blank stored as `NULL`. Both are shared across every domain and are
   not domain declarations
 
+`entries.unknown_fields` (migration `0033`, Sprint 124, DEC-179)
+
+- a JSON list of the fields the owner answered *I don't remember* for, `NULL` for none;
+  `PATCH /api/entries/{id}` takes `unknown_fields` and replaces the set (`[]` clears it).
+  Only `location`, `formats` (for a domain with formats) and the domain's own
+  `date_started`/`date_finished` can be named; anything else is a 422. Entries and the
+  export carry it as a list
+
 `score_events` (migration `0030`, Sprint 114, DEC-176)
 
 - one row per change of an entry's score: `score`, `previous`, `reason` (NULL for a first

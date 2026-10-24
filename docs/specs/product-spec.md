@@ -923,6 +923,11 @@ edit.
   reader**, and this is the opaque-file side of that line: no format parsing, no
   in-browser reading, no reading progress, no device sync (DEC-048).
 - Delete entry
+- The personal region shows status, score, shelves and only the other rows that hold a value
+  (Sprint 124). Below them, one question at a time asks about the most useful gap: when it
+  was finished, how it is held, where it is, when it began. *I don't remember* is kept and
+  that question is not asked again; *Skip* moves on for the visit. *Lend…* is one of the
+  page's actions.
 - Anything under way has a *Finished* action on its page and on its card in *Now* (Sprint 123).
   One sheet asks when (today chosen), the score ("Still an 8?" when one is set) and the format
   if none is recorded; *Finish* at once takes every answer as it stands.

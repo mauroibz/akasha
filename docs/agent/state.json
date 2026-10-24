@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 51,
-  "project_status": "in_progress",
-  "active_sprint": "124",
-  "active_sprint_file": "docs/sprints/124-only-what-is-there.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "123",
+  "project_status": "ready",
+  "active_sprint": "125",
+  "active_sprint_file": "docs/sprints/125-play-in-insights.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "124",
   "completed_sprints": [
     "001",
     "002",
@@ -129,8 +129,9 @@
     "120",
     "121",
     "122",
-    "123"
+    "123",
+    "124"
   ],
-  "started_at": "2026-10-24T03:47:57-03:00",
-  "updated_at": "2026-10-24T03:47:57-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-24T03:57:14-03:00"
 }
