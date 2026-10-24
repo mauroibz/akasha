@@ -28,17 +28,15 @@ function monthYear(iso: string): string {
 /**
  * Play with your library (Sprint 125, DEC-179, mockup 2A): the decks, asked as
  * questions about your own books, at the top of Insights. A game appears only when it
- * has something to ask, and the section only when one does. `lead` puts another game
- * first (Sprint 126's mixed round).
+ * has something to ask, and the section only when one does. With two or more, *Five
+ * minutes* comes first: a mixed round of them all (Sprint 126).
  */
 export function PlaySection({
   type,
   types,
-  lead,
 }: {
   type: string;
   types: ItemType[] | undefined;
-  lead?: Game | null;
 }) {
   const distribution = useScoreDistribution({ type });
   const score = bestScore(distribution.data?.counts ?? []);
@@ -68,7 +66,7 @@ export function PlaySection({
     queryFn: ({ signal }) => getGaps(signal),
   });
 
-  const games: Game[] = lead ? [lead] : [];
+  const games: Game[] = [];
   if (score !== null && scored.data && scored.data.total >= 2)
     games.push({
       key: "best",
@@ -114,6 +112,21 @@ export function PlaySection({
     });
 
   if (games.length === 0) return null;
+  if (games.length >= 2)
+    games.unshift({
+      key: "five",
+      to: "/play/five",
+      question: "Five minutes",
+      label: "Five minutes",
+      meta: `A mixed round from ${games.length} games, ending with what changed`,
+      // One cover from each game, each book once.
+      covers: games
+        .map((game) => game.covers[0])
+        .filter(
+          (entry, at, all) =>
+            entry && all.findIndex((other) => other?.id === entry.id) === at,
+        ),
+    });
   return (
     <section id="play" aria-labelledby="play-heading" className="mt-8">
       <h2

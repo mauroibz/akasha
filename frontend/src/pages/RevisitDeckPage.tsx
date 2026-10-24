@@ -47,8 +47,8 @@ export function RevisitDeckPage() {
     <Deck<RevisitCard, Draft>
       label="Revisit"
       progressLabel="Progress through old scores"
-      closeLabel="Back to the chores"
-      onClose={() => navigate("/deck")}
+      closeLabel="Back to Insights"
+      onClose={() => navigate("/insights")}
       source={{
         cards,
         total: queue.data?.total ?? 0,
@@ -120,7 +120,7 @@ export function RevisitDeckPage() {
               className="rounded-full px-5"
               onClick={close}
             >
-              Back to the chores
+              Back to Insights
             </Button>
           </DeckEnd>
         );

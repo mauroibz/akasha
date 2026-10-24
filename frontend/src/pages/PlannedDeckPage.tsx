@@ -77,14 +77,14 @@ export function PlannedDeckPage() {
       void queryClient.invalidateQueries({ queryKey: ["chores"] });
     },
   });
-  const close = () => navigate("/deck");
+  const close = () => navigate("/insights");
 
   return (
     <>
       <Deck<LibraryEntry, Draft>
         label="Still want this?"
         progressLabel="Progress through the planned pile"
-        closeLabel="Back to the chores"
+        closeLabel="Back to Insights"
         onClose={close}
         source={{
           cards: entries,
@@ -185,7 +185,7 @@ export function PlannedDeckPage() {
                 summary={`Removed ${removed} · ${kept} kept.`}
               >
                 <Button className="rounded-full px-5" onClick={leave}>
-                  Back to the chores
+                  Back to Insights
                 </Button>
               </DeckEnd>
             );
@@ -218,7 +218,7 @@ export function PlannedDeckPage() {
                 className="rounded-full px-5"
                 onClick={leave}
               >
-                {letGo.length ? "Keep them all" : "Back to the chores"}
+                {letGo.length ? "Keep them all" : "Back to Insights"}
               </Button>
             </DeckEnd>
           );

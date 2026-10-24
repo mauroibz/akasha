@@ -35,9 +35,13 @@ const chip =
 export function OneQuestion({
   entry,
   types,
+  onDone,
 }: {
   entry: LibraryEntry;
   types: ItemType[] | undefined;
+  /** Asked once, inside a round (Sprint 126): called after the answer, a forget or a
+   * skip, instead of moving on to the entry's next question. */
+  onDone?: (outcome: "answered" | "forgotten" | "skipped") => void;
 }) {
   const [skipped, setSkipped] = useState<Question[]>([]);
   const questions = questionsFor(entry, types);
@@ -51,7 +55,10 @@ export function OneQuestion({
       types={types}
       question={current}
       position={`${questions.indexOf(current) + 1} of ${questions.length}`}
-      onSkip={() => setSkipped((rows) => [...rows, current])}
+      onSkip={() =>
+        onDone ? onDone("skipped") : setSkipped((rows) => [...rows, current])
+      }
+      onDone={onDone}
     />
   );
 }
@@ -62,12 +69,14 @@ function Card({
   question,
   position,
   onSkip,
+  onDone,
 }: {
   entry: LibraryEntry;
   types: ItemType[] | undefined;
   question: Question;
   position: string;
   onSkip: () => void;
+  onDone?: (outcome: "answered" | "forgotten") => void;
 }) {
   const queryClient = useQueryClient();
   // Empty, never today: a book finished years ago saved as today is worse than
@@ -84,7 +93,8 @@ function Card({
     )?.formats ?? [];
   const save = useMutation({
     mutationFn: (changes: EntryPatch) => patchEntry(entry.id, changes),
-    onSuccess: (saved) => {
+    onSuccess: (saved, changes) => {
+      onDone?.("unknown_fields" in changes ? "forgotten" : "answered");
       queryClient.setQueryData(queryKeys.entry(entry.id), saved);
       void queryClient.invalidateQueries({
         queryKey: queryKeys.entry(entry.id),

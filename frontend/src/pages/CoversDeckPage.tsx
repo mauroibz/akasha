@@ -51,7 +51,7 @@ export function CoversDeckPage() {
     <Deck<LibraryEntry, Draft>
       label="Find a cover"
       progressLabel="Progress through what has no cover"
-      closeLabel="Back to the chores"
+      closeLabel="Back to Tidy up"
       onClose={() => navigate("/deck")}
       source={{
         cards: entries,
@@ -101,7 +101,7 @@ export function CoversDeckPage() {
             className="rounded-full px-5"
             onClick={close}
           >
-            Back to the chores
+            Back to Tidy up
           </Button>
         </DeckEnd>
       )}

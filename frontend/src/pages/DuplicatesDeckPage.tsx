@@ -54,7 +54,7 @@ export function DuplicatesDeckPage() {
     <Deck<DuplicatePair, Draft>
       label="Duplicates"
       progressLabel="Progress through possible duplicates"
-      closeLabel="Back to the chores"
+      closeLabel="Back to Tidy up"
       onClose={() => navigate("/deck")}
       source={{
         cards: pairs,
@@ -120,7 +120,7 @@ export function DuplicatesDeckPage() {
               className="rounded-full px-5"
               onClick={close}
             >
-              Back to the chores
+              Back to Tidy up
             </Button>
           </DeckEnd>
         );

@@ -1163,6 +1163,9 @@ for (const scheme of ["light", "dark"] as const) {
     await page.goto("/play/gaps");
     await expect(page.locator("[data-question]")).toBeVisible();
     await expectNoSeriousViolations(page, `gaps (${scheme})`);
+    await page.goto("/play/five");
+    await expect(page.locator("main h2").first()).toBeVisible();
+    await expectNoSeriousViolations(page, `five minutes (${scheme})`);
   });
 }
 

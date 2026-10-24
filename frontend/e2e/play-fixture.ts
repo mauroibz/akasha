@@ -70,6 +70,15 @@ export async function stubPlay(
       },
     }),
   );
+  await page.route("**/api/entries/rank", async (route) => {
+    const request = route.request();
+    calls.push({
+      method: request.method(),
+      url: "/api/entries/rank",
+      body: request.postDataJSON(),
+    });
+    await route.fulfill({ json: [] });
+  });
   await page.route("**/api/gaps", (route) =>
     route.fulfill({ json: { entries: gaps, total: gaps.length } }),
   );

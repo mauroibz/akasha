@@ -47,6 +47,38 @@ test("the gaps are filled one book at a time", async ({ page }) => {
   await expect(page.getByText("That's every gap for now")).toBeVisible();
 });
 
+test("five minutes deals a mixed round and ends with what changed", async ({
+  page,
+}) => {
+  const calls: Array<{ method: string; url: string; body: unknown }> = [];
+  await stubPlay(page, calls);
+  await page.goto("/insights");
+  await page
+    .getByRole("region", { name: "Play with your library" })
+    .getByRole("link", { name: /Five minutes/ })
+    .click();
+  const end = page.getByRole("heading", { name: "Five minutes, done" });
+  for (let card = 0; card < 5 && !(await end.isVisible()); card++) {
+    const heading = page.locator("main h2, main [data-question] h3").first();
+    await expect(heading).toBeVisible();
+    const text = (await heading.textContent()) ?? "";
+    if (text.startsWith("Which did you like more"))
+      await page
+        .locator("main button")
+        .filter({ hasText: /\S/ })
+        .first()
+        .click();
+    else if (text.startsWith("Is "))
+      await page.getByRole("button", { name: /^Keep / }).click();
+    else if (text.startsWith("Still want"))
+      await page.getByRole("button", { name: "Keep", exact: true }).click();
+    else await page.getByRole("button", { name: "I don't remember" }).click();
+    await expect(heading).not.toHaveText(text);
+  }
+  await expect(end).toBeVisible();
+  expect(calls.some((call) => call.url === "/api/entries/rank")).toBe(true);
+});
+
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 664 } });
 

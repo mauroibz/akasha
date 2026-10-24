@@ -72,6 +72,14 @@ describe("PlaySection (Sprint 125)", () => {
     const section = await screen.findByRole("region", {
       name: "Play with your library",
     });
+    // More than one game: the mixed round leads (Sprint 126).
+    const five = await within(section).findByRole("link", {
+      name: /Five minutes/,
+    });
+    expect(five).toHaveAttribute("href", "/play/five");
+    expect(
+      await within(section).findByRole("link", { name: /from 4 games/ }),
+    ).toBe(five);
     const best = await within(section).findByRole("link", {
       name: /Which 8 is your best 8\?/,
     });
@@ -100,5 +108,12 @@ describe("PlaySection (Sprint 125)", () => {
     const { container } = mount();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("leaves the mixed round out when there is only one game", async () => {
+    stub({ revisit: [], pile: [], gaps: [] });
+    mount();
+    await screen.findByRole("link", { name: /Which 8 is your best 8\?/ });
+    expect(screen.queryByRole("link", { name: /Five minutes/ })).toBeNull();
   });
 });
