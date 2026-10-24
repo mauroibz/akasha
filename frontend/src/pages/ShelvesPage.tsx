@@ -8,6 +8,7 @@ import { queryKeys } from "@/api/keys";
 import type { ItemType } from "@/api/library";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SuggestedShelves } from "@/features/shelves/SuggestedShelves";
 import { Input } from "@/components/ui/input";
 import { Loading } from "@/components/ui/skeleton";
 import { spelled } from "@/features/insights/prose";
@@ -247,6 +248,8 @@ export function ShelvesPage() {
           )}
         </div>
       )}
+
+      <SuggestedShelves />
 
       {shelves.isPending && (
         <Loading label="Loading shelves…" shape="grid" className="mt-10" />

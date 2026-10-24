@@ -1660,6 +1660,43 @@ async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> Item
     return ItemResponse.model_validate(await off_loop(library.get_item, item_id))
 
 
+class ShelfSuggestionResponse(BaseModel):
+    """A shelf the library already implies (Sprint 119, DEC-176)."""
+
+    #: What it groups on (`creator:…`, `series:…`, `work:…`), to accept or dismiss it by.
+    key: str
+    kind: Literal["creator", "series", "work"]
+    name: str
+    reason: str
+    members: list[ShelfPreviewResponse]
+
+
+class SuggestionKeyBody(BaseModel):
+    key: str = Field(min_length=1, max_length=500)
+
+
+@router.get("/shelves/suggestions", response_model=list[ShelfSuggestionResponse])
+def shelf_suggestions(library: Library) -> list[ShelfSuggestionResponse]:
+    """Shelves proposed from what the library holds; no provider is asked."""
+    return [ShelfSuggestionResponse.model_validate(row) for row in library.shelf_suggestions()]
+
+
+@router.post(
+    "/shelves/suggestions/accept",
+    status_code=201,
+    response_model=ShelfResponse,
+    responses=ERRORS,
+)
+def accept_shelf_suggestion(body: SuggestionKeyBody, library: Library) -> ShelfResponse:
+    return ShelfResponse.model_validate(library.accept_shelf_suggestion(body.key))
+
+
+@router.post("/shelves/suggestions/dismiss", status_code=204, responses=ERRORS)
+def dismiss_shelf_suggestion(body: SuggestionKeyBody, library: Library) -> Response:
+    library.dismiss_shelf_suggestion(body.key)
+    return Response(status_code=204)
+
+
 @router.get("/shelves", response_model=list[ShelfResponse])
 def list_shelves(library: Library) -> list[ShelfResponse]:
     return [ShelfResponse.model_validate(value) for value in library.list_shelves()]

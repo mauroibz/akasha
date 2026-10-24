@@ -113,6 +113,10 @@ ROUTE_POLICY = {
     ("POST", "/api/items/{item_id}/fill"): "owned-shared-cache",
     ("POST", "/api/items/{item_id}/cover/fetch"): "owned-shared-cache",
     ("GET", "/api/shelves"): "private-collection",
+    # Sprint 119: read from and written to the requester's own library only.
+    ("GET", "/api/shelves/suggestions"): "private-collection",
+    ("POST", "/api/shelves/suggestions/accept"): "private-write",
+    ("POST", "/api/shelves/suggestions/dismiss"): "private-write",
     ("POST", "/api/shelves"): "private-write",
     ("PATCH", "/api/shelves/{shelf_id}"): "private-id",
     ("DELETE", "/api/shelves/{shelf_id}"): "private-id",
@@ -582,6 +586,7 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             # The admin's loan to Sofi (seeded) is the admin's alone (Sprint 110).
             assert (await second.get("/api/loans")).json() == []
             assert (await second.get("/api/duplicates")).json() == []
+            assert (await second.get("/api/shelves/suggestions")).json() == []
             assert (await second.get("/api/diary/timeline")).json()["events"] == []
             assert (await second.get("/api/locations")).json() == []
             lent = await second.get("/api/entries", params={"lent": "true"})

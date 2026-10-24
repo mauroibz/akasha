@@ -71,7 +71,11 @@ from book_tracker.infrastructure.models import (
     LoanRow,
     ScoreEventRow,
     ShelfRow,
+    ShelfSuggestionDismissalRow,
 )
+
+#: What tells one edition's title from another's, as `work_key` sets it aside.
+_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
 
 #: The room a score leaves for ranks inside it in the library's score sort (Sprint 116).
 SCORE_RANK_SPAN = 1_000_000
@@ -1478,6 +1482,152 @@ class LibraryService:
                 f"/api/items/{row.item_id}/cover?v={version}"
             )
         return covers
+
+    # -- Suggested shelves (Sprint 119, DEC-176) -----------------------------------
+
+    #: How many a creator needs before a shelf of them is worth proposing.
+    SUGGEST_CREATOR_AT = 3
+    SUGGEST_LIMIT = 12
+
+    def shelf_suggestions(self) -> list[dict[str, Any]]:
+        """Shelves the library already implies, from stored data only.
+
+        Three groupings: one creator three times or more; one series twice or more (a
+        domain's `series` field); one work in two libraries or more (the same title once
+        edition notes and a subtitle are set aside, as duplicate detection reads it).
+        A suggestion a shelf already holds, or the owner dismissed, is not offered.
+        """
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(
+                    EntryRow.id,
+                    EntryRow.item_id,
+                    ItemRow.type,
+                    ItemRow.title,
+                    ItemRow.year,
+                    ItemRow.cover_path,
+                    ItemRow.updated_at,
+                    ItemRow.creator_primary,
+                    ItemRow.creator_primary_normalized,
+                    ItemRow.metadata_json,
+                    EntryRow.score,
+                )
+                .join(ItemRow, ItemRow.id == EntryRow.item_id)
+                .where(EntryRow.user_id == self.user_id, EntryRow.status != "unsorted")
+                .order_by(EntryRow.id)
+            ).all()
+            dismissed = set(
+                session.scalars(
+                    select(ShelfSuggestionDismissalRow.key).where(
+                        ShelfSuggestionDismissalRow.user_id == self.user_id
+                    )
+                )
+            )
+            shelves = session.execute(
+                select(ShelfRow.slug, EntryShelfRow.entry_id)
+                .outerjoin(EntryShelfRow, EntryShelfRow.shelf_id == ShelfRow.id)
+                .where(ShelfRow.user_id == self.user_id)
+            ).all()
+        held: dict[str, set[int]] = {}
+        for slug, entry_id in shelves:
+            held.setdefault(slug, set())
+            if entry_id is not None:
+                held[slug].add(entry_id)
+
+        groups: dict[str, dict[str, Any]] = {}
+
+        def add(key: str, name: str, row: Any) -> None:
+            group = groups.setdefault(key, {"name": name, "rows": [], "types": set()})
+            group["rows"].append(row)
+            group["types"].add(row.type)
+
+        for row in rows:
+            if row.creator_primary_normalized:
+                add(f"creator:{row.creator_primary_normalized}", row.creator_primary, row)
+            series = json.loads(row.metadata_json or "{}").get("series")
+            if isinstance(series, str) and normalize_text(series):
+                add(f"series:{normalize_text(series)}", series.strip(), row)
+            key = work_key(row.title or "")
+            if key:
+                head = _EDITION_NOTE.sub(" ", (row.title or "").split(":", 1)[0])
+                add(f"work:{key}", " ".join(head.split()), row)
+
+        suggestions = []
+        for key, group in groups.items():
+            kind = key.split(":", 1)[0]
+            count = len(group["rows"])
+            libraries = len(group["types"])
+            if kind == "creator" and count < self.SUGGEST_CREATOR_AT:
+                continue
+            if kind == "series" and count < 2:
+                continue
+            if kind == "work" and libraries < 2:
+                continue
+            if key in dismissed:
+                continue
+            ids = {row.id for row in group["rows"]}
+            if shelf_slug(group["name"]) in held or any(
+                ids <= members for members in held.values() if members
+            ):
+                continue
+            reason = {
+                "creator": f"{count} by {group['name']}",
+                "series": f"{count} in {group['name']}",
+                "work": f"{group['name']} in {libraries} libraries",
+            }[kind]
+            suggestions.append(
+                {
+                    "key": key,
+                    "kind": kind,
+                    "name": group["name"],
+                    "reason": reason,
+                    "members": [
+                        {
+                            "entry_id": row.id,
+                            "title": row.title,
+                            "year": row.year,
+                            "score": row.score,
+                            "cover_url": (
+                                f"/api/items/{row.item_id}/cover?v="
+                                + row.updated_at.replace(":", "").replace("-", "")
+                            )
+                            if row.cover_path
+                            else None,
+                        }
+                        for row in group["rows"]
+                    ],
+                }
+            )
+        suggestions.sort(key=lambda row: (-len(row["members"]), row["name"].casefold()))
+        return suggestions[: self.SUGGEST_LIMIT]
+
+    def accept_shelf_suggestion(self, key: str) -> dict[str, Any]:
+        """Make the suggested shelf, with exactly its entries."""
+        suggestion = next((row for row in self.shelf_suggestions() if row["key"] == key), None)
+        if suggestion is None:
+            raise LibraryError(
+                "suggestion_not_found", "That suggestion is not on offer", status_code=404
+            )
+        shelf = self.create_shelf(suggestion["name"])
+        with self._write() as session:
+            session.add_all(
+                EntryShelfRow(entry_id=member["entry_id"], shelf_id=shelf["id"])
+                for member in suggestion["members"]
+            )
+        return shelf
+
+    def dismiss_shelf_suggestion(self, key: str) -> None:
+        with self._write() as session:
+            exists = session.scalar(
+                select(ShelfSuggestionDismissalRow.id).where(
+                    ShelfSuggestionDismissalRow.user_id == self.user_id,
+                    ShelfSuggestionDismissalRow.key == key,
+                )
+            )
+            if exists is None:
+                session.add(
+                    ShelfSuggestionDismissalRow(user_id=self.user_id, key=key, created_at=_now())
+                )
 
     def create_shelf(self, name: str) -> dict[str, Any]:
         try:

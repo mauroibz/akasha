@@ -1,5 +1,5 @@
 import type { Shelf } from "./library";
-import { apiFailure, jsonOrApiError, request } from "./request";
+import { apiFailure, jsonOrApiError, readApiError, request } from "./request";
 
 export interface ShelfWithCount extends Shelf {
   entry_count: number;
@@ -66,4 +66,41 @@ export function deleteShelf(id: number) {
   }).then(async (r) => {
     if (!r.ok) throw await apiFailure(r, "Shelf could not be deleted");
   });
+}
+
+/** A shelf the library already implies (Sprint 119, DEC-176). */
+export interface ShelfSuggestion {
+  key: string;
+  kind: "creator" | "series" | "work";
+  name: string;
+  reason: string;
+  members: ShelfPreviewMember[];
+}
+
+const json = { Accept: "application/json", "Content-Type": "application/json" };
+
+export function getShelfSuggestions(signal?: AbortSignal) {
+  return request("/api/shelves/suggestions", { signal }).then((r) =>
+    jsonOrApiError<ShelfSuggestion[]>(r, "Suggestions could not be loaded"),
+  );
+}
+
+export function acceptShelfSuggestion(key: string) {
+  return request("/api/shelves/suggestions/accept", {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ key }),
+  }).then((r) =>
+    jsonOrApiError<ShelfWithCount>(r, "The shelf could not be made"),
+  );
+}
+
+export async function dismissShelfSuggestion(key: string) {
+  const response = await request("/api/shelves/suggestions/dismiss", {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ key }),
+  });
+  if (!response.ok)
+    throw await readApiError(response, "Your answer could not be saved");
 }

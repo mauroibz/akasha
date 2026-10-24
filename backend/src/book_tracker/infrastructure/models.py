@@ -170,6 +170,16 @@ class DuplicateDismissalRow(Base):
     created_at: Mapped[str]
 
 
+class ShelfSuggestionDismissalRow(Base):
+    """A suggested shelf the owner said is not useful (Sprint 119, DEC-176)."""
+
+    __tablename__ = "shelf_suggestion_dismissals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int]
+    key: Mapped[str]
+    created_at: Mapped[str]
+
+
 class ShelfRow(Base):
     __tablename__ = "shelves"
     id: Mapped[int] = mapped_column(primary_key=True)

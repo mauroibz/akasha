@@ -676,6 +676,10 @@ GET    /api/shelves
 POST   /api/shelves                     → create a shelf
 PATCH  /api/shelves/{id}               → rename
 DELETE /api/shelves/{id}               → detaches, does not delete entries
+GET    /api/shelves/suggestions        → shelves the library implies (a creator 3+ times, a
+                                          series 2+, a work in 2+ libraries); no provider
+POST   /api/shelves/suggestions/accept → {key}: make the shelf with exactly its entries
+POST   /api/shelves/suggestions/dismiss → {key}: never offer it again
 
 POST   /api/import/goodreads/preview   → CSV upload, returns dry-run report
 POST   /api/import/goodreads/commit    → {batch_id, options}

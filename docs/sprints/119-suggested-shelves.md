@@ -1,7 +1,7 @@
 # Sprint 119 — Suggested shelves
 
 **Sprint:** 119
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 49
 **Depends on:** 118
 **Owner:** Mauro

@@ -7,6 +7,7 @@ import { stubTimeline } from "./diary-fixture";
 import { stubHouse } from "./house-fixture";
 import { stubRank } from "./rank-fixture";
 import { stubRescore } from "./rescore-fixture";
+import { stubSuggestions } from "./suggestions-fixture";
 import { stubSeries } from "./progress-fixture";
 
 import {
@@ -1223,5 +1224,19 @@ for (const scheme of ["light", "dark"] as const) {
     await page.getByRole("button", { name: "All years" }).click();
     await expect(page.getByRole("list", { name: "Every year" })).toBeVisible();
     await expectNoSeriousViolations(page, `timeline (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`suggested shelves have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubSuggestions(page);
+    await page.goto("/shelves");
+    await expect(
+      page.getByRole("region", { name: "Suggested shelves" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `suggested shelves (${scheme})`);
   });
 }

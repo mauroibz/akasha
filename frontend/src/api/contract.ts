@@ -25,6 +25,7 @@ import type {
 import type { CreateEntryResponse, SearchCandidate, SourceRef } from "./add";
 import type { DuplicatePair } from "./duplicates";
 import type { Loan, LoanWithEntry, Location } from "./loans";
+import type { ShelfSuggestion } from "./shelves";
 import type {
   Attachment,
   BulkBody,
@@ -103,5 +104,6 @@ export type Contract = [
   Holds<NamesOnly<DuplicatePair, Schemas["DuplicatePairResponse"]>>,
   Holds<NamesOnly<ScoreEvent, Schemas["ScoreEventResponse"]>>,
   Holds<NamesOnly<Timeline, Schemas["TimelineResponse"]>>,
+  Holds<NamesOnly<ShelfSuggestion, Schemas["ShelfSuggestionResponse"]>>,
   Holds<NamesOnly<TimelineEvent, Schemas["TimelineEvent"]>>,
 ];
