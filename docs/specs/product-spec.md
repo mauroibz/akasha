@@ -1012,6 +1012,13 @@ Sprint 126): one round of up to five cards dealt from them all, each answer writ
 game writes it, ending with what changed. Upkeep is `/deck`, *Tidy up*: the inbox, covers and duplicates,
 reached from Settings and the command bar.
 
+**`/diary` — what was finished, month by month.** A gentle goal leads it (Sprint 127,
+DEC-179). Without one, for the current year: what the year holds so far and three goals said
+as paces, one tap to set a yearly goal for the library finished most; *Another number* opens
+the full dialog. With one: the count against the goal, one sentence, and a slot per thing aimed
+at, filled by the year's covers in the order they were finished (a bar with today's place in
+the year above 24). Empty slots are dashed outlines; nothing is marked as behind.
+
 **`/import` — Import.** One prominent workflow tablist separates **1. Import** from
 **2. Triage** (above). The registered connector tabs are visibly subordinate to the
 Import step and are absent from Triage. The chosen connector or Triage still lives in

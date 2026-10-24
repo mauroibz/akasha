@@ -1876,14 +1876,14 @@ deck (DEC-178), and the commonplace book is a v3 candidate.
 The owner's first look at 2.8 in the running app, recorded 2026-10-24 as **DEC-179**: lent
 out as a shelf, an obvious way to finish, a personal region that only shows what it has, the
 decks turned into play, and the goal at the head of the Diary. Mockups *A second look*,
-approved as recommended.
+approved as recommended. All six sprints are completed, unreleased on top of 2.7.0.
 
-- **[122 — Lent out, on the shelves](122-lent-out-on-the-shelves.md)** (**ready**).
-- **[123 — Finishing](123-finishing.md)**: a *Finished* action and one sheet (mockup 1C).
-- **[124 — Only what is there, and one question](124-only-what-is-there.md)** (mockup 1A).
-- **[125 — Play, at the top of Insights](125-play-in-insights.md)** (mockup 2A) and
-  **[126 — Five minutes](126-five-minutes.md)** (mockup 2C).
-- **[127 — The goal in the Diary](127-the-goal-in-the-diary.md)** (mockups 3A and 3B).
+- **[122 — Lent out, on the shelves](122-lent-out-on-the-shelves.md)** (**completed**).
+- **[123 — Finishing](123-finishing.md)** (**completed**): a *Finished* action and one sheet.
+- **[124 — Only what is there, and one question](124-only-what-is-there.md)** (**completed**).
+- **[125 — Play, at the top of Insights](125-play-in-insights.md)** (**completed**) and
+  **[126 — Five minutes](126-five-minutes.md)** (**completed**).
+- **[127 — The goal in the Diary](127-the-goal-in-the-diary.md)** (**completed**).
 
 ## Not scheduled
 

@@ -6781,3 +6781,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Found and fixed in the walkthrough: one pair answer wrote ranks for every book of that
   score; now only the placed books and the two compared.
 - Next: Sprint 127, the goal in the Diary.
+
+## 2026-10-24 — Sprint 127: The goal in the Diary; the 122–127 line closed
+
+- Done: the invitation (three paces, one tap) and the slots (a bar above 24) replace the quiet
+  line and the calendar of lights.
+- Verified: Vitest (goals, Diary; red first), `vitest related` (17), `make check`, Playwright
+  diary-goal (new)/diary-timeline/year-review/a11y. Walkthrough `walk127.mjs`: invitation,
+  one tap to 12, slots, a goal of 30 as a bar; no sideways scroll at 390/1440.
+- Line verification: `make test` (1792 + 549), full Playwright (214 passed, 2 skipped).
+- Next: nothing planned; the owner's look at 122–127 and a 2.8 release when asked.
