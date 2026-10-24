@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Timeline } from "@/features/diary/Timeline";
 import { GoalBand } from "@/features/goals/GoalBand";
 import { GoalDialog } from "@/features/goals/GoalDialog";
+import { GoalInvite } from "@/features/goals/GoalInvite";
 import { goalDomains } from "@/features/goals/goals";
 import { Loading } from "@/components/ui/skeleton";
 import { countLabel } from "@/features/library/labels";
@@ -29,8 +30,8 @@ function monthName(month: string): string {
  * The Diary (Sprint 098, proposal §7): what you finished, month by month, across every
  * domain: "March: 3 books, 1 movie", with the covers. Read from `date_finished`.
  *
- * A gentle goal sits above the months when one is set (Sprint 104, DEC-169): the
- * calendar of lights and a few picks. Without one, a single quiet line offers it.
+ * A gentle goal leads the page (Sprint 104, DEC-169; Sprint 127, DEC-179): slots the
+ * year's covers fill, and a few picks. Without one, an invitation with three paces.
  */
 export function DiaryPage() {
   const navigate = useNavigate();
@@ -55,6 +56,16 @@ export function DiaryPage() {
   });
   const canSetGoal = goalDomains(types).length > 0;
   const goalYear = shown ?? new Date().getFullYear();
+  const thisYear = goalYear === new Date().getFullYear();
+  // A domain's finishes in the shown year, for its goal's slots (Sprint 127).
+  const finishedOf = (itemType: string) =>
+    (diary.data?.months ?? []).flatMap((month) =>
+      month.entries.filter((entry) => entry.item.type === itemType),
+    );
+  // The library a goal is offered for: the one finished most this year.
+  const invited = [...goalDomains(types)].sort(
+    (a, b) => finishedOf(b.id).length - finishedOf(a.id).length,
+  )[0];
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-8">
@@ -114,20 +125,27 @@ export function DiaryPage() {
               goal={goal}
               year={goalYear}
               types={types}
+              finished={finishedOf(goal.item_type)}
               onChange={() => setEditing({ open: true, goal })}
             />
           ))}
-          {goals.data && canSetGoal && (
+          {/* No goal: the Diary opens with an invitation (Sprint 127). */}
+          {goals.data?.length === 0 && invited && thisYear && (
+            <GoalInvite
+              domain={invited}
+              done={finishedOf(invited.id).length}
+              year={goalYear}
+              onOther={() => setEditing({ open: true })}
+            />
+          )}
+          {goals.data && goals.data.length > 0 && canSetGoal && (
             <p className="mt-6 text-sm text-muted-foreground">
-              {goals.data.length === 0 ? "Want something to aim at? " : null}
               <button
                 type="button"
                 onClick={() => setEditing({ open: true })}
                 className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
               >
-                {goals.data.length === 0
-                  ? "Set a gentle goal"
-                  : "Add a goal for another library"}
+                Add a goal for another library
               </button>
             </p>
           )}

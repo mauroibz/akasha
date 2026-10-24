@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 51,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "127",
   "active_sprint_file": "docs/sprints/127-the-goal-in-the-diary.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "126",
   "completed_sprints": [
     "001",
@@ -134,6 +134,6 @@
     "125",
     "126"
   ],
-  "started_at": "",
-  "updated_at": "2026-10-24T04:13:30-03:00"
+  "started_at": "2026-10-24T04:13:35-03:00",
+  "updated_at": "2026-10-24T04:13:35-03:00"
 }

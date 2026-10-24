@@ -1,7 +1,7 @@
 # Sprint 127 — The goal in the Diary
 
 **Sprint:** 127
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 51
 **Depends on:** 126
 **Owner:** Mauro

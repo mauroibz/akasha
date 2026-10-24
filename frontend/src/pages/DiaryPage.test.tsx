@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -104,7 +104,10 @@ describe("DiaryPage with a gentle goal", () => {
     since: reason === "waiting" ? "2024-03-01T00:00:00Z" : null,
   });
 
-  function stub(goals: unknown[]) {
+  function stub(
+    goals: unknown[],
+    { target = 24, finished = [] as unknown[] } = {},
+  ) {
     const calls: Array<{ url: string; method: string; body?: string }> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
@@ -120,7 +123,15 @@ describe("DiaryPage with a gentle goal", () => {
           JSON.stringify({
             year: new Date().getFullYear(),
             years: [],
-            months: [],
+            months: finished.length
+              ? [
+                  {
+                    month: "2026-03",
+                    counts: { book: finished.length },
+                    entries: finished,
+                  },
+                ]
+              : [],
           }),
         );
       if (url.includes("/progress"))
@@ -130,7 +141,7 @@ describe("DiaryPage with a gentle goal", () => {
             year: new Date().getFullYear(),
             months,
             total: 17,
-            target: 24,
+            target,
           }),
         );
       if (url.includes("/picks"))
@@ -174,14 +185,39 @@ describe("DiaryPage with a gentle goal", () => {
 
   const goal = { item_type: "book", count: 2, period: "month", suggest: true };
 
-  it("draws the year so far as a calendar of lights, nothing marked as missed", async () => {
-    stub([goal]);
+  it("draws the goal as slots the year's covers fill, in order (Sprint 127)", async () => {
+    stub([goal], {
+      finished: [
+        { ...entry(2, "book", "Ficciones"), date_finished: "2026-03-20" },
+        { ...entry(1, "book", "Rayuela"), date_finished: "2026-03-02" },
+      ],
+    });
     renderDiary();
     const band = await screen.findByRole("region", { name: /books$/ });
-    expect(band).toHaveTextContent("17 so far");
-    const lit = band.querySelectorAll('[data-place="lit"]');
-    expect(lit).toHaveLength(17);
-    expect(band.querySelector('[data-place="missed"]')).toBeNull();
+    expect(band).toHaveTextContent("17 of 24");
+    const slots = await within(band).findByRole("list", {
+      name: /2 of 24 books in/,
+    });
+    const filled = slots.querySelectorAll('[data-slot="filled"]');
+    expect(
+      [...filled].map(
+        (slot) =>
+          slot.textContent ||
+          slot.querySelector("a")?.getAttribute("aria-label"),
+      ),
+    ).toEqual(["Rayuela", "Ficciones"]);
+    expect(slots.querySelectorAll('[data-slot="next"]')).toHaveLength(1);
+    expect(slots.querySelectorAll('[data-slot="open"]')).toHaveLength(21);
+  });
+
+  it("draws a goal above 24 as a bar with today's place in the year", async () => {
+    stub([{ ...goal, count: 30, period: "year" }], { target: 30 });
+    renderDiary();
+    const band = await screen.findByRole("region", { name: /books$/ });
+    expect(
+      await within(band).findByRole("img", { name: /17 of 30 books in/ }),
+    ).toBeVisible();
+    expect(band.querySelector("[data-slot]")).toBeNull();
   });
 
   it("offers two picks with their reasons, swaps one, and starts one", async () => {
@@ -207,12 +243,35 @@ describe("DiaryPage with a gentle goal", () => {
     expect(JSON.parse(patch?.body ?? "{}")).toEqual({ status: "reading" });
   });
 
-  it("invites a goal quietly when none is set, and sets one", async () => {
+  it("opens with an invitation when no goal is set, one tap to set one (Sprint 127)", async () => {
+    const calls = stub([]);
+    renderDiary();
+    const user = (await import("@testing-library/user-event")).default.setup();
+    const invite = await screen.findByRole("region", {
+      name: "Want something to aim at this year?",
+    });
+    expect(invite).toHaveTextContent("one a month");
+    await user.click(within(invite).getByRole("button", { name: /^12/ }));
+    await user.click(
+      within(invite).getByRole("button", { name: "Aim for 12" }),
+    );
+    await waitFor(() => {
+      const put = calls.find((call) => call.method === "PUT");
+      expect(put?.url).toBe("/api/goals/book");
+      expect(JSON.parse(put?.body ?? "{}")).toEqual({
+        count: 12,
+        period: "year",
+        suggest: true,
+      });
+    });
+  });
+
+  it("keeps the full dialog behind Another number", async () => {
     const calls = stub([]);
     renderDiary();
     const user = (await import("@testing-library/user-event")).default.setup();
     await user.click(
-      await screen.findByRole("button", { name: "Set a gentle goal" }),
+      await screen.findByRole("button", { name: "Another number" }),
     );
     // Only libraries that record a finish date can be counted.
     expect(screen.queryByRole("button", { name: "Albums" })).toBeNull();

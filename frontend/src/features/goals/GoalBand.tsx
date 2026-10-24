@@ -11,34 +11,38 @@ import {
   type GoalPick,
 } from "@/api/goals";
 import { queryKeys } from "@/api/keys";
-import { patchEntry, type ItemType } from "@/api/library";
+import { patchEntry, type ItemType, type LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { Button } from "@/components/ui/button";
 import {
-  calendarPlaces,
   goalSentence,
-  type CalendarMonth,
-  type Place,
+  slotsFor,
+  yearPassed,
+  type Slot,
 } from "@/features/goals/goals";
 import { Prose } from "@/features/insights/sections";
 import { cn } from "@/lib/utils";
 
 /**
- * One domain's goal on the Diary (Sprint 104, DEC-169): the year so far as a large
- * numeral, one sentence, and the calendar of lights — after Simone Giertz's
- * Everyday Calendar, a light for each thing finished, in its month. Unlit places
- * are plain, never red. Below it, when the goal asks for them, a few picks from
- * what is waiting.
+ * One domain's goal on the Diary (Sprint 104, DEC-169), leading the page since Sprint
+ * 127 (DEC-179, mockup 3B): the year so far against the goal, one sentence, and a
+ * slot for each thing aimed at, filled by the year's covers in the order they were
+ * finished. Empty slots are dashed outlines, room left rather than a miss; a goal
+ * above 24 is a bar with today's place in the year. Below it, when the goal asks
+ * for them, a few picks from what is waiting.
  */
 export function GoalBand({
   goal,
   year,
   types,
+  finished,
   onChange,
 }: {
   goal: Goal;
   year: number;
   types: ItemType[];
+  /** This domain's finishes in `year`, any order. */
+  finished: LibraryEntry[];
   onChange: () => void;
 }) {
   const headingId = useId();
@@ -58,10 +62,10 @@ export function GoalBand({
   const current = year === today.getFullYear();
 
   if (!progress.data) return null;
-  const calendar = calendarPlaces(progress.data.months, goal, year, today);
-  const described = calendar
-    .map((month) => `${month.name} ${progress.data.months[month.index]}`)
-    .join(", ");
+  const target =
+    progress.data.target ??
+    (goal.period === "month" ? goal.count * 12 : goal.count);
+  const slots = slotsFor(target, finished);
 
   return (
     <section
@@ -82,7 +86,7 @@ export function GoalBand({
               {progress.data.total}
             </span>{" "}
             <span className="text-3xl text-foreground/80 md:text-4xl">
-              so far
+              of {target}
             </span>
           </p>
           <Prose
@@ -106,67 +110,108 @@ export function GoalBand({
             </button>
           </div>
         </div>
-        <Calendar
-          calendar={calendar}
-          label={`A light for each of your ${plural} finished in ${year}: ${described}.`}
-        />
+        {slots ? (
+          <Slots slots={slots} year={year} plural={plural} target={target} />
+        ) : (
+          <Bar
+            total={progress.data.total}
+            target={target}
+            passed={yearPassed(year, today)}
+            label={`${progress.data.total} of ${target} ${plural} in ${year}`}
+          />
+        )}
       </div>
       {goal.suggest && current && <Picks goal={goal} types={types} />}
     </section>
   );
 }
 
-const placeClass: Record<Place, string> = {
-  lit: "bg-primary shadow-[0_0_0_3px_hsl(var(--primary)/0.16),0_0_14px_hsl(var(--primary)/0.55)]",
-  open: "bg-muted",
-  now: "border-[1.5px] border-dashed border-primary",
-  ahead: "border-[1.5px] border-dashed border-border",
-};
+/** A slot per thing aimed at, the year's covers standing in them in order. */
+function Slots({
+  slots,
+  year,
+  plural,
+  target,
+}: {
+  slots: Slot<LibraryEntry>[];
+  year: number;
+  plural: string;
+  target: number;
+}) {
+  const filled = slots.filter((slot) => slot.entry).length;
+  return (
+    <ol
+      aria-label={`${filled} of ${target} ${plural} in ${year}`}
+      className="grid w-full grid-cols-6 gap-2 sm:gap-3 lg:w-[26rem]"
+    >
+      {slots.map((slot, index) =>
+        slot.entry ? (
+          <li key={index} data-slot="filled">
+            <Link
+              to={`/books/${slot.entry.id}`}
+              aria-label={slot.entry.item.title}
+              className="block rounded-[2px_5px_5px_2px] focus-ring"
+            >
+              <CoverImage
+                src={slot.entry.item.cover_url ?? null}
+                alt=""
+                className="aspect-[2/3] w-full rounded-[2px_5px_5px_2px] object-cover shadow-[inset_3px_0_0_rgba(0,0,0,0.18),0_8px_14px_-8px_rgba(28,25,23,0.5)]"
+              />
+            </Link>
+          </li>
+        ) : (
+          <li
+            key={index}
+            data-slot={slot.next ? "next" : "open"}
+            aria-hidden="true"
+            className={cn(
+              "aspect-[2/3] rounded-[2px_5px_5px_2px] border-[1.5px] border-dashed",
+              slot.next ? "border-primary" : "border-border",
+            )}
+          />
+        ),
+      )}
+    </ol>
+  );
+}
 
-function Calendar({
-  calendar,
+/** Above 24: one bar, and a mark where today falls in the year (mockup 3C). */
+function Bar({
+  total,
+  target,
+  passed,
   label,
 }: {
-  calendar: CalendarMonth[];
+  total: number;
+  target: number;
+  passed: number;
   label: string;
 }) {
   return (
-    <div
-      role="img"
-      aria-label={label}
-      className="flex items-end gap-[5px] md:gap-2"
-    >
-      {calendar.map((month) => (
-        <div key={month.index} className="flex flex-col items-center gap-2">
-          {month.more > 0 && (
-            <span className="text-[10px] text-muted-foreground">
-              +{month.more}
-            </span>
-          )}
-          <div className="flex flex-col-reverse gap-[5px] md:gap-1.5">
-            {month.places.map((place, slot) => (
-              <span
-                key={slot}
-                data-place={place}
-                className={cn(
-                  "block h-[22px] w-5 rounded-[7px] md:h-[30px] md:w-7 md:rounded-[9px]",
-                  placeClass[place],
-                )}
-              />
-            ))}
-          </div>
-          <span
-            className={cn(
-              "text-[11px]",
-              month.current
-                ? "font-semibold text-foreground"
-                : "text-muted-foreground",
-            )}
-          >
-            {month.short}
-          </span>
-        </div>
-      ))}
+    <div className="w-full lg:w-[26rem]">
+      <div
+        role="img"
+        aria-label={label}
+        className="relative h-3 rounded-full bg-muted"
+      >
+        <span
+          className="absolute inset-y-0 left-0 rounded-full bg-primary"
+          style={{ width: `${Math.min(100, (total / target) * 100)}%` }}
+        />
+        <span
+          aria-hidden="true"
+          data-today=""
+          className="absolute -top-1 h-5 w-0.5 rounded bg-foreground/50"
+          style={{ left: `${passed * 100}%` }}
+        />
+      </div>
+      <div
+        aria-hidden="true"
+        className="mt-2 flex justify-between text-xs tabular-nums text-muted-foreground"
+      >
+        <span>Jan</span>
+        <span>Dec</span>
+      </div>
     </div>
   );
 }

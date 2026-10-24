@@ -3,31 +3,13 @@ import type { ItemType } from "@/api/library";
 import { spelled, type Segment } from "@/features/insights/prose";
 
 /**
- * Gentle goals, drawn (Sprint 104, DEC-169): the calendar of lights and the one
- * sentence beside it. Pure, so both are tested without a screen.
+ * Gentle goals, drawn (Sprint 104, DEC-169; slots since Sprint 127): the one sentence,
+ * the slots or the bar, and the goals offered. Pure, so all are tested without a screen.
  *
- * Nothing here says behind. A month with fewer than the goal is not marked, it is
- * simply less lit; a later month can hold more than the goal, and the year counts
+ * Nothing here says behind. An empty slot is room left, a month with fewer than the
+ * goal is not marked, and a later month can hold more than the goal: the year counts
  * them together.
  */
-
-/** One place in a month's column: lit by a finished entry, or not. */
-export type Place = "lit" | "open" | "now" | "ahead";
-
-export interface CalendarMonth {
-  index: number;
-  /** One letter, for the column foot. */
-  short: string;
-  /** The month's name, for the column's accessible description. */
-  name: string;
-  places: Place[];
-  /** Finished entries beyond what the column draws. */
-  more: number;
-  current: boolean;
-}
-
-/** The tallest a column is drawn; a busier month says "+N" instead. */
-export const columnCap = 6;
 
 const names = Array.from({ length: 12 }, (_, month) =>
   new Intl.DateTimeFormat("en", { month: "long" }).format(
@@ -39,47 +21,11 @@ export function monthName(index: number): string {
   return names[index];
 }
 
-/**
- * The calendar's columns. A monthly goal draws that many places a month; a lit
- * place for each entry finished in it, beyond the goal too. A yearly goal has no
- * per-month share, so its columns hold only what was finished. Places in the
- * current month are `now`, later ones `ahead`; a past year has no `now`.
- */
-export function calendarPlaces(
-  months: number[],
-  goal: Pick<Goal, "count" | "period"> | null,
-  year: number,
-  today: Date,
-): CalendarMonth[] {
-  const thisYear = today.getFullYear();
-  const currentMonth =
-    year === thisYear ? today.getMonth() : year < thisYear ? 12 : -1;
-  const perMonth = goal?.period === "month" ? goal.count : 0;
-  return months.map((finished, index) => {
-    const total = Math.max(perMonth, finished);
-    const drawn = Math.min(total, columnCap);
-    const places: Place[] = Array.from({ length: drawn }, (_, slot) => {
-      if (slot < finished) return "lit";
-      if (index < currentMonth) return "open";
-      if (index === currentMonth) return "now";
-      return "ahead";
-    });
-    return {
-      index,
-      short: names[index][0],
-      name: names[index],
-      places,
-      more: Math.max(0, finished - columnCap),
-      current: index === currentMonth,
-    };
-  });
-}
-
 const em = (text: string): Segment => ({ text, em: true });
 const plain = (text: string): Segment => ({ text });
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** The one sentence beside the calendar: the goal, then where this month stands. */
+/** The one sentence beside the slots: the goal, then where this month stands. */
 export function goalSentence(
   goal: Pick<Goal, "count" | "period">,
   progress: Pick<GoalProgress, "months" | "total" | "year">,
@@ -134,4 +80,61 @@ export function goalDomains(types: ItemType[]): ItemType[] {
   return types.filter((type) =>
     (type.entry_fields ?? []).includes("date_finished"),
   );
+}
+
+/** The most slots drawn; a larger goal is a bar (Sprint 127, mockup 3C). */
+export const slotCap = 24;
+
+const paces: Array<{ count: number; words: string }> = [
+  { count: 6, words: "one every two months" },
+  { count: 12, words: "one a month" },
+  { count: 24, words: "two a month" },
+  { count: 36, words: "three a month" },
+  { count: 52, words: "one a week" },
+];
+
+/**
+ * Three goals to offer when none is set (Sprint 127, DEC-179, mockup 3A): the first
+ * three paces above what the year already holds, each said as a pace.
+ */
+export function suggestedCounts(
+  done: number,
+): Array<{ count: number; words: string }> {
+  const above = paces.filter((pace) => pace.count > done);
+  return (above.length >= 3 ? above : paces.slice(-3)).slice(0, 3);
+}
+
+export interface Slot<T> {
+  entry: T | null;
+  /** The first empty slot: where the next one goes. */
+  next: boolean;
+}
+
+/**
+ * The goal as slots (mockup 3B): one per thing aimed at, filled by the year's finishes
+ * in the order they happened, every finish beyond the goal given one too. `null` above
+ * `slotCap`, where the slots would be too small to read.
+ */
+export function slotsFor<T extends { date_finished: string | null }>(
+  target: number,
+  finished: T[],
+): Slot<T>[] | null {
+  if (target > slotCap) return null;
+  const ordered = [...finished].sort((a, b) =>
+    (a.date_finished ?? "").localeCompare(b.date_finished ?? ""),
+  );
+  const total = Math.max(target, ordered.length);
+  return Array.from({ length: total }, (_, index) => ({
+    entry: ordered[index] ?? null,
+    next: index === ordered.length,
+  }));
+}
+
+/** How much of `year` has passed by `today`, 0 to 1 (the bar's mark). */
+export function yearPassed(year: number, today: Date): number {
+  if (year < today.getFullYear()) return 1;
+  if (year > today.getFullYear()) return 0;
+  const start = new Date(year, 0, 1).getTime();
+  const end = new Date(year + 1, 0, 1).getTime();
+  return (today.getTime() - start) / (end - start);
 }
