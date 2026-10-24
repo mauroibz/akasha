@@ -1218,6 +1218,30 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 for (const scheme of ["light", "dark"] as const) {
+  test(`the finish sheet has no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubRescore(page);
+    await page.goto("/books/7");
+    await page.getByRole("button", { name: "Start again" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Start again" })
+      .click();
+    await page.getByRole("button", { name: "Finished", exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "You finished Rayuela" })
+      .getByRole("button", { name: "Another day" })
+      .click();
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `finish sheet (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
   test(`ordering a score has no serious accessibility violations (${scheme})`, async ({
     page,
   }) => {

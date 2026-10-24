@@ -4,7 +4,7 @@ import json
 import re
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
@@ -762,8 +762,10 @@ class LibraryService:
     def update_entry(self, entry_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
             entry = self._entry(session, entry_id)
-            changes = self._validated(self._domain(session, entry), changes)
+            domain = self._domain(session, entry)
+            changes = self._validated(domain, changes)
             last_event = self._last_score_event(session, entry.id)
+            was = entry.status
             for field in (
                 "status",
                 "score",
@@ -777,6 +779,15 @@ class LibraryService:
                 # stored value instead of being mistaken for "not sent".
                 if field in changes:
                     setattr(entry, field, changes[field])
+            if (
+                entry.status != was
+                and entry.date_started is None
+                and "date_started" in domain.entry_fields
+                and any(s.value == entry.status and s.in_progress for s in domain.statuses)
+            ):
+                # Starting is when you know the start (Sprint 123, DEC-179): an empty
+                # date is filled with today, one already written is kept.
+                entry.date_started = date.today().isoformat()
             if "location" in changes:
                 # One line of the owner's own words; blank means "not recorded".
                 entry.location = (changes["location"] or "").strip() or None

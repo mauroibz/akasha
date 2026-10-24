@@ -47,3 +47,71 @@ test("a reread starts, finishes on the last light, and its new score joins the h
   await expect(row).toContainText("after a reread");
   await expect(row).toContainText("The hopscotch order this time");
 });
+
+/**
+ * Finishing (Sprint 123, DEC-179): after *Start again* the page offers *Finished*,
+ * which asks when, the score and the format in one sheet.
+ */
+test("a reread is finished with one button and one sheet", async ({ page }) => {
+  const patches: Array<Record<string, unknown>> = [];
+  await stubRescore(page, patches);
+  await page.goto("/books/7");
+  await expect(
+    page.getByRole("button", { name: "Finished", exact: true }),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Start again" }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Start again" })
+    .click();
+  await page.getByRole("button", { name: "Finished", exact: true }).click();
+
+  const sheet = page.getByRole("dialog", { name: "You finished Rayuela" });
+  await expect(sheet).toContainText("Still an 8?");
+  await sheet.getByRole("button", { name: "Yesterday" }).click();
+  await sheet.getByRole("button", { name: "Score 9" }).click();
+  await sheet.getByRole("textbox").fill("The hopscotch order this time");
+  await sheet.getByRole("button", { name: "Finish" }).click();
+  await expect(sheet).toBeHidden();
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const day = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, "0")}-${String(yesterday.getDate()).padStart(2, "0")}`;
+  expect(patches.at(-1)).toEqual({
+    status: "read",
+    date_finished: day,
+    score: 9,
+    score_reason: "reread",
+    score_note: "The hopscotch order this time",
+  });
+  await expect(page.locator("[data-fact='status'] dd")).toContainText("Read");
+  await expect(
+    page.getByRole("button", { name: "Finished", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.locator("[data-fact='score-history']")).toContainText(
+    "9 in",
+  );
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 390, height: 664 } });
+
+  test("the finish sheet fits", async ({ page }) => {
+    await stubRescore(page);
+    await page.goto("/books/7");
+    await page.getByRole("button", { name: "Start again" }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Start again" })
+      .click();
+    await page.getByRole("button", { name: "Finished", exact: true }).click();
+    const sheet = page.getByRole("dialog", { name: "You finished Rayuela" });
+    await expect(
+      sheet.getByRole("button", { name: "Finish" }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(390);
+  });
+});

@@ -80,4 +80,45 @@ describe("NowStrip", () => {
       expect(screen.queryByRole("heading", { name: "Now" })).toBeNull(),
     );
   });
+
+  it("finishes something from the strip, in the finish sheet (Sprint 123)", async () => {
+    const patches: unknown[] = [];
+    const types = [
+      {
+        ...anime,
+        statuses: [
+          { value: "watching", label: "Watching", in_progress: true },
+          { value: "completed", label: "Completed", finished: true },
+        ],
+        entry_fields: ["date_finished"],
+        formats: [],
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (init?.method === "PATCH") {
+        patches.push(JSON.parse(String(init.body)));
+        return new Response(
+          JSON.stringify({ ...watching, status: "completed" }),
+        );
+      }
+      if (url === "/api/now")
+        return new Response(
+          JSON.stringify([{ ...watching, score: null, formats: [] }]),
+        );
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(types));
+      return new Response("[]");
+    });
+    mount();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Finished Frieren" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Finish" }),
+    );
+    await waitFor(() =>
+      expect(patches[0]).toMatchObject({ status: "completed" }),
+    );
+  });
 });

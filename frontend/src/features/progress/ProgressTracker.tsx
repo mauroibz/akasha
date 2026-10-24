@@ -158,7 +158,17 @@ export function ProgressTracker({
           }}
           className="ml-auto flex shrink-0 items-center gap-1 rounded px-1.5 text-xs text-muted-foreground focus-ring hover:text-foreground"
         >
-          {open ? "Hide" : outline.length ? `Show ${unit}s` : "Set"}
+          {open ? (
+            "Hide"
+          ) : outline.length ? (
+            // "Show chapters" overran a phone's row by a pixel or more (Sprint
+            // 123); the unit stays in the name and returns at wider sizes.
+            <>
+              Show<span className="sr-only sm:not-sr-only"> {unit}s</span>
+            </>
+          ) : (
+            "Set"
+          )}
           <ChevronDown
             aria-hidden="true"
             className={cn(

@@ -1626,6 +1626,28 @@ describe("DetailPage", () => {
       expect(calls.length).toBe(before);
     });
 
+    it("something under way is finished from its page in one sheet (Sprint 123)", async () => {
+      const calls: Call[] = [];
+      routes(calls, { reread_count: 1 });
+      renderPage();
+      const user = userEvent.setup();
+      await screen.findByRole("heading", { name: "Rayuela" });
+      await user.click(screen.getByRole("button", { name: "Finished" }));
+      const sheet = await screen.findByRole("dialog", {
+        name: "You finished Rayuela",
+      });
+      expect(within(sheet).getByText("Still an 8?")).toBeVisible();
+      await user.click(within(sheet).getByRole("button", { name: "Finish" }));
+      await waitFor(() =>
+        expect(calls.at(-1)?.body).toEqual({
+          status: "read",
+          date_finished: today(),
+          score: 8,
+          score_reason: "reread",
+        }),
+      );
+    });
+
     it("starting again begins another pass and keeps the score", async () => {
       const calls: Call[] = [];
       routes(calls, {

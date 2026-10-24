@@ -55,6 +55,7 @@ import { HowFarDialog } from "@/features/progress/HowFarDialog";
 import { isAbandoned, localDay } from "@/features/progress/outline";
 import { askStill, isFinished, statusWith } from "@/features/rescore/rescore";
 import { ScoreHistoryRow } from "@/features/rescore/ScoreHistoryRow";
+import { FinishDialog } from "@/features/finish/FinishDialog";
 import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
@@ -284,6 +285,8 @@ export function DetailPage() {
   const [deleteError, setDeleteError] = useState("");
   // The entry just dropped, while the page asks how far it got (DEC-172).
   const [asking, setAsking] = useState<LibraryEntry | null>(null);
+  // Finishing what is under way, in one sheet (Sprint 123).
+  const [finishing, setFinishing] = useState(false);
   // Finished again with a score: "Still an 8?" (Sprint 115).
   const [still, setStill] = useState<{
     entry: LibraryEntry;
@@ -387,6 +390,7 @@ export function DetailPage() {
   // back to it, with the dates of the last pass cleared; one without (a film) has no
   // pass to begin, so watching it again is answered at once.
   const underWay = statusWith(item.type, itemTypes.data, "in_progress");
+  const inProgress = underWay !== null && entry.status === underWay;
   function beginAgain() {
     if (underWay) setDialog("again");
     else setStill({ entry, again: true });
@@ -668,7 +672,18 @@ export function DetailPage() {
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-3">
+              {/* Under way, the next thing to do is finish it (Sprint 123): after
+               *Start again* there was no way to finish but the status menu. */}
+              {inProgress && (
+                <Button
+                  className="rounded-full px-5"
+                  onClick={() => setFinishing(true)}
+                >
+                  Finished
+                </Button>
+              )}
               <Button
+                variant={inProgress ? "outline" : "default"}
                 className="rounded-full px-5"
                 onClick={() => setDialog("opinion")}
               >
@@ -849,6 +864,12 @@ export function DetailPage() {
         entry={asking}
         types={itemTypes.data}
         onClose={() => setAsking(null)}
+      />
+
+      <FinishDialog
+        entry={finishing ? entry : null}
+        types={itemTypes.data}
+        onClose={() => setFinishing(false)}
       />
 
       <StillDialog

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 51,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "123",
   "active_sprint_file": "docs/sprints/123-finishing.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "122",
   "completed_sprints": [
     "001",
@@ -130,6 +130,6 @@
     "121",
     "122"
   ],
-  "started_at": "",
-  "updated_at": "2026-10-24T03:37:56-03:00"
+  "started_at": "2026-10-24T03:38:01-03:00",
+  "updated_at": "2026-10-24T03:38:01-03:00"
 }

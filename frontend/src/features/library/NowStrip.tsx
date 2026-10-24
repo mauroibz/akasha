@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { queryKeys } from "@/api/keys";
 import { getNow, patchEntry, type LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
+import { FinishDialog } from "@/features/finish/FinishDialog";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { navigateWithTransition } from "@/lib/viewTransition";
 
@@ -22,6 +24,8 @@ export function NowStrip() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const itemTypes = useItemTypes();
+  // Finishing from the strip opens the same sheet as the page (Sprint 123).
+  const [finishing, setFinishing] = useState<LibraryEntry | null>(null);
   const now = useQuery({
     queryKey: queryKeys.now,
     queryFn: ({ signal }) => getNow(signal),
@@ -142,10 +146,23 @@ export function NowStrip() {
                   In progress
                 </p>
               )}
+              <button
+                type="button"
+                onClick={() => setFinishing(entry)}
+                aria-label={`Finished ${entry.item.title}`}
+                className="mt-2 min-h-11 w-full rounded-full bg-primary/15 px-3 text-sm font-medium text-primary hover:bg-primary/25 focus-ring"
+              >
+                Finished
+              </button>
             </li>
           );
         })}
       </ul>
+      <FinishDialog
+        entry={finishing}
+        types={itemTypes.data}
+        onClose={() => setFinishing(null)}
+      />
     </section>
   );
 }

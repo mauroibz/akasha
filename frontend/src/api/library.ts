@@ -431,6 +431,9 @@ export async function getInsightSummary(params: {
   return (await response.json()) as InsightSummary;
 }
 
+/** What one entry save may send (named in Sprint 123 for the finish sheet). */
+export type EntryPatch = Parameters<typeof patchEntry>[1];
+
 export async function patchEntry(
   entryId: number,
   changes: Partial<
