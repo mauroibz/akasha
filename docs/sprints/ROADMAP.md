@@ -2,7 +2,7 @@
 
 **Plan revision:** 50
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 121, the thirteenth of the owner's 2026-10-23 line (DEC-176); see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** none. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -241,7 +241,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [118](118-the-diary-as-a-timeline.md) | The Diary as a timeline across years and libraries | 117 | completed |
 | [119](119-suggested-shelves.md) | Suggested shelves from what the library holds | 118 | completed |
 | [120](120-the-year-in-review.md) | The year in review, from the Diary | 119 | completed |
-| [121](121-the-revisit-deck.md) | The revisit deck: old scores, one card at a time | 120 | planned |
+| [121](121-the-revisit-deck.md) | The revisit deck: old scores, one card at a time | 120 | completed |
 
 ## Sprint contracts
 
@@ -1850,24 +1850,24 @@ the goal calendar's style. No ratings per part.
 
 ## The house and the history — the 2.8 line
 
-Brainstormed by the owner after v2.7.0 and sorted on 2026-10-23; accepted as **DEC-176**. Built
-in order; from the resurfacing mockups the owner approved the year in review and the revisit
+Brainstormed by the owner after v2.7.0 and sorted on 2026-10-23; accepted as **DEC-176**. All
+thirteen sprints are completed; they are unreleased on top of 2.7.0. Built in order; from the resurfacing mockups the owner approved the year in review and the revisit
 deck (DEC-178), and the commonplace book is a v3 candidate.
 
 - **[109 — Undo on the card, and facts that fill themselves](109-undo-and-facts.md)** (**completed**).
-- **[110 — Where things are: underneath](110-where-things-are-underneath.md)** and
+- **[110 — Where things are: underneath](110-where-things-are-underneath.md)** (**completed**) and
   **[111 — on screen](111-where-things-are-on-screen.md)**: a location per entry, loans, a
   *Lent out* list.
-- **[112 — The deck for any chore](112-the-deck-for-any-chore.md)** and
+- **[112 — The deck for any chore](112-the-deck-for-any-chore.md)** (**completed**) and
   **[113 — Duplicates in the deck](113-duplicates-in-the-deck.md)**.
-- **[114 — The score history: underneath](114-score-history-underneath.md)** and
+- **[114 — The score history: underneath](114-score-history-underneath.md)** (**completed**) and
   **[115 — on screen](115-score-history-on-screen.md)**: every score change with why, *Start
   again*, "Still an 8?".
-- **[116 — A rank inside a score](116-rank-inside-a-score.md)** and
+- **[116 — A rank inside a score](116-rank-inside-a-score.md)** (**completed**) and
   **[117 — The tier board](117-the-tier-board.md)**.
-- **[118 — The Diary as a timeline](118-the-diary-as-a-timeline.md)** and
+- **[118 — The Diary as a timeline](118-the-diary-as-a-timeline.md)** (**completed**) and
   **[119 — Suggested shelves](119-suggested-shelves.md)**.
-- **[120 — The year in review](120-the-year-in-review.md)** and
+- **[120 — The year in review](120-the-year-in-review.md)** (**completed**) and
   **[121 — The revisit deck](121-the-revisit-deck.md)**: the resurfacing options the owner
   approved from the mockups (DEC-178).
 

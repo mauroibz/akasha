@@ -6703,3 +6703,16 @@ accessibility; walkthrough `walk119.mjs` making a *Dune* shelf of a book and a f
 none until the owner picks a past one.
 
 **Next.** Sprint 121, the revisit deck.
+
+## 2026-10-23 — Sprint 121: the revisit deck; the 109–121 line closes
+
+**Done.** `/api/revisit` and `/deck/revisit` on the shared deck; a chore with its count. The
+plan is complete (`project_status: complete`, FINAL_SPRINT 121).
+
+**Verified and how.** Backend 73; Vitest 285 related; Playwright 52; walkthrough `walk121.mjs`
+keeping one old score and changing another on a fresh backend. Then, once for the whole line,
+`make test` and the full Playwright run (results in the handoff).
+
+**Found.** The eyebrow wrapped at 390px; shortened to *Revisit*.
+
+**Next.** Owner: read the mockups' 02/03 note against DEC-178; a 2.8 release when asked.

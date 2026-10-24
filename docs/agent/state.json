@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 50,
-  "project_status": "in_progress",
-  "active_sprint": "121",
-  "active_sprint_file": "docs/sprints/121-the-revisit-deck.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "120",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "121",
   "completed_sprints": [
     "001",
     "002",
@@ -126,8 +126,9 @@
     "117",
     "118",
     "119",
-    "120"
+    "120",
+    "121"
   ],
-  "started_at": "2026-10-23T21:07:30-03:00",
-  "updated_at": "2026-10-23T21:07:30-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-23T21:12:40-03:00"
 }

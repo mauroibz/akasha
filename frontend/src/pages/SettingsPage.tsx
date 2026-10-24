@@ -130,7 +130,7 @@ export function SettingsPage() {
         Tidy up one card at a time: the planned pile, covers, the inbox.{" "}
         <Link
           to="/deck"
-          className="font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+          className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
         >
           Chores
         </Link>

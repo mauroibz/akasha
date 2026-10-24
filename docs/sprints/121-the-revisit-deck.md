@@ -1,7 +1,7 @@
 # Sprint 121 — The revisit deck
 
 **Sprint:** 121
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 50
 **Depends on:** 120
 **Owner:** Mauro
@@ -38,4 +38,25 @@ running app.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-23 in `8b61b07`. Verified per DEC-167: `test_revisit.py` (observed failing
+first) with isolation and the API suite (73); page tests (2) and the chores page test;
+`vitest related` (285); `make check`; Playwright `chores` (revisit fit and flow) and
+`accessibility` (52). Walkthrough on a fresh backend at 390 Ink: *Stoner* (9, 2021, a note)
+and the 2021 *Dune* film (7, 2021) offered, Dune kept, Stoner changed to 6 with a line; both
+then rest (the queue reads 0) and their histories hold `(7, 7, time)` and `(6, 9, time, …)`.
+
+1. Keeping and changing each write one history row with the chosen reason (Vitest, API,
+   walkthrough).
+2. A score kept today does not come back for a year (API test, moving the row's date).
+3. Fits at 390×664 and 1440×900; accessibility passes.
+
+Deviations and notes:
+
+- **The reasons are *Went back to it* and *Time*,** one wording for every library, rather than
+  each domain's word for a reread (the mockup's *Rewatched it*): the domains declare no such
+  word, and inventing one per domain in the shared layer is the branching the contract forbids.
+- **Undo is off** in this deck: an answer is a history row, and taking one back would be
+  another row, not an undo.
+- **The eyebrow is *Revisit*:** "Look again" wrapped at 390px.
+- The owner's note on the mockups ("02 … how often someone would open it if not prompted")
+  may have meant this deck; DEC-178 records the reading. If so, this sprint is one commit.
