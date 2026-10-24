@@ -923,6 +923,9 @@ edit.
   reader**, and this is the opaque-file side of that line: no format parsing, no
   in-browser reading, no reading progress, no device sync (DEC-048).
 - Delete entry
+- Anything under way has a *Finished* action on its page and on its card in *Now* (Sprint 123).
+  One sheet asks when (today chosen), the score ("Still an 8?" when one is set) and the format
+  if none is recorded; *Finish* at once takes every answer as it stands.
 
 **Triage — the inbox, a tab on `/import`.** The surface that makes bulk import
 viable, and the second-most-important in the app after `/`. Everything `unsorted`

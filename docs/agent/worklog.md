@@ -6739,3 +6739,16 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Noticed: the owner's check server runs on 8000 with a copy of their library
   (scratchpad `check-data`); unstubbed e2e requests reach it. Loans are now stubbed by default.
 - Next: Sprint 123, finishing.
+
+## 2026-10-24 — Sprint 123: Finishing
+
+- Done: a *Finished* action on the detail page and the *Now* strip opening one sheet (when,
+  score or "Still an 8?", format); starting dates an empty start (shared layer).
+- Verified: pytest (finishing + API/history/isolation/conformance, 284), Vitest (red first),
+  `vitest related` (292), `make check`, Playwright rescore/progress-marks/library/a11y.
+  Walkthrough `walk123.mjs` at 390: start date filled, finished from Now, a reread finished
+  from its page with one `reread` row.
+- Noticed: a `git checkout` of two files to undo an experiment also discarded this sprint's
+  DetailPage wiring; reapplied and re-verified. The reading-data panel is still all dashes
+  (Sprint 124's subject).
+- Next: Sprint 124, only what is there and one question.

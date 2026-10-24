@@ -722,6 +722,9 @@ The product-spec route list is authoritative, with these refinements:
 - `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
   most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
   month with per-domain counts (Sprint 098).
+- `PATCH /api/entries/{id}` that moves an entry into an `in_progress` status fills an empty
+  `date_started` with the server's today, for a domain that has the field; a written date is
+  kept, and an entry added already under way is not dated (Sprint 123, DEC-179).
 - `POST /api/import/detect` (multipart `files`) reads the first 64 KiB of each file and returns the
   connectors that claim it, most confident first, from each connector's optional `sniff`
   (Sprint 095).
