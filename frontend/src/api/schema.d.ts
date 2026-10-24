@@ -520,6 +520,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/gaps": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Gaps */
+    get: operations["gaps_api_gaps_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/goals": {
     parameters: {
       query?: never;
@@ -2140,6 +2157,16 @@ export interface components {
       label: string;
       /** Value */
       value: string;
+    };
+    /**
+     * GapsResponse
+     * @description Finished entries missing a finish date or a format (Sprint 125, DEC-179).
+     */
+    GapsResponse: {
+      /** Entries */
+      entries: components["schemas"]["EntryResponse"][];
+      /** Total */
+      total: number;
     };
     /** GoalBody */
     GoalBody: {
@@ -5069,6 +5096,53 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ExportViewResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  gaps_api_gaps_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GapsResponse"];
         };
       };
       /** @description Unauthorized */

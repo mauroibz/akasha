@@ -79,6 +79,9 @@ const TiersPage = lazy(async () => ({
 const YearReviewPage = lazy(async () => ({
   default: (await import("@/pages/YearReviewPage")).YearReviewPage,
 }));
+const GapsPage = lazy(async () => ({
+  default: (await import("@/pages/GapsPage")).GapsPage,
+}));
 const RevisitDeckPage = lazy(async () => ({
   default: (await import("@/pages/RevisitDeckPage")).RevisitDeckPage,
 }));
@@ -194,6 +197,7 @@ function PrivateRoutes({
             <Route path="/deck/planned" element={<PlannedDeckPage />} />
             <Route path="/deck/covers" element={<CoversDeckPage />} />
             <Route path="/deck/revisit" element={<RevisitDeckPage />} />
+            <Route path="/play/gaps" element={<GapsPage />} />
             <Route path="/deck/duplicates" element={<DuplicatesDeckPage />} />
             <Route
               path="/people"

@@ -139,6 +139,7 @@ ROUTE_POLICY = {
     ("GET", "/api/diary"): "private-collection",
     ("GET", "/api/diary/timeline"): "private-collection",
     ("GET", "/api/revisit"): "private-collection",
+    ("GET", "/api/gaps"): "private-collection",
     ("GET", "/api/diary/{year}/review"): "private-collection",
     ("GET", "/api/views"): "private-collection",
     ("POST", "/api/views"): "private-write",
@@ -589,6 +590,7 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             assert (await second.get("/api/loans")).json() == []
             assert (await second.get("/api/duplicates")).json() == []
             assert (await second.get("/api/revisit")).json()["cards"] == []
+            assert (await second.get("/api/gaps")).json()["total"] == 0
             assert (await second.get("/api/shelves/suggestions")).json() == []
             assert (await second.get("/api/diary/timeline")).json()["events"] == []
             assert (await second.get("/api/locations")).json() == []

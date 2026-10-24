@@ -1661,6 +1661,28 @@
         "title": "FormatSpecResponse",
         "type": "object"
       },
+      "GapsResponse": {
+        "description": "Finished entries missing a finish date or a format (Sprint 125, DEC-179).",
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryResponse"
+            },
+            "title": "Entries",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entries",
+          "total"
+        ],
+        "title": "GapsResponse",
+        "type": "object"
+      },
       "GoalBody": {
         "properties": {
           "count": {
@@ -7185,6 +7207,54 @@
           }
         },
         "summary": "Available Exports"
+      }
+    },
+    "/api/gaps": {
+      "get": {
+        "operationId": "gaps_api_gaps_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GapsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Gaps"
       }
     },
     "/api/goals": {

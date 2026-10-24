@@ -1,39 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowRight,
-  Copy,
-  History,
-  Image,
-  Inbox,
-  ListChecks,
-  ListOrdered,
-} from "lucide-react";
+import { ArrowRight, Copy, Image, Inbox } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { getDuplicates } from "@/api/duplicates";
-import { getInboxCount, getLibraryPage, getRevisit } from "@/api/library";
+import { getInboxCount, getLibraryPage } from "@/api/library";
 import { queryKeys } from "@/api/keys";
 import { PageHeader } from "@/components/PageHeader";
-import { coverlessFilters, plannedFilters } from "@/features/chores/chores";
-import { useItemTypes } from "@/features/library/useItemTypes";
+import { coverlessFilters } from "@/features/chores/chores";
 
 /**
- * The chores the deck does one card at a time (Sprint 112, DEC-176), each with how
- * many cards it holds. A count is the list endpoint's own total for that chore's
- * filter, asked with a page of one.
+ * Tidy up: the upkeep the deck does one card at a time (Sprint 112, DEC-176; named
+ * and narrowed in Sprint 125, DEC-179), each with how many cards it holds. A count
+ * is the list endpoint's own total for that chore's filter, asked with a page of one.
  */
 export function ChoresPage() {
-  const itemTypes = useItemTypes();
-  const planned = plannedFilters(itemTypes.data);
   const inbox = useQuery({
     queryKey: queryKeys.triage.count,
     queryFn: ({ signal }) => getInboxCount(signal),
-  });
-  const pile = useQuery({
-    queryKey: ["chores", "planned", "count", planned.statuses],
-    queryFn: ({ signal }) =>
-      getLibraryPage(planned, undefined, signal, 1).then((page) => page.total),
-    enabled: itemTypes.isSuccess && planned.statuses.length > 0,
   });
   const coverless = useQuery({
     queryKey: ["chores", "covers", "count"],
@@ -43,15 +26,13 @@ export function ChoresPage() {
       ),
   });
 
-  const revisit = useQuery({
-    queryKey: ["chores", "revisit"],
-    queryFn: ({ signal }) => getRevisit(signal),
-  });
   const duplicates = useQuery({
     queryKey: ["chores", "duplicates"],
     queryFn: ({ signal }) => getDuplicates(signal),
   });
 
+  // Upkeep only (Sprint 125, DEC-179): the questions about your taste moved to
+  // the top of Insights as games, and this page keeps the jobs that are jobs.
   const chores = [
     {
       to: "/inbox/deck",
@@ -61,32 +42,11 @@ export function ChoresPage() {
       count: inbox.data,
     },
     {
-      to: "/deck/planned",
-      title: "Still want this?",
-      lede: "The planned pile, what has waited longest first. Keep it or let it go.",
-      icon: <ListChecks aria-hidden="true" />,
-      count: pile.data,
-    },
-    {
       to: "/deck/covers",
       title: "Find a cover",
       lede: "Everything without a cover, with editions to choose from.",
       icon: <Image aria-hidden="true" />,
       count: coverless.data,
-    },
-    {
-      to: "/deck/revisit",
-      title: "Look at old scores again",
-      lede: "Still a 9? Keep it, or give the score it has now, and why.",
-      icon: <History aria-hidden="true" />,
-      count: revisit.data?.total,
-    },
-    {
-      to: "/rank",
-      title: "Put your scores in order",
-      lede: "Two at a time, inside one score. No score ever changes.",
-      icon: <ListOrdered aria-hidden="true" />,
-      count: undefined,
     },
     {
       to: "/deck/duplicates",
@@ -100,11 +60,11 @@ export function ChoresPage() {
   return (
     <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
       <PageHeader
-        back
-        title="Chores"
+        back={{ to: "/settings", label: "Settings" }}
+        title="Tidy up"
         lede="Small jobs, one card at a time. Stop whenever you like."
       />
-      <ul aria-label="Chores" className="mt-6 grid gap-3">
+      <ul aria-label="Tidy up" className="mt-6 grid gap-3">
         {chores.map((chore) => (
           <li key={chore.to}>
             <Link
@@ -133,6 +93,15 @@ export function ChoresPage() {
           </li>
         ))}
       </ul>
+      <p className="mt-8 text-sm text-muted-foreground">
+        Looking for the games, like which of your 8s is best?{" "}
+        <Link
+          to="/insights"
+          className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
+        >
+          They're at the top of Insights
+        </Link>
+      </p>
     </main>
   );
 }

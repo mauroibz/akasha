@@ -3,6 +3,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
 import { stubChores } from "./chores-fixture";
+import { stubPlay } from "./play-fixture";
 import { stubReview, stubTimeline } from "./diary-fixture";
 import { stubHouse } from "./house-fixture";
 import { stubRank } from "./rank-fixture";
@@ -1149,13 +1150,30 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 for (const scheme of ["light", "dark"] as const) {
+  test(`Play and the gaps have no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubPlay(page);
+    await page.goto("/insights");
+    await expect(
+      page.getByRole("region", { name: "Play with your library" }),
+    ).toBeVisible();
+    await expectNoSeriousViolations(page, `play (${scheme})`);
+    await page.goto("/play/gaps");
+    await expect(page.locator("[data-question]")).toBeVisible();
+    await expectNoSeriousViolations(page, `gaps (${scheme})`);
+  });
+}
+
+for (const scheme of ["light", "dark"] as const) {
   test(`the chores and their decks have no serious accessibility violations (${scheme})`, async ({
     page,
   }) => {
     await page.emulateMedia({ colorScheme: scheme });
     await stubChores(page);
     await page.goto("/deck");
-    await expect(page.getByRole("list", { name: "Chores" })).toBeVisible();
+    await expect(page.getByRole("list", { name: "Tidy up" })).toBeVisible();
     await expectNoSeriousViolations(page, `chores (${scheme})`);
     await page.goto("/deck/planned");
     await expect(page.getByTestId("deck-title")).toHaveText("Stoner");

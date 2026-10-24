@@ -124,15 +124,15 @@ export function SettingsPage() {
         and the amber dot look the same in both.
       </p>
       <ExportPanel embedded />
-      {/* The deck's chores (Sprint 112): tidying is a data job, so it is offered
+      {/* Upkeep (Sprint 112; *Tidy up* since Sprint 125): a data job, offered
           beside the export, as well as from the command bar. */}
       <p className="mt-6 text-sm text-muted-foreground">
-        Tidy up one card at a time: the planned pile, covers, the inbox.{" "}
+        Covers, duplicates and the inbox, one card at a time.{" "}
         <Link
           to="/deck"
           className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
         >
-          Chores
+          Tidy up
         </Link>
       </p>
     </main>

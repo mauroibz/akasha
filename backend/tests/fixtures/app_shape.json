@@ -203,6 +203,12 @@
    ]
   ],
   [
+   "/api/gaps",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/revisit",
    [
     "GET"

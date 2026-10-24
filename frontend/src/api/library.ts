@@ -1036,3 +1036,16 @@ export async function getRevisit(
     throw await apiFailure(response, "Old scores could not be loaded");
   return response.json() as Promise<{ cards: RevisitCard[]; total: number }>;
 }
+
+/** Finished entries missing a finish date or a format (Sprint 125, DEC-179). */
+export async function getGaps(
+  signal?: AbortSignal,
+): Promise<{ entries: LibraryEntry[]; total: number }> {
+  const response = await request("/api/gaps", {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The gaps could not be loaded");
+  return response.json() as Promise<{ entries: LibraryEntry[]; total: number }>;
+}

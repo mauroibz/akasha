@@ -91,8 +91,8 @@ test("what is let go is removed only after the end asks once", async ({
 }) => {
   const calls: Array<{ method: string; url: string; body: unknown }> = [];
   await stubChores(page, calls);
-  await page.goto("/deck");
-  await page.getByRole("link", { name: /Still want this/ }).click();
+  // The pile is a game on Insights now (Sprint 125); its deck is unchanged.
+  await page.goto("/deck/planned");
   await expect(page.getByTestId("deck-title")).toHaveText("Stoner");
   await page.getByRole("button", { name: "Let go", exact: true }).click();
   await page.keyboard.press("ArrowRight");

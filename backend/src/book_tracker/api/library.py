@@ -953,6 +953,18 @@ class RevisitResponse(BaseModel):
     total: int
 
 
+class GapsResponse(BaseModel):
+    """Finished entries missing a finish date or a format (Sprint 125, DEC-179)."""
+
+    entries: list[EntryResponse]
+    total: int
+
+
+@router.get("/gaps", response_model=GapsResponse)
+def gaps(library: Library) -> GapsResponse:
+    return GapsResponse.model_validate(library.gaps())
+
+
 @router.get("/revisit", response_model=RevisitResponse)
 def revisit(library: Library) -> RevisitResponse:
     return RevisitResponse.model_validate(library.revisit())

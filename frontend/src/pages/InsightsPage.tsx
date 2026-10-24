@@ -38,6 +38,7 @@ import {
   type RememberedLibraryFilters,
 } from "@/features/library/library";
 import { useInsights } from "@/features/library/useInsights";
+import { PlaySection } from "@/features/play/PlaySection";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { cn } from "@/lib/utils";
@@ -247,6 +248,9 @@ export function InsightsPage() {
       >
         Insights
       </h1>
+
+      {/* The decks as games, first thing on the page (Sprint 125, DEC-179). */}
+      <PlaySection type={type} types={itemTypes.data} />
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 border-b border-border">
         {domains.length > 1 && (

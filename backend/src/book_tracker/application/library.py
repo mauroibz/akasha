@@ -494,6 +494,50 @@ class LibraryService:
     #: How long a score looked at rests before it comes back (Sprint 121, DEC-178).
     REVISIT_REST_DAYS = 365
 
+    def gaps(self, *, limit: int = 200) -> dict[str, Any]:
+        """Finished entries missing a finish date or a format (Sprint 125, DEC-179).
+
+        Only what can be asked: a domain's own finished status and its own fields, and
+        never a field the owner said they do not remember. Recently added first.
+        """
+        finished = {
+            (domain.item_type, status.value)
+            for domain in DOMAINS.values()
+            for status in domain.statuses
+            if status.finished
+        }
+        with Session(self.engine) as session:
+            rows = session.execute(
+                text(
+                    "SELECT e.id, i.type, e.status, e.date_finished, e.unknown_fields,"
+                    " (SELECT COUNT(*) FROM entry_formats f WHERE f.entry_id = e.id)"
+                    " FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user ORDER BY e.date_added DESC, e.id DESC"
+                ),
+                {"user": self.user_id},
+            ).all()
+            found: list[int] = []
+            for entry_id, item_type, status, date_finished, unknown, formats in rows:
+                domain = DOMAINS.get(item_type)
+                if domain is None or (item_type, status) not in finished:
+                    continue
+                forgotten = set(json.loads(unknown)) if unknown else set()
+                undated = (
+                    not date_finished
+                    and "date_finished" in domain.entry_fields
+                    and "date_finished" not in forgotten
+                )
+                formatless = not formats and bool(domain.formats) and "formats" not in forgotten
+                if undated or formatless:
+                    found.append(entry_id)
+            return {
+                "entries": [
+                    self._entry_dict(session, self._entry(session, entry_id))
+                    for entry_id in found[:limit]
+                ],
+                "total": len(found),
+            }
+
     def revisit(self, *, limit: int = 200) -> dict[str, Any]:
         """Old scores to look at again, oldest first (Sprint 121, DEC-178).
 

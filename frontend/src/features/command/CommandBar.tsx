@@ -7,6 +7,7 @@ import {
   ChartBar,
   Download,
   Handshake,
+  Gamepad2,
   ListChecks,
   ListOrdered,
   Rows3,
@@ -214,11 +215,18 @@ export function CommandBar({
       },
       {
         id: "chores",
-        label: "Chores",
-        words:
-          "chores deck tidy clean pile covers still want planned one at a time",
+        label: "Tidy up",
+        words: "chores deck tidy clean covers duplicates inbox one at a time",
         icon: <ListChecks />,
         run: () => go("/deck"),
+      },
+      {
+        id: "play",
+        label: "Play with your library",
+        words:
+          "play games best still want pile revisit old scores gaps fill in",
+        icon: <Gamepad2 />,
+        run: () => go("/insights"),
       },
       {
         id: "rank",

@@ -30,8 +30,8 @@ const page = (total: number) =>
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("ChoresPage (Sprint 112)", () => {
-  it("lists each chore with how many cards it holds", async () => {
+describe("ChoresPage (Sprint 112; Tidy up since Sprint 125)", () => {
+  it("lists each upkeep job with how many cards it holds, and points to the games", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
       if (url === "/api/item-types")
@@ -52,19 +52,24 @@ describe("ChoresPage (Sprint 112)", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    const list = await screen.findByRole("list", { name: "Chores" });
+    expect(
+      await screen.findByRole("heading", { name: "Tidy up" }),
+    ).toBeVisible();
+    const list = await screen.findByRole("list", { name: "Tidy up" });
     const inbox = within(list).getByRole("link", { name: /Sort the inbox/ });
     expect(inbox).toHaveAttribute("href", "/inbox/deck");
     expect(await within(inbox).findByText("4")).toBeVisible();
-    const planned = within(list).getByRole("link", { name: /Still want this/ });
-    expect(planned).toHaveAttribute("href", "/deck/planned");
-    expect(await within(planned).findByText("30")).toBeVisible();
+    // The questions about taste are games now, at the top of Insights.
+    expect(
+      within(list).queryByRole("link", { name: /Still want this/ }),
+    ).toBeNull();
+    expect(within(list).queryByRole("link", { name: /old scores/ })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "They're at the top of Insights" }),
+    ).toHaveAttribute("href", "/insights");
     const covers = within(list).getByRole("link", { name: /Find a cover/ });
     expect(covers).toHaveAttribute("href", "/deck/covers");
     expect(await within(covers).findByText("12")).toBeVisible();
-    const revisit = within(list).getByRole("link", { name: /old scores/ });
-    expect(revisit).toHaveAttribute("href", "/deck/revisit");
-    expect(await within(revisit).findByText("7")).toBeVisible();
     const duplicates = within(list).getByRole("link", { name: /Duplicates/ });
     expect(duplicates).toHaveAttribute("href", "/deck/duplicates");
     expect(await within(duplicates).findByText("2")).toBeVisible();
