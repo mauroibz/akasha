@@ -11,7 +11,7 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc AS backend-build
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS backend-build
 WORKDIR /build/backend
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN pip install --no-cache-dir uv
@@ -20,7 +20,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY backend/ ./
 RUN uv sync --frozen --no-dev --no-editable && uv build
 
-FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc AS runtime
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
     AKASHA_DATA_DIR=/data \
     AKASHA_BACKUP_DIR=/backups \
