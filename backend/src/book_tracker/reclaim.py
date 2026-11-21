@@ -235,12 +235,18 @@ def unconsumed_stage_files(engine: Engine, data_dir: Path, batch_id: str) -> lis
     return left
 
 
+#: How long a batch kept for uninstalled files waits before the runner retries it.
+KEPT_BATCH_RETRY_SECONDS = 3600.0
+
+
 def reclaim_import_batches(
     engine: Engine,
     data_dir: Path,
     *,
     now: datetime | None = None,
     resume: Callable[[str], None] | None = None,
+    retries: dict[str, float] | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> ImportBatchReclaimReport:
     """Remove a committed batch's staging directory once its undo window has passed.
 
@@ -262,6 +268,9 @@ def reclaim_import_batches(
     mid-install leaves some behind. A directory still holding one is never removed:
     `resume` (the install, run as the batch's owner) gets one more go at it first,
     and whatever it could not finish keeps the directory and is logged.
+    The runner passes `retries`, its own memory of when each kept batch was last
+    tried, so a batch that keeps failing is retried and logged once an hour, not
+    on every idle second.
     """
     now_iso = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
     reclaimed: list[str] = []
@@ -281,6 +290,10 @@ def reclaim_import_batches(
         staging = data_dir / "imports" / batch_id
         if not staging.is_dir():
             continue
+        last_tried = retries.get(batch_id) if retries is not None else None
+        if last_tried is not None and clock() - last_tried < KEPT_BATCH_RETRY_SECONDS:
+            kept.append(batch_id)
+            continue
         if unconsumed_stage_files(engine, data_dir, batch_id) and resume is not None:
             try:
                 resume(batch_id)
@@ -293,7 +306,11 @@ def reclaim_import_batches(
                 extra={"batch": batch_id, "files": len(left)},
             )
             kept.append(batch_id)
+            if retries is not None:
+                retries[batch_id] = clock()
             continue
+        if retries is not None:
+            retries.pop(batch_id, None)
         rmtree(staging)
         reclaimed.append(batch_id)
     return ImportBatchReclaimReport(reclaimed=tuple(reclaimed), kept=tuple(kept))

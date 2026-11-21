@@ -485,6 +485,8 @@ class JobRunner:
         #: (the default, and every existing caller) simply skips that sweep, so
         #: nothing about job leasing depends on it.
         self.data_dir = data_dir
+        #: When each batch kept for uninstalled files was last retried (Sprint 129).
+        self._kept_batch_retries: dict[str, float] = {}
         self._running = False
 
     async def run_forever(self) -> None:
@@ -523,6 +525,7 @@ class JobRunner:
                             self.data_dir,
                             now=now,
                             resume=partial(self._resume_install, self.data_dir),
+                            retries=self._kept_batch_retries,
                         )
                     await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:

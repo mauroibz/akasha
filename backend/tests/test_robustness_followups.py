@@ -333,3 +333,45 @@ async def test_a_batch_folder_holding_uninstalled_files_is_never_reclaimed(
         assert report.reclaimed == (batch_id,)
         assert _files_of(engine)[1] == ["Mistborn.epub"]
         assert not staging.exists()
+
+
+@pytest.mark.anyio
+async def test_a_kept_batch_is_retried_and_logged_at_most_once_an_hour(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The runner sweeps every idle second; a batch whose install keeps failing
+    must not be retried (and logged) every second with it."""
+    from test_calibre_import import _no_mount_app
+
+    app: Any = _no_mount_app(tmp_path)
+    data_dir = tmp_path / "data"
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.job_runner.stop()
+        engine = app.state.engine
+        batch_id = await _commit_killed_before_install(tmp_path, monkeypatch, client)
+        _expire_undo_window(engine, batch_id)
+        attempts: list[str] = []
+
+        def broken(batch: str) -> None:
+            attempts.append(batch)
+            raise OSError("disk unavailable")
+
+        retries: dict[str, float] = {}
+        clock = [1000.0]
+        for _ in range(5):
+            report = reclaim_import_batches(
+                engine, data_dir, resume=broken, retries=retries, clock=lambda: clock[0]
+            )
+            assert report.kept == (batch_id,)
+            clock[0] += 1
+        assert attempts == [batch_id]
+        clock[0] += 3600
+        reclaim_import_batches(
+            engine, data_dir, resume=broken, retries=retries, clock=lambda: clock[0]
+        )
+        assert attempts == [batch_id, batch_id]
+        kept_lines = [r for r in caplog.records if "import staging kept" in r.getMessage()]
+        assert len(kept_lines) == 2
