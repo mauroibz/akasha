@@ -550,7 +550,7 @@ export function HomePage() {
     localStorage.setItem(viewPreferenceKey, next);
   };
 
-  const inboxCount = firstPage?.facets.status_counts.unsorted ?? 0;
+  const inboxCount = firstPage?.facets?.status_counts.unsorted ?? 0;
   const domainLabel = labelFor(selectedDomain, domains);
   // Sprint 072 D6: the library states its size at the fold — `firstPage.total`,
   // the number the response already carried and spent on `aria-setsize` alone
@@ -864,7 +864,7 @@ export function HomePage() {
                       {formatChoices.map((format) => (
                         <SelectItem key={format.value} value={format.value}>
                           {format.label}{" "}
-                          {firstPage?.facets.format_counts[format.value] ?? 0}
+                          {firstPage?.facets?.format_counts[format.value] ?? 0}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -910,7 +910,8 @@ export function HomePage() {
                       key={type.id}
                       statuses={type.statuses}
                       counts={
-                        firstPage?.facets.status_counts_by_type?.[type.id] ?? {}
+                        firstPage?.facets?.status_counts_by_type?.[type.id] ??
+                        {}
                       }
                       value={filters.statuses}
                       onChange={(statuses) => updateFilters({ statuses })}

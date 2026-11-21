@@ -181,7 +181,7 @@ export function ShelfPage() {
     );
   }
 
-  const formatCounts = firstPage?.facets.format_counts ?? {};
+  const formatCounts = firstPage?.facets?.format_counts ?? {};
   const formatLabelsById = formatLabels(itemTypes.data);
 
   return (

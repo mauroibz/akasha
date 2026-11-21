@@ -959,7 +959,14 @@
       "EntryListResponse": {
         "properties": {
           "facets": {
-            "$ref": "#/components/schemas/FacetsResponse"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FacetsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "items": {
             "items": {
@@ -980,8 +987,15 @@
             "title": "Next Cursor"
           },
           "total": {
-            "title": "Total",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
           }
         },
         "required": [

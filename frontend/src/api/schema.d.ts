@@ -1943,13 +1943,13 @@ export interface components {
       | "dvd";
     /** EntryListResponse */
     EntryListResponse: {
-      facets: components["schemas"]["FacetsResponse"];
+      facets: components["schemas"]["FacetsResponse"] | null;
       /** Items */
       items: components["schemas"]["EntryResponse"][];
       /** Next Cursor */
       next_cursor: string | null;
       /** Total */
-      total: number;
+      total: number | null;
     };
     /** EntryPatch */
     EntryPatch: {
