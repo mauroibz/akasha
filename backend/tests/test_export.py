@@ -10,16 +10,30 @@ import csv
 import io
 import json
 import tracemalloc
+from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from book_tracker.application.export import export_json, stream_export_view
+from book_tracker.api.export import export as export_route
+from book_tracker.api.export import export_view_route
+from book_tracker.application.export import (
+    EXPORT_CHUNK_BYTES,
+    coalesce,
+    export_json,
+    stream_export_view,
+)
 from book_tracker.config import Settings
-from book_tracker.domain.registry import DOMAINS, REGISTERED_EXPORTS, find_export_view
+from book_tracker.domain.registry import (
+    DOMAINS,
+    REGISTERED_EXPORTS,
+    ItemTypeName,
+    find_export_view,
+)
 from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
 from book_tracker.domains.book.goodreads import GOODREADS_COLUMNS as GOODREADS_EXPORT_COLUMNS
 from book_tracker.domains.book.goodreads import parse_goodreads
@@ -803,3 +817,54 @@ async def test_get_export_route_serves_only_the_requesting_user(tmp_path: Path) 
     assert response.status_code == 200
     document = json.loads(response.text)
     assert _entry_titles(document) == ["Rayuela"]
+
+
+def test_streamed_exports_are_joined_into_large_chunks_with_identical_bytes(
+    tmp_path: Path,
+) -> None:
+    """One small string per row made 20,000 chunks of a 10k-entry export, and the
+    response spent seven seconds sending them (Sprint 129). Joined to about 64 KB,
+    the bytes are the same and the chunks a few hundred times fewer."""
+    app = create_app(settings(tmp_path))
+    with TestClient(app):
+        _seed(app.state.engine, 600)
+        when = datetime(2026, 1, 1, tzinfo=UTC)
+        view = find_export_view("book", "table")
+        assert view is not None
+        engine = app.state.engine
+        producers = (
+            lambda: export_json(engine, user_id=1, now=when),
+            lambda: stream_export_view(engine, view, "book", 1),
+            lambda: _export_csv(engine),
+        )
+        for produce in producers:
+            raw = list(produce())
+            joined = list(coalesce(produce()))
+            assert "".join(joined) == "".join(raw)
+            assert len(joined) < len(raw) / 50
+            assert all(len(chunk) >= EXPORT_CHUNK_BYTES for chunk in joined[:-1])
+    assert list(coalesce(iter(()))) == []
+
+
+@pytest.mark.anyio
+async def test_the_export_routes_send_the_same_bytes_in_few_chunks(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        _seed(app.state.engine, 600)
+        view = find_export_view("book", "table")
+        assert view is not None
+        expected = "".join(stream_export_view(app.state.engine, view, "book", 1)).encode()
+        user = SimpleNamespace(effective_user_id=1)
+        request = SimpleNamespace(app=app)
+        for response in (
+            export_route(request, user, format="json"),  # type: ignore[arg-type]
+            export_route(request, user, format="csv"),  # type: ignore[arg-type]
+            export_view_route("table", request, ItemTypeName("book"), user),  # type: ignore[arg-type]
+        ):
+            chunks = [chunk async for chunk in response.body_iterator]
+            # 600 entries are over 600 rows; joined, a handful of chunks.
+            assert len(chunks) < 30
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/api/export/table", params={"type": "book"})
+        assert response.content == expected
