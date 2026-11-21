@@ -39,6 +39,11 @@ DEFAULT_MAX_RETRIES = 3
 # resume as one.
 RETRY_BACKOFF_BASE_SECONDS = 30.0
 RETRY_BACKOFF_MAX_SECONDS = 600.0
+#: States a job never leaves on its own (Sprint 129). `complete`, `fail` and `defer`
+#: are written by the handler that was running, and undo may have cancelled the job
+#: under it meanwhile: a late finish must not turn a cancelled job back into a
+#: succeeded, failed or queued one. Only `retry` — an explicit person — leaves one.
+_TERMINAL = ("succeeded", "failed", "cancelled")
 
 
 @dataclass(frozen=True)
@@ -175,6 +180,8 @@ class JobRepository:
             row = session.get(JobRow, job_id)
             if row is None:
                 raise LookupError(job_id)
+            if row.state in _TERMINAL:
+                return
             row.state = "succeeded"
             row.progress = json.dumps(dict(progress))
             row.finished_at = now_iso
@@ -198,6 +205,8 @@ class JobRepository:
             row = session.get(JobRow, job_id)
             if row is None:
                 raise LookupError(job_id)
+            if row.state in _TERMINAL:
+                return
             row.attempts += 1
             row.error = error
             row.error_code = code
@@ -229,6 +238,8 @@ class JobRepository:
             row = session.get(JobRow, job_id)
             if row is None:
                 raise LookupError(job_id)
+            if row.state in _TERMINAL:
+                return
             row.state = "queued"
             row.available_at = until.isoformat().replace("+00:00", "Z")
             row.error = reason
@@ -243,7 +254,7 @@ class JobRepository:
             row = session.get(JobRow, job_id)
             if row is None:
                 return
-            if row.state in ("succeeded", "failed", "cancelled"):
+            if row.state in _TERMINAL:
                 return
             row.state = "cancelled"
             row.finished_at = now_iso
@@ -269,10 +280,15 @@ class JobRepository:
                 row.updated_at = now_iso
             return len(rows)
 
-    def reclaim_expired(self, now: datetime) -> Sequence[str]:
+    def reclaim_expired(
+        self, now: datetime, *, max_retries: int = DEFAULT_MAX_RETRIES
+    ) -> Sequence[str]:
         """Return expired running jobs to queued with incremented attempts.
 
-        Called at startup to recover from crashes and at each poll tick.
+        Called at startup to recover from crashes and at each poll tick. A lease
+        that expired counts as an attempt, and the ceiling `fail` applies holds here
+        too (Sprint 129): a job that kills the process every time it runs is
+        dead-lettered instead of being reclaimed and re-run forever.
         """
         now_iso = now.isoformat().replace("+00:00", "Z")
         with self._write() as session:
@@ -286,9 +302,15 @@ class JobRepository:
                 )
             )
             for row in rows:
-                row.state = "queued"
                 row.attempts += 1
-                row.available_at = now_iso
+                if row.attempts >= max_retries:
+                    row.state = "failed"
+                    row.error = "The job stopped answering while it ran and was given up on"
+                    row.error_code = "lease_expired"
+                    row.finished_at = now_iso
+                else:
+                    row.state = "queued"
+                    row.available_at = now_iso
                 row.lease_expires_at = None
                 row.heartbeat_at = None
                 row.updated_at = now_iso
@@ -481,7 +503,7 @@ class JobRunner:
             try:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
-                    await off_loop(self.repo.reclaim_expired, now)
+                    await off_loop(self.repo.reclaim_expired, now, max_retries=self.max_retries)
                     if self.data_dir is not None:
                         await off_loop(reclaim_import_batches, self.engine, self.data_dir, now=now)
                     await asyncio.sleep(self.poll_interval)

@@ -3,9 +3,12 @@
 import hashlib
 import os
 import sqlite3
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from sqlalchemy import Engine
 
 from book_tracker.application.providers import search_providers
 from book_tracker.config import Settings
@@ -13,6 +16,7 @@ from book_tracker.database import create_engine
 from book_tracker.domain.providers import SearchCandidate, SourceRef
 from book_tracker.infrastructure.attachments import blob_path, store_blob
 from book_tracker.infrastructure.covers import install_cover
+from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.observed import (
     ObservedProvider,
     ProviderObservations,
@@ -141,3 +145,53 @@ def test_an_installed_cover_and_its_directory_reach_the_disk(
     assert target.read_bytes() == b"jpeg bytes"
     assert prepared in synced
     assert tmp_path / "covers" in synced
+
+
+@pytest.fixture
+def engine(tmp_path: Path) -> Iterator[Engine]:
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+    value = create_engine(configured)
+    yield value
+    value.dispose()
+
+
+def test_a_cancelled_job_stays_cancelled_when_its_handler_finishes(engine: Engine) -> None:
+    # Undo cancels a batch's jobs while one is running; the handler that was already
+    # in flight finishing must not resurrect it as succeeded, failed or queued.
+    repo = JobRepository(engine)
+    now = datetime.now(UTC)
+    finishing = [
+        lambda job_id: repo.complete(job_id, {"filled": ["year"]}, now),
+        lambda job_id: repo.fail(job_id, "provider down", now),
+        lambda job_id: repo.defer(job_id, now + timedelta(days=1), reason="quota"),
+    ]
+    for finish in finishing:
+        job_id = repo.enqueue(None, "enrich_item", {"item_id": 5})
+        assert repo.claim(datetime.now(UTC)) is not None
+        repo.cancel(job_id)
+        finish(job_id)
+        job = repo.get_job(job_id)
+        assert job is not None
+        assert job["state"] == "cancelled"
+        assert job["attempts"] == 0
+
+
+def test_a_job_whose_lease_keeps_expiring_is_dead_lettered(engine: Engine) -> None:
+    # A job that kills the process every time it runs (its lease expires, it is
+    # reclaimed, claimed, and kills it again) must stop after max_retries.
+    repo = JobRepository(engine)
+    job_id = repo.enqueue(None, "enrich_item", {"item_id": 5})
+    now = datetime.now(UTC)
+    for attempt in range(1, 4):
+        assert repo.claim(now) is not None
+        now += timedelta(minutes=10)
+        assert repo.reclaim_expired(now, max_retries=3) == [job_id]
+        job = repo.get_job(job_id)
+        assert job is not None
+        assert job["attempts"] == attempt
+    assert job["state"] == "failed"
+    assert job["error_code"] == "lease_expired"
+    assert job["finished_at"] is not None
+    assert repo.claim(now) is None
