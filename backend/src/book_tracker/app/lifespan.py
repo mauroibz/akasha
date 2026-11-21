@@ -3,17 +3,21 @@
 import asyncio
 import contextlib
 import logging
+import secrets
 import sqlite3
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from sqlalchemy import Engine
 
 from book_tracker.api.auth import (
     LoginRateLimiter,
     bootstrap_admin,
+    has_credentialed_user,
 )
 from book_tracker.app.providers import build_provider_catalog
 from book_tracker.application.enrichment import EnrichmentHandler
@@ -109,6 +113,54 @@ def back_up_before_migrating(configured: Settings) -> None:
     )
 
 
+#: No 0/O, 1/l/i: the code is read off a terminal and typed on a phone.
+_SETUP_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+
+def generate_setup_code() -> str:
+    """Twelve characters in three groups, about 59 bits: `k7mq-3xwd-p9hz`."""
+    characters = "".join(secrets.choice(_SETUP_ALPHABET) for _ in range(12))
+    return "-".join(characters[index : index + 4] for index in range(0, 12, 4))
+
+
+def _prepare_setup_code(engine: Engine, configured: Settings) -> str | None:
+    """The one-time code first-run setup asks for (Sprint 128, F4).
+
+    Only while no account has a password: once the library is claimed there is
+    nothing to protect with it. A configured `AKASHA_SETUP_TOKEN` is used as is
+    and never logged; otherwise a fresh code is generated and printed, because
+    the server log is something only the operator can read.
+    """
+    if has_credentialed_user(engine):
+        return None
+    logger = logging.getLogger("book_tracker.setup")
+    if configured.setup_token is not None and configured.setup_token.get_secret_value().strip():
+        logger.warning(
+            "Akasha is waiting for first-run setup: enter the setup code from "
+            "AKASHA_SETUP_TOKEN on the setup screen."
+        )
+        return configured.setup_token.get_secret_value().strip()
+    code = generate_setup_code()
+    # The code is in the message itself, under no field name the log redaction
+    # knows, so it survives scrubbing on purpose.
+    logger.warning(
+        "Akasha setup code: %s (enter it on the setup screen to create the first "
+        "admin; a new code is printed at every start until setup is done)",
+        code,
+    )
+    return code
+
+
+def _warn_about_insecure_cookie(configured: Settings) -> None:
+    if configured.cookie_secure is None and not configured.trusted_proxy_peers:
+        logging.getLogger("book_tracker.setup").warning(
+            "Authentication is on but AKASHA_COOKIE_SECURE is not set and no "
+            "AKASHA_TRUSTED_PROXY_PEERS are configured: behind a proxy or tunnel that "
+            "terminates TLS, the session cookie would go out without Secure. Set "
+            "AKASHA_COOKIE_SECURE=true for any install reached over HTTPS."
+        )
+
+
 def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -134,6 +186,12 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             and configured.admin_password is not None
         ):
             bootstrap_admin(app.state.engine, configured.admin_username, configured.admin_password)
+        app.state.client_ip_header = configured.client_ip_header
+        app.state.session_lifetime = timedelta(days=configured.session_days)
+        app.state.setup_code = None
+        if configured.auth == "on":
+            app.state.setup_code = _prepare_setup_code(app.state.engine, configured)
+            _warn_about_insecure_cookie(configured)
         provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir

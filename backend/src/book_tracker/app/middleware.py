@@ -5,6 +5,7 @@ import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
+from urllib.parse import urlsplit
 
 import structlog
 from fastapi import FastAPI, Request
@@ -13,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from book_tracker.api.auth import (
     error_response,
     has_credentialed_user,
+    request_uses_https,
     set_session_cookie,
     strip_untrusted_identity_header,
     trusted_header_user,
@@ -21,15 +23,74 @@ from book_tracker.api.auth import (
 from book_tracker.api.auth import (
     setup_required as setup_required_response,
 )
-from book_tracker.api.identity import Principal
+from book_tracker.api.identity import Principal, request_path, session_store, session_token
 from book_tracker.app.errors import NOT_FOUND
-from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 from book_tracker.config import Settings
 from book_tracker.infrastructure.offload import off_loop
 
 #: What an incoming `X-Request-Id` must look like to be kept: a proxy's own id
 #: joins its logs to ours, but anything else is replaced rather than echoed.
 _REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}")
+
+#: Methods a browser may send cross-site without asking first; everything else
+#: on `/api/` must come from the application's own pages (F9).
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_SAME_SITE_FETCH = frozenset({"same-origin", "none"})
+
+#: The only routes reachable without a session when authentication is on: the
+#: container's own probes. Provider health names providers and their state, so
+#: it waits behind the boundary like the rest (F18).
+_PUBLIC_API = frozenset({"/api/health/live", "/api/health/ready"})
+
+#: Paths that are not part of the shell even though they are GET and outside
+#: `/api/`: the contract, the docs, and `/metrics` (F18).
+_NOT_SHELL = frozenset({"/openapi.json", "/docs", "/docs/oauth2-redirect", "/redoc", "/metrics"})
+
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: blob: https:; font-src 'self'; connect-src 'self'; "
+    "manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+}
+#: FastAPI's interactive docs load their script from a CDN; they exist only
+#: with authentication off, where the policy would simply break them.
+_DOCS_PATHS = frozenset({"/docs", "/docs/oauth2-redirect", "/redoc"})
+
+
+def cross_site_refusal(request: Request) -> Response | None:
+    """Refuse an unsafe API request a browser sent from another site (F9).
+
+    `Sec-Fetch-Site` decides when the browser sent it; otherwise an `Origin`
+    must name this host. A request carrying neither is not from a browser page
+    (curl, scripts, the test client) and is left to authentication.
+    """
+    if request.method in _SAFE_METHODS or not request_path(request).startswith("/api/"):
+        return None
+    fetch_site = request.headers.get("sec-fetch-site")
+    if fetch_site is not None:
+        allowed = fetch_site.strip().casefold() in _SAME_SITE_FETCH
+    else:
+        origin = request.headers.get("origin")
+        if origin is None:
+            return None
+        host = request.headers.get("host", "").strip().casefold()
+        try:
+            origin_host = urlsplit(origin.strip()).netloc.casefold()
+        except ValueError:
+            origin_host = ""
+        allowed = bool(host) and origin_host == host
+    if allowed:
+        return None
+    return error_response(
+        403, "cross_site_request", "This request did not come from Akasha's own pages"
+    )
 
 
 def install_middleware(app: FastAPI, configured: Settings) -> None:
@@ -49,29 +110,28 @@ def install_middleware(app: FastAPI, configured: Settings) -> None:
                             "admin_user_id": principal.user_id,
                             "acting_as_user_id": principal.acting_as,
                             "method": request.method,
-                            "route": getattr(route, "path", request.url.path),
+                            "route": getattr(route, "path", request_path(request)),
                         },
                     )
 
+        # Every decision below reads the routed path, never the Host-built URL (F2).
+        path = request_path(request)
+        refusal = cross_site_refusal(request)
+        if refusal is not None:
+            return refusal
         if configured.auth == "off":
-            if request.url.path.startswith("/api/auth/"):
+            if path.startswith("/api/auth/"):
                 return JSONResponse(status_code=404, content=NOT_FOUND)
             return await call_next(request)
         strip_untrusted_identity_header(
             request, configured.trusted_proxy_header, configured.trusted_proxy_peers
         )
-        path = request.url.path
-        if path.startswith("/api/health/"):
+        if path in _PUBLIC_API:
             return await call_next(request)
         # The shell and its emitted assets must load before Sprint 078 can draw
-        # a login screen. FastAPI's own contract/docs routes are not shell assets
-        # and remain behind the same boundary as the rest of the application.
-        is_spa_get = request.method == "GET" and path not in {
-            "/openapi.json",
-            "/docs",
-            "/docs/oauth2-redirect",
-            "/redoc",
-        }
+        # a login screen. FastAPI's own contract/docs routes and `/metrics` are not
+        # shell assets and remain behind the same boundary as the rest.
+        is_spa_get = request.method in {"GET", "HEAD"} and path not in _NOT_SHELL
         if not path.startswith("/api/") and is_spa_get:
             return await call_next(request)
 
@@ -83,8 +143,8 @@ def install_middleware(app: FastAPI, configured: Settings) -> None:
                 return setup_required_response()
             return await call_next(request)
 
-        token = request.cookies.get(SESSION_COOKIE_NAME)
-        sessions = SessionStore(request.app.state.engine)
+        token = session_token(request)
+        sessions = session_store(request)
         identity = await off_loop(sessions.lookup, token) if token else None
         issued_token: str | None = None
         if (
@@ -157,7 +217,7 @@ def install_middleware(app: FastAPI, configured: Settings) -> None:
     ) -> Response:
         incoming = request.headers.get("x-request-id", "")
         request_id = incoming if _REQUEST_ID.fullmatch(incoming) else uuid.uuid4().hex
-        path = request.url.path
+        path = request_path(request)
         # One line per API request. Health checks run every few seconds from the
         # container's own probe, and shell assets are not requests anyone debugs.
         logged = path.startswith("/api/") and not path.startswith("/api/health/")
@@ -188,4 +248,30 @@ def install_middleware(app: FastAPI, configured: Settings) -> None:
                         },
                     )
         response.headers["X-Request-Id"] = request_id
+        return response
+
+
+def install_security_headers(app: FastAPI) -> None:
+    """Browser hardening on every response (Sprint 128, F13).
+
+    Registered after the other two so it is the outermost: even a refusal from
+    the authentication boundary carries the headers.
+    """
+
+    @app.middleware("http")
+    async def security_headers(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        response = await call_next(request)
+        path = request_path(request)
+        headers = response.headers
+        for name, value in SECURITY_HEADERS.items():
+            headers.setdefault(name, value)
+        if path not in _DOCS_PATHS:
+            headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        if request_uses_https(request):
+            headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+        if path.startswith("/api/") or path in {"/openapi.json", "/metrics"}:
+            # Authenticated JSON never lands in a shared or disk cache.
+            headers.setdefault("Cache-Control", "no-store")
         return response

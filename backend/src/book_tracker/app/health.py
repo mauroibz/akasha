@@ -66,15 +66,12 @@ def install_health_routes(app: FastAPI) -> None:
         # HEALTHCHECK only sees the status code, and restarting a container fixes
         # nothing about a full disk.
         disk_free = free_bytes(app.state.data_dir)
-        return JSONResponse(
-            {
-                "status": "ready",
-                "disk": {
-                    "free_bytes": disk_free,
-                    "low": disk_free < app.state.min_free_bytes,
-                },
-            }
-        )
+        disk: dict[str, object] = {"low": disk_free < app.state.min_free_bytes}
+        # Unauthenticated with auth on (the probe needs no session), so the byte
+        # count, which says something about the host, is left out (Sprint 128).
+        if getattr(app.state, "auth", "off") == "off":
+            disk = {"free_bytes": disk_free, **disk}
+        return JSONResponse({"status": "ready", "disk": disk})
 
     @app.get("/api/health/providers", response_model=ProviderHealth)
     def provider_health() -> ProviderHealth:

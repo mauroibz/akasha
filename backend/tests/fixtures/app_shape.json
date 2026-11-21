@@ -653,6 +653,7 @@
   ]
  ],
  "middleware": [
+  "security_headers",
   "request_identity",
   "authentication_boundary"
  ],

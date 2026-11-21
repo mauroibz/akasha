@@ -462,6 +462,10 @@ async def test_acting_as_ends_on_logout_target_deletion_and_either_password_chan
                 json={"current_password": ADMIN_PASSWORD, "new_password": "admin changed"},
             )
             assert changed.status_code == 204
+            # Sprint 128 (F21): the change rotates the session, so the old token is
+            # gone and the device carries on with the one the response issued.
+            assert SessionStore(app.state.engine).lookup(token) is None
+            token = changed.cookies[COOKIE_NAME]
             assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
 
             assert (await admin.post(f"/api/auth/act-as/{second['id']}")).status_code == 204

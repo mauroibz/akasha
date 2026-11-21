@@ -223,9 +223,15 @@ async def test_setup_gates_api_then_claims_the_existing_library(tmp_path: Path) 
             assert shell.status_code == 200
             assert "<title>Akasha</title>" in shell.text
 
+            # Sprint 128 (F4): setup needs the one-time code printed in the log.
             setup = await client.post(
                 "/api/auth/setup",
-                json={"username": " Mauro ", "display_name": "Mauro", "password": PASSWORD},
+                json={
+                    "username": " Mauro ",
+                    "display_name": "Mauro",
+                    "password": PASSWORD,
+                    "setup_code": app.state.setup_code,
+                },
             )
             assert setup.status_code == 200
             assert setup.json()["username"] == "mauro"
