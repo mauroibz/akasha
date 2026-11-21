@@ -284,7 +284,8 @@ export interface paths {
      * Backfill Enrichment
      * @description Queue enrichment for persisted items a provider lookup could still improve.
      *
-     *     Explicit and operator-driven: it only queues work, and the handler it queues fills
+     *     Explicit and operator-driven, so admin-only (DEC-180 §3): it walks every item in
+     *     the install, not the caller's. It only queues work, and the handler it queues fills
      *     empty fields only, so it can never overwrite a hand edit. Each domain is asked on
      *     its own identifier and its own incompleteness rule (DEC-067 row 3).
      */
@@ -3020,6 +3021,8 @@ export interface components {
        * Format: password
        */
       password: string;
+      /** Setup Code */
+      setup_code?: string | null;
       /** Username */
       username: string;
     };
@@ -3501,6 +3504,15 @@ export interface operations {
           "application/json": components["schemas"]["ErrorResponse"];
         };
       };
+      /** @description Too Many Requests */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
     };
   };
   logout_api_auth_session_delete: {
@@ -3682,6 +3694,15 @@ export interface operations {
           "application/json": components["schemas"]["UserResponse"];
         };
       };
+      /** @description Forbidden */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
       /** @description Conflict */
       409: {
         headers: {
@@ -3693,6 +3714,15 @@ export interface operations {
       };
       /** @description Unprocessable Entity */
       422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Too Many Requests */
+      429: {
         headers: {
           [name: string]: unknown;
         };

@@ -332,7 +332,7 @@
           "new_password": {
             "format": "password",
             "maxLength": 1024,
-            "minLength": 1,
+            "minLength": 12,
             "title": "New Password",
             "type": "string",
             "writeOnly": true
@@ -509,7 +509,7 @@
           "password": {
             "format": "password",
             "maxLength": 1024,
-            "minLength": 1,
+            "minLength": 12,
             "title": "Password",
             "type": "string",
             "writeOnly": true
@@ -4129,10 +4129,24 @@
           "password": {
             "format": "password",
             "maxLength": 1024,
-            "minLength": 1,
+            "minLength": 12,
             "title": "Password",
             "type": "string",
             "writeOnly": true
+          },
+          "setup_code": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 200,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Code"
           },
           "username": {
             "maxLength": 100,
@@ -4657,7 +4671,7 @@
               {
                 "format": "password",
                 "maxLength": 1024,
-                "minLength": 1,
+                "minLength": 12,
                 "type": "string",
                 "writeOnly": true
               },
@@ -5081,6 +5095,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "summary": "Change Password",
@@ -5279,6 +5303,16 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
           "409": {
             "content": {
               "application/json": {
@@ -5298,6 +5332,16 @@
               }
             },
             "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
           }
         },
         "summary": "Setup",
@@ -5789,7 +5833,7 @@
     },
     "/api/enrichment/backfill": {
       "post": {
-        "description": "Queue enrichment for persisted items a provider lookup could still improve.\n\nExplicit and operator-driven: it only queues work, and the handler it queues fills\nempty fields only, so it can never overwrite a hand edit. Each domain is asked on\nits own identifier and its own incompleteness rule (DEC-067 row 3).",
+        "description": "Queue enrichment for persisted items a provider lookup could still improve.\n\nExplicit and operator-driven, so admin-only (DEC-180 \u00a73): it walks every item in\nthe install, not the caller's. It only queues work, and the handler it queues fills\nempty fields only, so it can never overwrite a hand edit. Each domain is asked on\nits own identifier and its own incompleteness rule (DEC-067 row 3).",
         "operationId": "backfill_enrichment_api_enrichment_backfill_post",
         "responses": {
           "202": {
