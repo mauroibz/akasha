@@ -240,3 +240,37 @@ def _epub(root: Path, *, description: str = "", opf: bytes | None = None) -> Pat
         archive.writestr("META-INF/container.xml", _CONTAINER)
         archive.writestr("c.opf", package)
     return path
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("provider_name", ["openlibrary", "googlebooks", "musicbrainz"])
+async def test_a_provider_source_id_cannot_change_the_request_path(provider_name: str) -> None:
+    """A source id is client text; it is one path segment, never `../` or a query."""
+    from book_tracker.domains.album.providers import MusicBrainzProvider
+    from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+
+    seen: list[httpx.URL] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url)
+        return httpx.Response(404, json={})
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    client = create_provider_client(httpx.MockTransport(handler))
+    provider = {
+        "openlibrary": lambda: OpenLibraryProvider(client, "t@example.invalid"),
+        "googlebooks": lambda: GoogleBooksProvider(client, "key"),
+        "musicbrainz": lambda: MusicBrainzProvider(client, "t@example.invalid", sleep=no_sleep),
+    }[provider_name]()
+    try:
+        with pytest.raises(Exception):  # noqa: B017 - any refusal; the request is the point
+            await provider.fetch("../../admin?x=1#y")
+    finally:
+        await client.aclose()
+    assert seen, "the provider made no request"
+    for url in seen:
+        assert b"/admin" not in url.raw_path
+        assert url.params.get("x") is None
+        assert "..%2F..%2Fadmin%3Fx%3D1%23y" in url.raw_path.decode()

@@ -56,6 +56,7 @@ import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -286,7 +287,9 @@ class MusicBrainzProvider:
         )
 
     async def fetch(self, source_id: str) -> ItemPayload:
-        group = await self._json(f"/release-group/{source_id}", {"inc": "releases+artist-credits"})
+        group = await self._json(
+            f"/release-group/{quote(source_id, safe='')}", {"inc": "releases+artist-credits"}
+        )
         release_stub = self._preferred_release(
             group.get("releases") or [], _text(group.get("first-release-date"))
         )
