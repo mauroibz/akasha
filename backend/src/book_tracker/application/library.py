@@ -2186,9 +2186,13 @@ class LibraryService:
         lent: bool = False,
         missing_cover: bool = False,
         exact_score: int | None = None,
+        columns: Sequence[Any] = (EntryRow,),
     ) -> Any:
+        # `columns` lets a count aggregate over this join directly instead of
+        # wrapping it in a subquery and joining `items` a second time (Sprint 129).
         query = (
-            select(EntryRow)
+            select(*columns)
+            .select_from(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
@@ -2368,22 +2372,19 @@ class LibraryService:
             entries = list(session.scalars(query))
             has_more = len(entries) > limit
             entries = entries[:limit]
-            total_query = select(func.count()).select_from(
-                self._filtered_entries(
-                    statuses,
-                    shelves,
-                    q,
-                    formats,
-                    types,
-                    key,
-                    value,
-                    location=location,
-                    lent=lent,
-                    missing_cover=missing_cover,
-                    exact_score=exact_score,
-                )
-                .order_by(None)
-                .subquery()
+            total_query = self._filtered_entries(
+                statuses,
+                shelves,
+                q,
+                formats,
+                types,
+                key,
+                value,
+                location=location,
+                lent=lent,
+                missing_cover=missing_cover,
+                exact_score=exact_score,
+                columns=(func.count(),),
             )
             total = session.scalar(total_query) or 0
             # Each facet clears its own dimension, so a count reads as "what you would
@@ -2403,17 +2404,14 @@ class LibraryService:
                 lent=lent,
                 missing_cover=missing_cover,
                 exact_score=exact_score,
-            ).subquery()
+                columns=(EntryRow.status, ItemRow.type, func.count()),
+            )
             # Grouped by the item's type as well as the status, because a status two
             # domains share is not one number on a screen that lists them separately:
             # a wishlisted record counted under "Book · Wishlist" is a wrong answer
             # the walkthrough caught. `status_counts` stays the whole-library total,
             # which is what the inbox badge means.
-            facet_rows = session.execute(
-                select(facet_base.c.status, ItemRow.type, func.count())
-                .join(ItemRow, ItemRow.id == facet_base.c.item_id)
-                .group_by(facet_base.c.status, ItemRow.type)
-            ).all()
+            facet_rows = session.execute(facet_base.group_by(EntryRow.status, ItemRow.type)).all()
             status_counts: dict[str, int] = {}
             by_type: dict[str, dict[str, int]] = {}
             for status_value, item_type, count in facet_rows:
@@ -2432,11 +2430,12 @@ class LibraryService:
                 lent=lent,
                 missing_cover=missing_cover,
                 exact_score=exact_score,
-            ).subquery()
+                columns=(EntryFormatRow.format, func.count()),
+            )
             format_rows = session.execute(
-                select(EntryFormatRow.format, func.count())
-                .join(format_base, format_base.c.id == EntryFormatRow.entry_id)
-                .group_by(EntryFormatRow.format)
+                format_base.join(EntryFormatRow, EntryFormatRow.entry_id == EntryRow.id).group_by(
+                    EntryFormatRow.format
+                )
             ).all()
             next_cursor = None
             if has_more and entries:

@@ -11,6 +11,7 @@ with its size.
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, event, select, text
@@ -104,7 +105,7 @@ def _seed(engine: Engine, count: int) -> list[int]:
                     " unknown_fields = :unknown, location = :location WHERE id = :id"
                 ),
                 {
-                    "status": statuses[item_type],
+                    "status": statuses[item_type] if index % 9 else "unsorted",
                     "score": None if index % 4 == 0 else 1 + index % 10,
                     "finished": f"2026-0{1 + index % 9}-1{index % 10}" if index % 5 else None,
                     "marks": '[{"at": 3}]' if index % 6 == 0 else None,
@@ -218,3 +219,55 @@ def test_the_fixture_reaches_every_batched_reader(engine: Engine) -> None:
     assert library.year_review(2026)["best"]
     assert library.now()
     assert library.search_entries("title")
+
+
+FACET_FILTERS: list[dict[str, Any]] = [
+    {},
+    {"statuses": ["read", "unsorted"]},
+    {"shelves": ["alpha"]},
+    {"shelves": ["alpha", "beta"]},
+    {"formats": ["digital"]},
+    {"types": ["book", "movie"]},
+    {"q": "title 1"},
+    {"location": "Hall"},
+    {"lent": True},
+    {"missing_cover": True},
+    {"exact_score": 5},
+    {"shelves": ["beta"], "formats": ["cd"], "types": ["album"], "statuses": ["owned"]},
+]
+
+
+@pytest.mark.parametrize("filters", FACET_FILTERS, ids=lambda filters: ",".join(filters) or "none")
+def test_the_total_and_facets_count_what_the_filters_list(
+    engine: Engine, filters: dict[str, Any]
+) -> None:
+    """Each count, recomputed from the entries the same filters list (Sprint 129
+    rewrote the facet queries; this pins what they mean, not how they are spelled)."""
+    _seed(engine, 40)
+    library = LibraryService(engine, 1)
+    page = library.list_entries(limit=1, **filters)
+
+    every = {key: value for key, value in filters.items()}
+    listed = library.list_entries(limit=1000, **every)["items"]
+    assert page["total"] == len(listed)
+
+    # Statuses and types cleared, the rest kept: what clicking a tab would show.
+    cleared = {k: v for k, v in filters.items() if k not in ("statuses", "types")}
+    by_type: dict[str, dict[str, int]] = {}
+    for entry in library.list_entries(limit=1000, statuses=[], **cleared)["items"]:
+        counts = by_type.setdefault(entry["item"]["type"], {})
+        counts[entry["status"]] = counts.get(entry["status"], 0) + 1
+    status_counts: dict[str, int] = {}
+    for counts in by_type.values():
+        for status, count in counts.items():
+            status_counts[status] = status_counts.get(status, 0) + count
+    assert page["facets"]["status_counts_by_type"] == by_type
+    assert page["facets"]["status_counts"] == status_counts
+
+    # Formats cleared, the rest (types included) kept.
+    without_formats = {k: v for k, v in filters.items() if k != "formats"}
+    format_counts: dict[str, int] = {}
+    for entry in library.list_entries(limit=1000, **without_formats)["items"]:
+        for value in entry["formats"]:
+            format_counts[value] = format_counts.get(value, 0) + 1
+    assert page["facets"]["format_counts"] == format_counts
