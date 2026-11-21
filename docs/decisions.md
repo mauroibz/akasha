@@ -7167,3 +7167,31 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   on unfixable base-image advisories; revisit with an ignore policy).
 - Consequences: a new advisory in a shipped dependency turns the `audit` CI job red on every
   pull request until the dependency moves, by design.
+
+## DEC-182 — Robustness and performance join Sprint 129
+
+- Date: 2026-11-21
+- Status: accepted
+- Context: while Sprint 129 was open the owner added: "Cualquier mejora de robustez o
+  performance que podamos hacer me gusta" (any robustness or performance improvement is
+  welcome). Two read-only audits followed, one for robustness (failure, crash and
+  concurrency paths) and one for measured performance on a 10,000-entry library.
+- Decision: Sprint 129 takes their findings rather than a new sprint, because they share its
+  branch and its verification. Points worth keeping:
+  1. **The whole upgrade is one SQLite transaction** (pysqlite recipe: driver transactions
+     off, an explicit deferred `BEGIN`); foreign keys stay off for migrations, set before the
+     transaction because SQLite ignores the pragma inside one (DEC-092).
+  2. **A pre-migration backup is reused only while it holds the live library**, decided by a
+     content digest recorded in every manifest, not by file times: a rolled-back attempt
+     touches the file without changing its content, and an mtime rule would bring back the
+     backup-per-restart loop.
+  3. **`synchronous=NORMAL` under WAL**; files are fsynced before their rows commit, so a lost
+     commit leaves at worst an orphan file for `akasha-attachments reclaim`.
+  4. **Cancelling a job is final**; a job whose lease keeps expiring is dead-lettered.
+  5. **A library cursor page carries `null` total and facets** (contract change, first page
+     unchanged).
+  6. **React Query: 30 s stale time, no refetch on window focus.** Mutations still invalidate;
+     a change made on another device appears on the next navigation after 30 s rather than on
+     focus. The inbox badge keeps a focus refetch.
+- Consequences: migration 0035 (`entry_shelves(shelf_id)`, `entries(item_id)`); backup
+  manifests gain `database_digest`; the container CMD gains `--timeout-graceful-shutdown 10`.

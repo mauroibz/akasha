@@ -6821,3 +6821,22 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Blocked/open: egress firewall script only dry-run; `_EDITION_NOTE` regex quadratic on
   unclosed brackets (bounded by title caps); uvicorn access log keeps query strings.
 - Next: owner reviews the PR; on the server, follow runbook *Publishing on the internet*.
+
+## 2026-11-21 — Sprint 129 (complete)
+- Done: Sprint 128 merged as #38 after CI found one regression, fixed before merge: the image's
+  empty `/data/tmp` made a fresh named volume "not empty" for the runbook's restore drill
+  (`8a4cf84`). Sprint 129 planned (DEC-181) and widened at the owner's request to robustness and
+  performance (DEC-182): two read-only audits, four fix streams in worktrees, merged; coordinator
+  fixes: hourly retry for kept import batches (`e5408fa`), runner stop-before-start race and the
+  flaky events test (`ea188e6`, `7bde257`), nullable cursor-page fields in the frontend contract
+  (`2c183c3`), the goal invitation's stale choice (walkthrough find). Migration 0035.
+- Verified: backend 2003 passed / 1 failed (root-only prune test); Vitest 557; Playwright
+  diary-goal, auth, library, add-detail 41 passed; `make check`; `make audit` clean. Walkthrough on
+  a seeded 10k library (auth on, built dist, :8798): library 8334 books renders, Diary, detail,
+  Insights, Shelves, Import with no console errors besides the fixture's missing cover files
+  (1,812 404s, expected: the seed sets cover paths without files); focus made 0 API requests;
+  `/api/diary?year=2026` 0.22 s, `/api/entries?limit=100` 0.07 s and 4.3 KB gzip.
+- Observed: the Diary invitation said "Aim for 12" beside 24/36/52 — fixed (test first).
+- Deviations: cursor pages carry `null` total/facets; no refetch on focus (DEC-182).
+- Next: owner reviews the PR; release as 2.9.0 so compose and image move together (Sprint 128's
+  read-only compose with the 2.8.0 image caps uploads at the 64 MB /tmp).

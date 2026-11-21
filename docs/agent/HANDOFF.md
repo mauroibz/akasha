@@ -2,6 +2,11 @@
 
 ## Where the project stands
 
+**2026-11-21 (later):** Sprint 128 is merged to `main` (#38). Sprint 129, *Security
+follow-ups* (DEC-181) widened to robustness and performance (DEC-182), is completed on branch
+`ccr-61c66a6d-g1wptf` for a pull request. Migrations 0034–0035 are unreleased; the next release
+should be 2.9.0 so `compose.yaml`'s hardening and the image that expects it ship together.
+
 **2026-11-21:** Sprint 128, *Public exposure hardening* (DEC-180), is completed on branch
 `ccr-61c66a6d-g1wptf` for a pull request to `main`; unreleased on top of 2.8.0. It fixes the
 21 findings of a six-way security audit (see the sprint file's table) and adds the public

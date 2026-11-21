@@ -777,6 +777,28 @@ forces `AKASHA_METRICS=off`.
 has stopped answering. That is a provider outage, not a fault in Akasha: searches keep working on
 the other providers, and the notice clears once the provider answers again.
 
+## Durability and caching (Sprint 129)
+
+- **Upgrades are one transaction.** A migration that fails leaves the database at the
+  revision it started from, so the next start retries cleanly instead of looping on a
+  half-applied schema.
+- **SQLite runs `synchronous=NORMAL` under WAL.** A power cut can lose the last few
+  commits but cannot corrupt the database. Covers and attachment files are synced to
+  disk before the rows that point at them commit, and a damaged attachment blob is
+  replaced when the same file is uploaded again.
+- **Interrupted imports finish themselves.** Covers and ebooks are installed after an
+  import commits; if the process dies part-way, the next start completes the install.
+  A batch's staging folder is never removed while it still holds uninstalled files (the
+  log says `import staging kept`, retried once an hour).
+- **Jobs:** a cancelled job stays cancelled; a job whose lease keeps expiring (it
+  crashes the process) is failed with `lease_expired` after its retries.
+- **Stopping** takes well under ten seconds even with a tab open (`/api/events` ends at
+  shutdown; uvicorn's graceful shutdown is bounded at 10 s).
+- **Caching and compression:** `/assets/*` is immutable for a year (file names carry a
+  content hash); the page shell, `sw.js` and `theme-init.js` revalidate every load.
+  Responses over 1 KB are gzip-compressed, except images, downloads and `/api/events`.
+  A reverse proxy or Cloudflare can pass compressed responses through unchanged.
+
 ## When something is wrong
 
 | Symptom | Cause |
