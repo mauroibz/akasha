@@ -180,6 +180,44 @@ def test_an_epub_description_of_unclosed_tags_reads_in_linear_time(tmp_path: Pat
     assert _elapsed(read_epub, path, tmp_path / "covers", 1) < BOUND_SECONDS * 2
 
 
+_ENTITY_PACKAGE = (
+    '<?xml version="1.0" encoding="{encoding}"?>'
+    '<!DOCTYPE package [<!ENTITY a "aaaaaaaaaa"><!ENTITY b "&a;&a;&a;&a;&a;">]>'
+    '<package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>&b;</dc:title>'
+    "</metadata><manifest/></package>"
+)
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16", "utf-16-be", "utf-16-le"])
+def test_an_epub_declaring_entities_is_refused_in_any_encoding(
+    tmp_path: Path, encoding: str
+) -> None:
+    """F21: the entity check looked for the ASCII bytes `<!ENTITY`, which UTF-16 hides."""
+    from book_tracker.domains.book.epub import read_epub
+
+    declared = encoding.removesuffix("-be").removesuffix("-le").upper()
+    opf = _ENTITY_PACKAGE.format(encoding=declared).encode(encoding)
+    record = read_epub(_epub(tmp_path, opf=opf), tmp_path / "covers", 1)
+    assert record.errors, record
+    assert record.errors[0]["code"] == "invalid_epub"
+    assert "entities" in record.errors[0]["value"]
+
+
+def test_an_epub_with_a_plain_doctype_still_reads(tmp_path: Path) -> None:
+    from book_tracker.domains.book.epub import read_epub
+
+    opf = (
+        '<?xml version="1.0" encoding="UTF-16"?><!DOCTYPE package>'
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+        '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Plain</dc:title>'
+        "</metadata><manifest/></package>"
+    ).encode("utf-16")
+    record = read_epub(_epub(tmp_path, opf=opf), tmp_path / "covers", 1)
+    assert record.errors == ()
+    assert record.item.title == "Plain"
+
+
 _CONTAINER = (
     '<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">'
     '<rootfiles><rootfile full-path="c.opf"/></rootfiles></container>'
