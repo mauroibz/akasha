@@ -14,20 +14,22 @@ through, the export analogue of `GET /api/importers`.
 
 from typing import Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from book_tracker.api.identity import CurrentUser
+from book_tracker.api.identity import CurrentUser, current_user
 from book_tracker.application.export import export_json, stream_export_view
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.registry import REGISTERED_EXPORTS, ItemTypeName, find_export_view
 from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
 from book_tracker.infrastructure.models import EntryRow, ItemRow
 
-router = APIRouter(prefix="/api")
+# Every route names its principal (Sprint 128): a request that slipped past the
+# middleware still answers 401 rather than reaching a handler.
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
 
 class ExportViewResponse(BaseModel):

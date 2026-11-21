@@ -137,15 +137,19 @@ def _batches(
     library list already uses (technical spec 7.2). The key must be the first
     column and must be unique and ordered.
 
-    `user_id` scopes the walk to one owner's rows. `None` walks the whole table,
-    which only the item walk uses: items are the shared cache and an export of
-    them leaks nothing nobody's entry does not already describe (Sprint 076).
+    `user_id` scopes the walk to one owner's rows: for entries, their own; for
+    items, the ones their entries hold. Items are a shared cache, but the cache is
+    the whole install, and an export of it listed other people's catalogues and
+    the source ids that let a hand-typed item be claimed (Sprint 128, F8).
     """
     key = columns[0]
     last: Any = None
     while True:
         statement = select(*columns).order_by(key).limit(BATCH)
-        if user_id is not None:
+        if user_id is not None and key is ItemRow.id:
+            held = select(EntryRow.item_id).where(EntryRow.user_id == user_id)
+            statement = statement.where(ItemRow.id.in_(held))
+        elif user_id is not None:
             statement = statement.where(EntryRow.user_id == user_id)
         if last is not None:
             statement = statement.where(key > last)
@@ -158,8 +162,9 @@ def _batches(
         last = rows[-1][0]
 
 
-def iter_items(session: Session) -> Iterator[dict[str, Any]]:
-    for batch in _batches(session, _ITEM_COLUMNS):
+def iter_items(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
+    """The items one person's entries hold, each with that person's files only."""
+    for batch in _batches(session, _ITEM_COLUMNS, user_id):
         ids = [item.id for item in batch]
         identifiers = _grouped(
             session.execute(
@@ -196,7 +201,7 @@ def iter_items(session: Session) -> Iterator[dict[str, Any]]:
                     AttachmentRow.sha256,
                     AttachmentRow.created_at,
                 )
-                .where(AttachmentRow.item_id.in_(ids))
+                .where(AttachmentRow.item_id.in_(ids), AttachmentRow.user_id == user_id)
                 .order_by(AttachmentRow.item_id, AttachmentRow.id)
             ).all(),
             "item_id",
@@ -343,8 +348,8 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
 def export_json(engine: Engine, *, user_id: int, now: datetime | None = None) -> Iterator[str]:
     """Yield the export document in pieces, never holding the whole of it.
 
-    `user_id` scopes the entries the dump carries. Items follow unscoped: they are
-    the shared cache the entries describe.
+    `user_id` scopes everything the dump carries: the person's entries, the items
+    those entries hold, and the person's own attachments on them (Sprint 128).
     """
     generated = (now or datetime.now(UTC)).isoformat()
     with Session(engine) as session:
@@ -355,7 +360,7 @@ def export_json(engine: Engine, *, user_id: int, now: datetime | None = None) ->
         }
         yield json.dumps(header, ensure_ascii=False)[:-1]
         for name, rows in (
-            ("items", iter_items(session)),
+            ("items", iter_items(session, user_id)),
             ("entries", iter_entries(session, user_id)),
         ):
             yield f', "{name}": ['
