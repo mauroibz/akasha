@@ -27,7 +27,10 @@ export function GoalInvite({
   const headingId = useId();
   const queryClient = useQueryClient();
   const picks = suggestedCounts(done);
-  const [count, setCount] = useState(picks[1].count);
+  // The choice is a position among the picks, not a number: the picks move once
+  // the year's count arrives, and a remembered number would then match none of them.
+  const [choice, setChoice] = useState(1);
+  const count = picks[choice].count;
   const plural = (domain.plural_label ?? domain.label).toLowerCase();
   const save = useMutation({
     mutationFn: () =>
@@ -51,15 +54,15 @@ export function GoalInvite({
         Want something to aim at this year?
       </h2>
       <div className="mt-6 grid max-w-xl grid-cols-3 gap-2 sm:gap-3">
-        {picks.map((pick) => (
+        {picks.map((pick, index) => (
           <button
             key={pick.count}
             type="button"
-            aria-pressed={count === pick.count}
-            onClick={() => setCount(pick.count)}
+            aria-pressed={choice === index}
+            onClick={() => setChoice(index)}
             className={cn(
               "rounded-xl border px-2 pb-3 pt-2.5 text-center transition-colors focus-ring",
-              count === pick.count
+              choice === index
                 ? "border-primary bg-primary/15"
                 : "border-border bg-background hover:bg-accent",
             )}
