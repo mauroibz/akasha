@@ -2372,71 +2372,84 @@ class LibraryService:
             entries = list(session.scalars(query))
             has_more = len(entries) > limit
             entries = entries[:limit]
-            total_query = self._filtered_entries(
-                statuses,
-                shelves,
-                q,
-                formats,
-                types,
-                key,
-                value,
-                location=location,
-                lent=lent,
-                missing_cover=missing_cover,
-                exact_score=exact_score,
-                columns=(func.count(),),
-            )
-            total = session.scalar(total_query) or 0
-            # Each facet clears its own dimension, so a count reads as "what you would
-            # get if you clicked this" rather than as a count of the current page.
-            # `type` is deliberately *cleared* here while every other filter is kept.
-            # The two consumers below both need to see across the selected domain:
-            # `status_counts` is the whole-library total the inbox badge means, and
-            # narrowing it would make the badge disagree with `/triage`, which is
-            # domain-agnostic; `status_counts_by_type` is already split by type, so a
-            # tab that is *not* selected still has a live count to show.
-            facet_base = self._filtered_entries(
-                [],
-                shelves,
-                q,
-                formats,
-                location=location,
-                lent=lent,
-                missing_cover=missing_cover,
-                exact_score=exact_score,
-                columns=(EntryRow.status, ItemRow.type, func.count()),
-            )
-            # Grouped by the item's type as well as the status, because a status two
-            # domains share is not one number on a screen that lists them separately:
-            # a wishlisted record counted under "Book · Wishlist" is a wrong answer
-            # the walkthrough caught. `status_counts` stays the whole-library total,
-            # which is what the inbox badge means.
-            facet_rows = session.execute(facet_base.group_by(EntryRow.status, ItemRow.type)).all()
-            status_counts: dict[str, int] = {}
-            by_type: dict[str, dict[str, int]] = {}
-            for status_value, item_type, count in facet_rows:
-                status_counts[status_value] = status_counts.get(status_value, 0) + count
-                by_type.setdefault(item_type, {})[status_value] = count
-            # The format selector sits *under* the tab, so this one keeps the type
-            # filter: offering "Physical 312" while the library is showing records is
-            # an answer to a question nobody asked.
-            format_base = self._filtered_entries(
-                statuses,
-                shelves,
-                q,
-                (),
-                types,
-                location=location,
-                lent=lent,
-                missing_cover=missing_cover,
-                exact_score=exact_score,
-                columns=(EntryFormatRow.format, func.count()),
-            )
-            format_rows = session.execute(
-                format_base.join(EntryFormatRow, EntryFormatRow.entry_id == EntryRow.id).group_by(
-                    EntryFormatRow.format
+            # The counts describe the whole filtered library, not a page, and every
+            # screen reads them from its first page; a page asked for with a cursor
+            # carries `None` rather than recounting the library per scroll (Sprint 129).
+            total: int | None = None
+            facets: dict[str, Any] | None = None
+            if state is None:
+                total_query = self._filtered_entries(
+                    statuses,
+                    shelves,
+                    q,
+                    formats,
+                    types,
+                    key,
+                    value,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
+                    exact_score=exact_score,
+                    columns=(func.count(),),
                 )
-            ).all()
+                total = session.scalar(total_query) or 0
+                # Each facet clears its own dimension, so a count reads as "what you would
+                # get if you clicked this" rather than as a count of the current page.
+                # `type` is deliberately *cleared* here while every other filter is kept.
+                # The two consumers below both need to see across the selected domain:
+                # `status_counts` is the whole-library total the inbox badge means, and
+                # narrowing it would make the badge disagree with `/triage`, which is
+                # domain-agnostic; `status_counts_by_type` is already split by type, so a
+                # tab that is *not* selected still has a live count to show.
+                facet_base = self._filtered_entries(
+                    [],
+                    shelves,
+                    q,
+                    formats,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
+                    exact_score=exact_score,
+                    columns=(EntryRow.status, ItemRow.type, func.count()),
+                )
+                # Grouped by the item's type as well as the status, because a status two
+                # domains share is not one number on a screen that lists them separately:
+                # a wishlisted record counted under "Book · Wishlist" is a wrong answer
+                # the walkthrough caught. `status_counts` stays the whole-library total,
+                # which is what the inbox badge means.
+                facet_rows = session.execute(
+                    facet_base.group_by(EntryRow.status, ItemRow.type)
+                ).all()
+                status_counts: dict[str, int] = {}
+                by_type: dict[str, dict[str, int]] = {}
+                for status_value, item_type, count in facet_rows:
+                    status_counts[status_value] = status_counts.get(status_value, 0) + count
+                    by_type.setdefault(item_type, {})[status_value] = count
+                # The format selector sits *under* the tab, so this one keeps the type
+                # filter: offering "Physical 312" while the library is showing records is
+                # an answer to a question nobody asked.
+                format_base = self._filtered_entries(
+                    statuses,
+                    shelves,
+                    q,
+                    (),
+                    types,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
+                    exact_score=exact_score,
+                    columns=(EntryFormatRow.format, func.count()),
+                )
+                format_rows = session.execute(
+                    format_base.join(
+                        EntryFormatRow, EntryFormatRow.entry_id == EntryRow.id
+                    ).group_by(EntryFormatRow.format)
+                ).all()
+                facets = {
+                    "status_counts": status_counts,
+                    "status_counts_by_type": by_type,
+                    "format_counts": {row[0]: row[1] for row in format_rows},
+                }
             next_cursor = None
             if has_more and entries:
                 last = entries[-1]
@@ -2471,11 +2484,7 @@ class LibraryService:
                 "items": self._entry_dicts(session, entries),
                 "next_cursor": next_cursor,
                 "total": total,
-                "facets": {
-                    "status_counts": status_counts,
-                    "status_counts_by_type": by_type,
-                    "format_counts": {row[0]: row[1] for row in format_rows},
-                },
+                "facets": facets,
             }
 
     def _insight_explode(

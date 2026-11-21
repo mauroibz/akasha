@@ -108,7 +108,7 @@ def _seed(engine: Engine, count: int) -> list[int]:
                     "status": statuses[item_type] if index % 9 else "unsorted",
                     "score": None if index % 4 == 0 else 1 + index % 10,
                     "finished": f"2026-0{1 + index % 9}-1{index % 10}" if index % 5 else None,
-                    "marks": '[{"at": 3}]' if index % 6 == 0 else None,
+                    "marks": '{"1": [3, 1]}' if index % 6 == 0 else None,
                     "unknown": '["date_finished"]' if index % 7 == 0 else None,
                     "location": "Hall" if index % 2 else None,
                     "id": created.entry_id,
@@ -271,3 +271,43 @@ def test_the_total_and_facets_count_what_the_filters_list(
         for value in entry["formats"]:
             format_counts[value] = format_counts.get(value, 0) + 1
     assert page["facets"]["format_counts"] == format_counts
+
+
+def test_a_cursor_page_skips_the_counts_the_first_page_already_carried(engine: Engine) -> None:
+    """Every screen reads `total` and `facets` from the first page; a scroll's later
+    pages recounted the whole filtered library each time (Sprint 129). A page asked
+    for with `after` carries `null` for both and runs only the page's own queries."""
+    _seed(engine, 30)
+    library = LibraryService(engine, 1)
+    first = library.list_entries(limit=10)
+    assert first["total"] == 30 - 4  # the four unsorted entries are not listed
+    assert first["facets"] is not None
+    with counted(engine) as first_statements:
+        library.list_entries(limit=10)
+    with counted(engine) as later_statements:
+        later = library.list_entries(limit=10, after=first["next_cursor"])
+    assert later["total"] is None
+    assert later["facets"] is None
+    assert len(later["items"]) == 10
+    assert not any("count(" in statement.lower() for statement in later_statements)
+    assert len(later_statements) == len(first_statements) - 3
+
+
+@pytest.mark.anyio
+async def test_the_entries_route_answers_null_counts_on_a_cursor_page(tmp_path: Path) -> None:
+    import httpx
+
+    from book_tracker.main import create_app
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        _seed(app.state.engine, 12)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            first = (await client.get("/api/entries", params={"limit": 5})).json()
+            later = (
+                await client.get("/api/entries", params={"limit": 5, "after": first["next_cursor"]})
+            ).json()
+    assert isinstance(first["total"], int) and first["facets"]["status_counts"]
+    assert later["total"] is None and later["facets"] is None
+    assert len(later["items"]) == 5

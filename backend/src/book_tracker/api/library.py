@@ -287,8 +287,12 @@ class FacetsResponse(BaseModel):
 class EntryListResponse(BaseModel):
     items: list[EntryResponse]
     next_cursor: str | None
-    total: int
-    facets: FacetsResponse
+    #: The filtered library's size and counts: on the first page only. A page asked
+    #: for with `after` carries `null` for both, because every screen reads them
+    #: from its first page and recounting the library per scroll was most of a
+    #: later page's cost (Sprint 129).
+    total: int | None
+    facets: FacetsResponse | None
 
 
 class InsightRowResponse(BaseModel):
