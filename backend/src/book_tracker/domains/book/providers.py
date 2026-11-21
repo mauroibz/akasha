@@ -10,7 +10,7 @@ import asyncio
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from typing import Any
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 import httpx
 
@@ -265,7 +265,8 @@ class OpenLibraryProvider:
         return [candidate for _index, candidate in sorted(resolved, key=lambda row: row[0])]
 
     async def fetch(self, source_id: str) -> ItemPayload:
-        row = await self._json(f"https://openlibrary.org/books/{source_id}.json")
+        # A source id is client text: one quoted path segment, never `../` or a query.
+        row = await self._json(f"https://openlibrary.org/books/{quote(source_id, safe='')}.json")
         return await self._edition_payload(row, source_id)
 
     async def _edition_payload(
@@ -327,7 +328,8 @@ class OpenLibraryProvider:
             cover_urls.append(f"https://covers.openlibrary.org/b/id/{cover}-L.jpg?default=false")
         if source_id:
             cover_urls.append(
-                f"https://covers.openlibrary.org/b/olid/{source_id}-L.jpg?default=false"
+                "https://covers.openlibrary.org/b/olid/"
+                f"{quote(source_id, safe='')}-L.jpg?default=false"
             )
         if identifiers.get("isbn13"):
             cover_urls.append(
@@ -571,7 +573,8 @@ class GoogleBooksProvider:
         ]
 
     async def fetch(self, source_id: str) -> ItemPayload:
-        row = await self._get(f"https://www.googleapis.com/books/v1/volumes/{source_id}")
+        volume = quote(source_id, safe="")  # client text: one path segment, nothing more
+        row = await self._get(f"https://www.googleapis.com/books/v1/volumes/{volume}")
         candidate = self._candidate(row)
         if candidate is None:
             raise ProviderPayloadError("Google Books volume is incomplete")

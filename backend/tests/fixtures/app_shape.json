@@ -655,7 +655,8 @@
  "middleware": [
   "security_headers",
   "request_identity",
-  "authentication_boundary"
+  "authentication_boundary",
+  "BodyLimitMiddleware"
  ],
  "exception_handlers": [
   "AuthenticationRequired",

@@ -17,6 +17,7 @@ from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
+from book_tracker.app.body_limits import install_body_limits
 from book_tracker.app.errors import NOT_FOUND, install_error_handlers
 from book_tracker.app.health import install_health_routes
 from book_tracker.app.lifespan import back_up_before_migrating, make_lifespan
@@ -55,6 +56,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_lifetime = timedelta(days=configured.session_days)
 
     install_error_handlers(app)
+    install_body_limits(app)
     install_middleware(app, configured)
     install_security_headers(app)
     install_health_routes(app)

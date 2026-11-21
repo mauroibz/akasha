@@ -12,12 +12,14 @@ import hashlib
 import html
 import posixpath
 import re
+import shutil
 import zipfile
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import unquote
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.importers import (
@@ -48,7 +50,7 @@ _SUFFIX_TYPES = {suffix: content_type for content_type, suffix in _COVER_TYPES.i
 
 #: One creator string naming several people: "Martin Kleppmann and Chris Riccomini".
 _CREATOR_SPLIT = re.compile(r"\s+(?:and|&)\s+|\s*;\s*", re.IGNORECASE)
-_TAG = re.compile(r"<[^>]+>")
+_TAG = re.compile(r"<[^<>]+>")  # `[^<>]`, not `[^>]`: linear on a run of `<` (F14)
 _ISBN_PREFIX = re.compile(r"^(?:urn:)?isbn:?\s*", re.IGNORECASE)
 
 
@@ -74,12 +76,40 @@ def _document(archive: zipfile.ZipFile, name: str) -> ElementTree.Element:
     if info.file_size > MAX_DOCUMENT_BYTES:
         raise _Unreadable(f"{name} is too large")
     data = archive.read(info)
-    if b"<!ENTITY" in data.upper():
+    if b"<!ENTITY" in data.upper() or _declares_entities(data):
         raise _Unreadable(f"{name} declares entities")
     try:
         return ElementTree.fromstring(data)
     except ElementTree.ParseError as error:
         raise _Unreadable(f"{name} is not well formed") from error
+
+
+class _EntityDeclared(Exception):
+    pass
+
+
+def _declares_entities(data: bytes) -> bool:
+    """Whether the document declares any entity, in whatever encoding it is written.
+
+    The byte check above only sees ASCII-compatible encodings; a UTF-16 document hides
+    `<!ENTITY` from it (F21). Expat decodes the document by its own BOM and declaration,
+    so asking it is encoding-proof. A document expat cannot parse is left for the real
+    parse to refuse as not well formed.
+    """
+
+    def refuse(*_args: object) -> None:
+        raise _EntityDeclared
+
+    parser = expat.ParserCreate()
+    parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    parser.EntityDeclHandler = refuse
+    try:
+        parser.Parse(data, True)
+    except _EntityDeclared:
+        return True
+    except expat.ExpatError:
+        return False
+    return False
 
 
 def _text(element: ElementTree.Element | None) -> str:
@@ -363,7 +393,12 @@ class EpubImporter:
                     suffix = PurePosixPath(record.attachment_name).suffix.lower()
                     staged_file = directory / "files" / f"{record.row_number}{suffix}"
                     staged_file.parent.mkdir(parents=True, exist_ok=True)
-                    staged_file.write_bytes(Path(record.attachment_source).read_bytes())
+                    # Copied in chunks: an EPUB may be up to 2 GiB, never held whole (F21).
+                    with (
+                        Path(record.attachment_source).open("rb") as source_file,
+                        staged_file.open("wb") as staged_handle,
+                    ):
+                        shutil.copyfileobj(source_file, staged_handle, 1024 * 1024)
                     attachment_relative = str(staged_file.relative_to(data_dir))
                 except OSError:
                     pass

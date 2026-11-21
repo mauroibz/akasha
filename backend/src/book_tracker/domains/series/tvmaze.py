@@ -75,7 +75,7 @@ USER_AGENT = "Akasha/1.4 ({contact})"
 # existing quota and retry machinery, not a second one.
 MIN_INTERVAL_SECONDS = 0.5
 
-_TAG = re.compile(r"<[^>]+>")
+_TAG = re.compile(r"<[^<>]+>")  # `[^<>]`, not `[^>]`: linear on a run of `<` (F14)
 _BLANK_LINES = re.compile(r"\n{3,}")
 _IMDB_ID = re.compile(r"tt[0-9]{7,10}")
 
