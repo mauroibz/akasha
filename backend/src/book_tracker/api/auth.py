@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import time
 from collections import OrderedDict, deque
 from collections.abc import Callable
@@ -27,6 +28,7 @@ from book_tracker.api.identity import (
     session_token,
 )
 from book_tracker.api.library import ErrorResponse
+from book_tracker.api.security_log import security_event
 from book_tracker.application.library import LibraryError
 from book_tracker.application.passwords import hash_password, verify_password
 from book_tracker.application.sessions import (
@@ -461,14 +463,17 @@ async def login(
     # the guess was right (F3).
     if limiter.limited(username, client):
         limiter.refused(username, client)
+        security_event("login_rate_limited", client=client, username=username)
         return rate_limited()
     user = await off_loop(_lookup_user, request.app.state.engine, username)
     password_matches = await _credentials_match(user, body.password.get_secret_value())
     if not password_matches:
         limiter.fail(username, client)
+        security_event("login_failed", client=client, username=username)
         return unauthenticated()
     assert user is not None
     limiter.succeed(username, client)
+    security_event("login_succeeded", client=client, username=username, level=logging.INFO)
     store = session_store(request)
     presented = session_token(request)
     if presented:
@@ -596,6 +601,7 @@ async def setup(
     limiter: LoginRateLimiter = request.app.state.login_limiter
     if limiter.limited(SETUP_LIMIT_KEY, client):
         limiter.refused(SETUP_LIMIT_KEY, client)
+        security_event("setup_rate_limited", client=client)
         return rate_limited()
     expected = getattr(request.app.state, "setup_code", None)
     provided = body.setup_code.get_secret_value().strip() if body.setup_code else ""
@@ -605,6 +611,7 @@ async def setup(
         and hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
     ):
         limiter.fail(SETUP_LIMIT_KEY, client)
+        security_event("setup_code_invalid", client=client)
         return error_response(
             403,
             "setup_code_invalid",
@@ -806,10 +813,12 @@ async def change_password(
     limiter: LoginRateLimiter = request.app.state.login_limiter
     if limiter.limited(user.username, client):
         limiter.refused(user.username, client)
+        security_event("password_change_rate_limited", client=client, username=user.username)
         return rate_limited()
     row = await off_loop(_user_by_id, request.app.state.engine, user.user_id)
     if not await _credentials_match(row, body.current_password.get_secret_value()):
         limiter.fail(user.username, client)
+        security_event("password_change_failed", client=client, username=user.username)
         return unauthenticated()
     credential = await off_loop(hash_password, body.new_password.get_secret_value())
     store = session_store(request)

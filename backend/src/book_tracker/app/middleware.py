@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
 
 from book_tracker.api.auth import (
+    client_address,
     error_response,
     has_credentialed_user,
     request_uses_https,
@@ -24,6 +25,7 @@ from book_tracker.api.auth import (
     setup_required as setup_required_response,
 )
 from book_tracker.api.identity import Principal, request_path, session_store, session_token
+from book_tracker.api.security_log import security_event
 from book_tracker.app.errors import NOT_FOUND
 from book_tracker.config import Settings
 from book_tracker.infrastructure.offload import off_loop
@@ -88,6 +90,13 @@ def cross_site_refusal(request: Request) -> Response | None:
         allowed = bool(host) and origin_host == host
     if allowed:
         return None
+    security_event(
+        "cross_site_request_refused",
+        client=client_address(request),
+        method=request.method,
+        route=request_path(request),
+        fetch_site=fetch_site,
+    )
     return error_response(
         403, "cross_site_request", "This request did not come from Akasha's own pages"
     )
