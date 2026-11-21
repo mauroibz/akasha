@@ -21,7 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from book_tracker.api.identity import CurrentUser, current_user
-from book_tracker.application.export import export_json, stream_export_view
+from book_tracker.application.export import coalesce, export_json, stream_export_view
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.registry import REGISTERED_EXPORTS, ItemTypeName, find_export_view
 from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
@@ -58,17 +58,19 @@ def export(
     engine = request.app.state.engine
     if format == "csv":
         return StreamingResponse(
-            stream_export_view(
-                engine,
-                GOODREADS_EXPORT,
-                GOODREADS_EXPORT.item_types[0],
-                user.effective_user_id,
+            coalesce(
+                stream_export_view(
+                    engine,
+                    GOODREADS_EXPORT,
+                    GOODREADS_EXPORT.item_types[0],
+                    user.effective_user_id,
+                )
             ),
             media_type=GOODREADS_EXPORT.media_type,
             headers={"Content-Disposition": f'attachment; filename="{GOODREADS_EXPORT.filename}"'},
         )
     return StreamingResponse(
-        export_json(engine, user_id=user.effective_user_id),
+        coalesce(export_json(engine, user_id=user.effective_user_id)),
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="akasha-export.json"'},
     )
@@ -115,7 +117,7 @@ def export_view_route(
         )
     engine = request.app.state.engine
     return StreamingResponse(
-        stream_export_view(engine, resolved, type.value, user.effective_user_id),
+        coalesce(stream_export_view(engine, resolved, type.value, user.effective_user_id)),
         media_type=resolved.media_type,
         headers={"Content-Disposition": f'attachment; filename="{resolved.filename}"'},
     )
