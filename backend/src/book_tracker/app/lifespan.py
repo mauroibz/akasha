@@ -112,7 +112,14 @@ def back_up_before_migrating(configured: Settings) -> None:
 def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        configure_logging(configured.log_level, scrub=(configured.google_books_api_key,))
+        configure_logging(
+            configured.log_level,
+            scrub=(
+                configured.google_books_api_key,
+                configured.tmdb_read_token,
+                configured.admin_password.get_secret_value() if configured.admin_password else "",
+            ),
+        )
         for directory in ("", "covers", "imports", "attachments"):
             (configured.data_dir / directory).mkdir(parents=True, exist_ok=True)
         if not getattr(app.state, "skip_migrations", False):
