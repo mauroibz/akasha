@@ -1674,10 +1674,7 @@ export interface components {
     };
     /** Body_add_attachment_api_items__item_id__attachments_post */
     Body_add_attachment_api_items__item_id__attachments_post: {
-      /**
-       * File
-       * Format: binary
-       */
+      /** File */
       file: string;
     };
     /** Body_detect_api_import_detect_post */
