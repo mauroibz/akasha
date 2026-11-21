@@ -488,6 +488,9 @@ class JobRunner:
         #: When each batch kept for uninstalled files was last retried (Sprint 129).
         self._kept_batch_retries: dict[str, float] = {}
         self._running = False
+        #: Set by `stop()`, and never cleared: a stop that arrives before the
+        #: task's first step must still hold (Sprint 129).
+        self._stop_requested = False
 
     async def run_forever(self) -> None:
         """Drain the queue for as long as the application is running.
@@ -501,6 +504,8 @@ class JobRunner:
         event loop with the API, so a claim waiting on the write lock used to stall
         every request in the process for as long as it waited (Sprint 087).
         """
+        if self._stop_requested:
+            return
         self._running = True
         resumed = False
         while self._running:
@@ -535,6 +540,7 @@ class JobRunner:
                 await asyncio.sleep(self.poll_interval)
 
     def stop(self) -> None:
+        self._stop_requested = True
         self._running = False
 
     # The install is the import pipeline's (application layer), imported where it
