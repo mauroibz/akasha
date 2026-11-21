@@ -274,3 +274,15 @@ async def test_a_provider_source_id_cannot_change_the_request_path(provider_name
         assert b"/admin" not in url.raw_path
         assert url.params.get("x") is None
         assert "..%2F..%2Fadmin%3Fx%3D1%23y" in url.raw_path.decode()
+
+
+def test_work_key_is_linear_on_unclosed_brackets() -> None:
+    """Sprint 129: `[(\\[][^)\\]]*[)\\]]` rescanned to the end of the string from
+    every unclosed bracket, so a title made of them was quadratic."""
+    from book_tracker.domain.normalization import work_key
+
+    started = time.perf_counter()
+    work_key("(" * 200_000)
+    assert time.perf_counter() - started < 1.0
+    assert work_key("Rayuela (Spanish Edition)") == work_key("RAYUELA")
+    assert work_key("Ficciones [Edición crítica]: notas") == work_key("Ficciones")

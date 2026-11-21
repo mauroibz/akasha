@@ -131,7 +131,9 @@ def strip_html(value: str) -> str:
     return "\n\n".join(line for line in lines if line).strip()
 
 
-_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
+# No bracket inside the note: a run of unclosed ones then stops at the next one
+# instead of rescanning to the end of the title (linear, Sprint 129).
+_EDITION_NOTE = re.compile(r"[(\[][^()\[\]]*[)\]]")
 
 
 def work_key(title: str) -> str:

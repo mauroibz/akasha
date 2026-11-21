@@ -7152,3 +7152,18 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
 - Consequences: migration for attachment ownership; the session cookie is renamed to
   `__Host-akasha_session` when Secure (one sign-in again per device); new passwords need 12
   characters; existing ones keep working.
+
+## DEC-181 — Security follow-ups (Sprint 129)
+
+- Date: 2026-11-21
+- Status: accepted
+- Context: after Sprint 128 the owner asked for any further proposals that can advance with the
+  repository alone ("si tenés propuestas adicionales que podamos avanzar solo con el repo,
+  adelante"), keeping UX work for local development. Their install runs auth on, LAN only.
+- Decision: `FINAL_SPRINT` 128 → 129, plan revision 53. Sprint 129 adds a security event log,
+  a dependency audit in CI, a linear edition-note regex and a 30-day session default in the
+  public overlay. Not taken: two-factor login in the application (Access provides it), per-user
+  storage quotas (DEC-146 §4), an image scanner in the release workflow (it would fail releases
+  on unfixable base-image advisories; revisit with an ignore policy).
+- Consequences: a new advisory in a shipped dependency turns the `audit` CI job red on every
+  pull request until the dependency moves, by design.

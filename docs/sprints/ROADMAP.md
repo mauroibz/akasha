@@ -1894,6 +1894,9 @@ ways out; one sprint closes them and documents the deployment.
 - **[128 — Public exposure hardening](128-public-exposure-hardening.md)** (**completed**): the
   request boundary, per-user ownership of attachments and shared items, bounded untrusted
   input, patched dependencies, and a contained container with a public compose overlay.
+- **[129 — Security follow-ups](129-security-follow-ups.md)** (**ready**): the security event
+  log, a dependency audit in CI, the last linear regex, a 30-day public session default
+  (DEC-181).
 
 ## Not scheduled
 

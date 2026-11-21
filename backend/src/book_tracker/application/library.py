@@ -75,7 +75,9 @@ from book_tracker.infrastructure.models import (
 )
 
 #: What tells one edition's title from another's, as `work_key` sets it aside.
-_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
+# No bracket inside the note: a run of unclosed ones then stops at the next one
+# instead of rescanning to the end of the title (linear, Sprint 129).
+_EDITION_NOTE = re.compile(r"[(\[][^()\[\]]*[)\]]")
 
 #: The room a score leaves for ranks inside it in the library's score sort (Sprint 116).
 SCORE_RANK_SPAN = 1_000_000
