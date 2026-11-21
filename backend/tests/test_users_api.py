@@ -271,10 +271,10 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 connection.execute(
                     text(
                         "INSERT INTO attachments "
-                        "(item_id,filename,byte_size,sha256,created_at,updated_at) "
-                        "VALUES (:item,'notes.txt',4,:sha,:now,:now)"
+                        "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                        "VALUES (:item,:user,'notes.txt',4,:sha,:now,:now)"
                     ),
-                    {"item": owned.item_id, "sha": "a" * 64, "now": now},
+                    {"item": owned.item_id, "user": second["id"], "sha": "a" * 64, "now": now},
                 )
             missing = await client.request("DELETE", f"/api/users/{second['id']}", json={})
             assert missing.status_code == 422
@@ -303,12 +303,14 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 ).scalar_one()
                 == 1
             )
+            # The item is the shared cache and stays; the file was the deleted
+            # person's own and goes with them (DEC-180).
             assert (
                 connection.execute(
                     text("SELECT count(*) FROM attachments WHERE item_id=:item"),
                     {"item": owned.item_id},
                 ).scalar_one()
-                == 1
+                == 0
             )
             for table in ("import_batches", "import_records", "import_effects", "jobs"):
                 assert (

@@ -138,8 +138,8 @@ def _attach(eng: Engine, item_id: int, filename: str, sha256: str, byte_size: in
         return conn.execute(
             text(
                 "INSERT INTO attachments"
-                "(item_id,filename,byte_size,sha256,created_at,updated_at) "
-                "VALUES(:iid,:name,:size,:sha,'n','n') RETURNING id"
+                "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                "VALUES(:iid,1,:name,:size,:sha,'n','n') RETURNING id"
             ),
             {"iid": item_id, "name": filename, "size": byte_size, "sha": sha256},
         ).scalar_one()
@@ -499,8 +499,8 @@ class TestUndo:
             conn.execute(
                 text(
                     "INSERT INTO attachments "
-                    "(item_id, filename, byte_size, sha256, created_at, updated_at) "
-                    "VALUES (:iid, 'book.epub', 12, :sha, '2026-01-01', '2026-01-01')"
+                    "(item_id, user_id, filename, byte_size, sha256, created_at, updated_at) "
+                    "VALUES (:iid, 1, 'book.epub', 12, :sha, '2026-01-01', '2026-01-01')"
                 ),
                 {"iid": item_id, "sha": "a" * 64},
             )

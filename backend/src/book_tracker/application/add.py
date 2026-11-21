@@ -32,6 +32,9 @@ from book_tracker.infrastructure.repositories import (
     SourceIdentity,
 )
 
+#: The source a hand-typed item is filed under; never a provider's name.
+MANUAL_SOURCE = "manual"
+
 
 class AddService:
     def __init__(
@@ -43,6 +46,7 @@ class AddService:
         cover_client: httpx.AsyncClient | None = None,
         data_dir: Path | None = None,
     ) -> None:
+        self.user_id = user_id
         self.repository = DomainRepository(engine, user_id)
         self.library = LibraryService(engine, user_id)
         self.providers = providers
@@ -192,12 +196,25 @@ class AddService:
             metadata = dict(manual.get("metadata", {}))
             creators: Sequence[str] = ()
             identifiers = self._identifiers(manual.get("identifiers", {}))
-            sources = [SourceIdentity("manual", idempotency_key, True)] if idempotency_key else []
+            # A hand-typed item is its typist's (DEC-180 §2). The key is namespaced by
+            # the user, so a retry still lands on the same item while another person
+            # sending the same key — read from an export, or guessed — gets their own.
+            sources = (
+                [SourceIdentity(MANUAL_SOURCE, f"{self.user_id}:{idempotency_key}", True)]
+                if idempotency_key
+                else []
+            )
             subtitle = str(manual["subtitle"]) if manual.get("subtitle") else None
             year = int(manual["year"]) if manual.get("year") is not None else None
         else:
             assert source is not None and source_id is not None
-            cached = await off_loop(self.repository.cached_item_for_source, source, source_id)
+            # `manual` is not a provider: its ids name somebody's hand-typed item,
+            # and the shared cache must not hand that item to anyone who names it.
+            cached = (
+                None
+                if source == MANUAL_SOURCE
+                else await off_loop(self.repository.cached_item_for_source, source, source_id)
+            )
             if cached is not None:
                 item_type = cached.item_type
                 title = cached.title
@@ -386,10 +403,23 @@ class AddService:
 
         The item rule is `prune_items`' (DEC-158): no entry of anyone and no import
         record in a batch that can still be undone. Attachments are yours rather than
-        the cache's, so they follow the entry to the new item instead of going.
+        the cache's, so yours follow the entry to the new item whether or not the old
+        one stays (a file you attached twice keeps the copy already there); anyone
+        else's stay where they were.
         """
         self.library.delete_entry(entry_id)
         with self.repository.engine.begin() as connection:
+            moved = {"new": new_item_id, "old": old_item_id, "user": self.user_id}
+            connection.execute(
+                text(
+                    "UPDATE OR IGNORE attachments SET item_id = :new"
+                    " WHERE item_id = :old AND user_id = :user"
+                ),
+                moved,
+            )
+            connection.execute(
+                text("DELETE FROM attachments WHERE item_id = :old AND user_id = :user"), moved
+            )
             held = connection.execute(
                 text(
                     "SELECT EXISTS (SELECT 1 FROM entries WHERE item_id = :item)"
@@ -400,10 +430,6 @@ class AddService:
             ).scalar_one()
             if held:
                 return
-            connection.execute(
-                text("UPDATE attachments SET item_id = :new WHERE item_id = :old"),
-                {"new": new_item_id, "old": old_item_id},
-            )
             connection.execute(text("DELETE FROM items WHERE id = :id"), {"id": old_item_id})
         if self.data_dir is not None:
             (self.data_dir / "covers" / f"{old_item_id}.jpg").unlink(missing_ok=True)
