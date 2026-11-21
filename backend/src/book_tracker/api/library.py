@@ -1183,8 +1183,7 @@ def list_item_types() -> list[ItemTypeResponse]:
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
 def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
-    item = library_for(request, user).get_item(item_id)
-    if not item["cover_url"]:
+    if not library_for(request, user).has_cover(item_id):
         raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
     if not target.is_file():

@@ -311,3 +311,27 @@ async def test_the_entries_route_answers_null_counts_on_a_cursor_page(tmp_path: 
     assert isinstance(first["total"], int) and first["facets"]["status_counts"]
     assert later["total"] is None and later["facets"] is None
     assert len(later["items"]) == 5
+
+
+def test_a_cover_is_checked_with_one_query(engine: Engine) -> None:
+    """The cover route asked for the whole item (identifiers and sources too) to read
+    one column; a library page asks for dozens of covers at once (Sprint 129)."""
+    _seed(engine, 6)
+    with engine.connect() as connection:
+        rows = connection.execute(text("SELECT id, cover_path FROM items ORDER BY id")).all()
+    with_cover = next(item_id for item_id, cover in rows if cover)
+    without_cover = next(item_id for item_id, cover in rows if not cover)
+    for requires_entry in (False, True):
+        library = LibraryService(engine, 1, item_access_requires_entry=requires_entry)
+        with counted(engine) as statements:
+            assert library.has_cover(with_cover) is True
+        assert len(statements) == 1
+        assert library.has_cover(without_cover) is False
+        with pytest.raises(library_module.LibraryError) as missing:
+            library.has_cover(10_000)
+        assert missing.value.code == "item_not_found"
+    # Someone else's item is not found for a caller who must hold an entry on it.
+    stranger = LibraryService(engine, 2, item_access_requires_entry=True)
+    with pytest.raises(library_module.LibraryError) as hidden:
+        stranger.has_cover(with_cover)
+    assert hidden.value.code == "item_not_found"

@@ -1159,6 +1159,23 @@ class LibraryService:
         with Session(self.engine) as session:
             return self._item_dict(session, self._item(session, item_id))
 
+    def has_cover(self, item_id: int) -> bool:
+        """Whether a reachable item has a stored cover: one column, one query.
+
+        The cover route's check (Sprint 129). The same reach as `_item`: an item is
+        found only through this person's entry when that is required, else a 404.
+        """
+        query = select(ItemRow.cover_path).where(ItemRow.id == item_id)
+        if self.item_access_requires_entry:
+            query = query.join(EntryRow, EntryRow.item_id == ItemRow.id).where(
+                EntryRow.user_id == self.user_id
+            )
+        with self.engine.connect() as connection:
+            row = connection.execute(query).first()
+        if row is None:
+            raise LibraryError("item_not_found", "Item was not found", status_code=404)
+        return bool(row.cover_path)
+
     def update_item(self, item_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
             item = self._editable_item(session, item_id)
