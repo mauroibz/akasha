@@ -323,6 +323,55 @@ async def test_a_late_job_from_an_undone_batch_cancels_without_calling_a_provide
             assert session.get(JobRow, job_id).state == "cancelled"
 
 
+@pytest.mark.anyio
+async def test_a_batch_undone_while_its_provider_answers_gets_no_fill(tmp_path: Path) -> None:
+    """Sprint 129: the late-job guard ran only before the provider call. An undo
+    landing while the provider was answering let the fill write afterwards, onto
+    an item the undo had just restored. The guard is re-checked inside the write."""
+    from test_jobs import _create_committed_batch
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.job_runner.stop()
+        engine = app.state.engine
+        item_id = create_item(engine, "Rayuela")
+        batch_id = _create_committed_batch(engine)
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE import_records SET matched_item_id=:item WHERE batch_id=:batch"),
+                {"item": item_id, "batch": batch_id},
+            )
+        job_id = JobRepository(engine).enqueue(
+            batch_id, "enrich_item", {"item_id": item_id, "isbn": RECORDED_ISBN}
+        )
+        async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
+            handler = EnrichmentHandler(engine, providers, rate_limiter=None)
+            fetch = handler._fetch
+
+            async def answered_then_undone(*args: Any, **kwargs: Any) -> Any:
+                answer = await fetch(*args, **kwargs)
+                UndoService(engine, user_id=1).undo(batch_id)
+                return answer
+
+            handler._fetch = answered_then_undone  # type: ignore[method-assign]
+            result = await handler.process(job_id, datetime.now(UTC))
+
+        assert result["state"] == "cancelled"
+        row = read_item(engine, item_id)
+        assert row.year is None
+        assert json.loads(row.metadata) == {}
+        with Session(engine) as session:
+            assert session.get(JobRow, job_id).state == "cancelled"
+            assert not list(
+                session.scalars(
+                    select(ImportEffectRow).where(
+                        ImportEffectRow.batch_id == batch_id,
+                        ImportEffectRow.effect_type == "fill_empty",
+                    )
+                )
+            )
+
+
 # --------------------------------------------------------------------------------------
 # Sprint 039: the handler reads the item's own domain rather than assuming books
 # (DEC-067 row 3).
