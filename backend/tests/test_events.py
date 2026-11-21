@@ -7,7 +7,10 @@ EventSource reconnects by itself, which bounds every connection without a timer
 anywhere else.
 """
 
+import asyncio
 import json
+import signal
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -121,3 +124,47 @@ async def test_a_failed_job_can_be_retried_by_its_owner_only(tmp_path: Path) -> 
     assert retried.json()["state"] == "queued"
     assert retried.json()["attempts"] == 0
     assert refused.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_the_stream_ends_promptly_when_the_server_shuts_down(tmp_path: Path) -> None:
+    """Sprint 129: uvicorn waits for open responses before it shuts the application
+    down, and a stream lives for minutes, so every restart with a tab open ran into
+    the container's grace period and ended in SIGKILL mid-job."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.event_stream_seconds = 20.0
+        asyncio.get_running_loop().call_later(0.5, app.state.shutting_down.set)
+        started = time.monotonic()
+        response = await client.get("/api/events")
+        elapsed = time.monotonic() - started
+    assert response.status_code == 200
+    assert elapsed < 3.0
+
+
+@pytest.mark.anyio
+async def test_the_servers_termination_signal_marks_the_application_as_shutting_down(
+    tmp_path: Path,
+) -> None:
+    """The application cannot see uvicorn's `should_exit`, so it chains onto the
+    handler the server installed and hands the signal on unchanged."""
+    received: list[int] = []
+
+    def server_handler(signum: int, _frame: object) -> None:
+        received.append(signum)
+
+    previous = signal.signal(signal.SIGTERM, server_handler)
+    try:
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with app.router.lifespan_context(app):
+            assert not app.state.shutting_down.is_set()
+            signal.raise_signal(signal.SIGTERM)
+            await asyncio.wait_for(app.state.shutting_down.wait(), timeout=2)
+            assert received == [signal.SIGTERM]
+        # The server's own handler is back once the application has shut down.
+        assert signal.getsignal(signal.SIGTERM) is server_handler
+    finally:
+        signal.signal(signal.SIGTERM, previous)

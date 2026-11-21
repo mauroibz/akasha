@@ -4,11 +4,14 @@ import asyncio
 import contextlib
 import logging
 import secrets
+import signal
 import sqlite3
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+from types import FrameType
 from typing import Any
 
 from fastapi import FastAPI
@@ -22,7 +25,7 @@ from book_tracker.api.auth import (
 from book_tracker.app.providers import build_provider_catalog
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.import_search import ImportSearchHandler
-from book_tracker.backup import BackupError, create_backup, read_manifest
+from book_tracker.backup import BackupError, create_backup, database_digest, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
@@ -48,18 +51,37 @@ def _current_revision(database_path: Path) -> str | None:
     return str(row[0]) if row else None
 
 
-def _existing_pre_migration_backup(backup_dir: Path, revision: str | None) -> Path | None:
+def _existing_pre_migration_backup(
+    backup_dir: Path, revision: str | None, database_path: Path
+) -> Path | None:
+    """A pre-migration backup that still holds exactly what the library holds.
+
+    A matching revision is not enough (Sprint 129): after a failed upgrade the
+    runbook restores the backup and the old image may run for weeks; the backup
+    from that first attempt is then neither current nor the rollback point the
+    next attempt needs. It is reused only while its recorded content digest equals
+    the live database's. Modification times cannot decide this: a failed upgrade
+    that rolled back has touched the file without changing what is in it, and that
+    restart loop is exactly the case reuse exists for. A manifest without a digest
+    (written before Sprint 129) proves nothing, so it is never reused.
+    """
     if revision is None or not backup_dir.is_dir():
         return None
-    for candidate in sorted(backup_dir.iterdir()):
+    live: str | None = None
+    for candidate in sorted(backup_dir.iterdir(), reverse=True):
         if not candidate.is_dir():
             continue
         manifest = read_manifest(candidate)
         if (
-            manifest is not None
-            and manifest.get("label") == "pre-migration"
-            and manifest.get("alembic_revision") == revision
+            manifest is None
+            or manifest.get("label") != "pre-migration"
+            or manifest.get("alembic_revision") != revision
+            or not manifest.get("database_digest")
         ):
+            continue
+        if live is None:
+            live = database_digest(database_path)
+        if manifest["database_digest"] == live:
             return candidate
     return None
 
@@ -82,14 +104,14 @@ def back_up_before_migrating(configured: Settings) -> None:
         return
     logger = logging.getLogger(__name__)
     current = _current_revision(database_path)
-    existing = _existing_pre_migration_backup(configured.backup_dir, current)
+    existing = _existing_pre_migration_backup(configured.backup_dir, current, database_path)
     if existing is not None:
         # `restart: unless-stopped` plus a migration that keeps failing is a
         # loop, and this ran once per attempt: six identical copies in eleven
         # seconds during Sprint 018's upgrade drill. Nightly retention is scoped
         # by label and deliberately never prunes these, so the loop would fill
         # the disk. The rollback point wanted is the one from before the first
-        # attempt anyway.
+        # attempt anyway -- as long as the library has not changed since.
         logger.info(
             "pre_migration_backup_reused",
             extra={"path": str(existing), "revision": current},
@@ -159,6 +181,48 @@ def _warn_about_insecure_cookie(configured: Settings) -> None:
             "terminates TLS, the session cookie would go out without Secure. Set "
             "AKASHA_COOKIE_SECURE=true for any install reached over HTTPS."
         )
+
+
+def _watch_for_stop(app: FastAPI) -> Callable[[], None]:
+    """Set `app.state.shutting_down` the moment the server is told to stop (Sprint 129).
+
+    uvicorn handles SIGTERM itself and only shuts the application down once every
+    open response has finished, which an event stream does after minutes. The
+    application cannot see the server's `should_exit`, so it chains onto the handler
+    the server installed: the event is set, and the server's handler then runs
+    exactly as before. Only a handler something else installed is chained, never
+    the interpreter's default, and only from the main thread, where signal handlers
+    live. Returns the undo, which puts the server's handler back.
+    """
+    event = asyncio.Event()
+    app.state.shutting_down = event
+    if threading.current_thread() is not threading.main_thread():
+        return lambda: None
+    loop = asyncio.get_running_loop()
+    installed: dict[int, tuple[Any, Any]] = {}
+
+    def chain(previous: Callable[[int, FrameType | None], Any]) -> Callable[..., Any]:
+        def handler(signum: int, frame: FrameType | None) -> Any:
+            with contextlib.suppress(RuntimeError):  # the loop may already be closed
+                loop.call_soon_threadsafe(event.set)
+            return previous(signum, frame)
+
+        return handler
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        previous = signal.getsignal(signum)
+        if not callable(previous) or previous is signal.default_int_handler:
+            continue
+        handler = chain(previous)
+        signal.signal(signum, handler)
+        installed[signum] = (handler, previous)
+
+    def undo() -> None:
+        for signum, (handler, previous) in installed.items():
+            if signal.getsignal(signum) is handler:
+                signal.signal(signum, previous)
+
+    return undo
 
 
 def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
@@ -263,9 +327,11 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             job_runner.repo.reclaim_expired(datetime.now(UTC))
         # Nothing drove the runner before Sprint 014, so enqueued enrichment never ran.
         worker = asyncio.create_task(job_runner.run_forever())
+        stop_watching = _watch_for_stop(app)
         try:
             yield
         finally:
+            stop_watching()
             job_runner.stop()
             worker.cancel()
             with contextlib.suppress(asyncio.CancelledError):
