@@ -48,7 +48,7 @@ _SUFFIX_TYPES = {suffix: content_type for content_type, suffix in _COVER_TYPES.i
 
 #: One creator string naming several people: "Martin Kleppmann and Chris Riccomini".
 _CREATOR_SPLIT = re.compile(r"\s+(?:and|&)\s+|\s*;\s*", re.IGNORECASE)
-_TAG = re.compile(r"<[^>]+>")
+_TAG = re.compile(r"<[^<>]+>")  # `[^<>]`, not `[^>]`: linear on a run of `<` (F14)
 _ISBN_PREFIX = re.compile(r"^(?:urn:)?isbn:?\s*", re.IGNORECASE)
 
 

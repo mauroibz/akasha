@@ -109,7 +109,7 @@ _MAX_RATING = 5.0
 _ISO_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 _SHORT_URI = re.compile(r"https://boxd\.it/[A-Za-z0-9]{2,12}/?")
 _FILM_URI = re.compile(r"https://(?:www\.)?letterboxd\.com/film/[a-z0-9][a-z0-9-]*/?")
-_TAG = re.compile(r"<[^>]+>")
+_TAG = re.compile(r"<[^<>]+>")  # `[^<>]`, not `[^>]`: linear on a run of `<` (F14)
 _BLANK_LINES = re.compile(r"\n{3,}")
 _TRUTHY = {"yes", "true", "1"}
 
