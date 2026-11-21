@@ -2,6 +2,11 @@ import { z } from "zod";
 
 import { entryFormats, entryStatuses, type FieldSpec } from "@/api/library";
 
+// The Content-Security-Policy is `script-src 'self'` (Sprint 128): no eval. Zod
+// otherwise probes with `new Function("")` on its first parse, which the browser
+// reports as a violation even though zod catches it and falls back.
+z.config({ jitless: true });
+
 /**
  * Validation for the two detail forms. Technical spec section 8 requires schema
  * validation on every form and that a failed write never silently loses input,

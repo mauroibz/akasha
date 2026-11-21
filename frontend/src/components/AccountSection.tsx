@@ -6,6 +6,7 @@ import {
   changePassword,
   getSessions,
   logoutEverywhere,
+  requireNewPassword,
   revokeSession,
   type AuthSession,
 } from "@/api/auth";
@@ -29,7 +30,10 @@ function ChangePassword({ onChanged }: { onChanged: () => void }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const mutation = useMutation({
-    mutationFn: () => changePassword(current, next),
+    mutationFn: async () => {
+      requireNewPassword(next);
+      await changePassword(current, next);
+    },
     onSuccess: () => {
       setCurrent("");
       setNext("");
@@ -42,7 +46,8 @@ function ChangePassword({ onChanged }: { onChanged: () => void }) {
       <div>
         <h2 className="text-lg font-semibold">Change password</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          This device stays signed in; your other sessions are closed.
+          This device stays signed in; your other sessions are closed. A new
+          password needs at least 12 characters.
         </p>
       </div>
       <form

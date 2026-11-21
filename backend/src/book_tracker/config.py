@@ -57,8 +57,17 @@ class Settings(BaseSettings):
     trusted_proxy_peers: list[str] = Field(default_factory=list)
     trusted_proxy_header: str | None = None
     trusted_header_autocreate: bool = False
+    #: The header a trusted proxy names the real client in (`CF-Connecting-IP`
+    #: behind Cloudflare). Honoured only when the immediate peer is one of
+    #: `trusted_proxy_peers`; otherwise the socket peer is the client (Sprint 128).
+    client_ip_header: str | None = None
     login_max_failures: int = Field(default=5, ge=1)
     login_window_seconds: int = Field(default=300, ge=1)
+    #: How long an unused session lives; each day of use extends it (DEC-146).
+    session_days: int = Field(default=400, ge=1)
+    #: The one-time code first-run setup asks for (Sprint 128, F4). Unset, a
+    #: random one is generated at start and printed in the server log.
+    setup_token: SecretStr | None = None
     admin_username: str | None = None
     admin_password: SecretStr | None = None
     static_dir: Path | None = None

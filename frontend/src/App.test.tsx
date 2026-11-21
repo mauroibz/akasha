@@ -178,6 +178,7 @@ describe("authentication routing", () => {
     await user.type(screen.getByLabelText("Username"), "mauro");
     await user.type(screen.getByLabelText("Display name"), "Mauro");
     await user.type(screen.getByLabelText("Password"), "right password");
+    await user.type(screen.getByLabelText("Setup code"), "k7mq-3xwd-p9hz");
     await user.click(screen.getByRole("button", { name: "Claim library" }));
 
     expect(

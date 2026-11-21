@@ -65,8 +65,9 @@ class SessionRecord:
 
 
 class SessionStore:
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, *, lifetime: timedelta = SESSION_LIFETIME) -> None:
         self.engine = engine
+        self.lifetime = lifetime
 
     def create(
         self,
@@ -76,7 +77,7 @@ class SessionStore:
         now: datetime | None = None,
     ) -> CreatedSession:
         current = now or utc_now()
-        expires_at = current + SESSION_LIFETIME
+        expires_at = current + self.lifetime
         token = secrets.token_urlsafe(32)
         session_id = secrets.token_urlsafe(18)
         with self.engine.begin() as connection:
@@ -138,7 +139,7 @@ class SessionStore:
                     ),
                     {
                         "seen": timestamp(current),
-                        "expires": timestamp(current + SESSION_LIFETIME),
+                        "expires": timestamp(current + self.lifetime),
                         "id": row["id"],
                         "previous_seen": row["last_seen_at"],
                     },
