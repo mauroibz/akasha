@@ -5,16 +5,24 @@
 # home network only: never to the internet, never through a port forward, and
 # never behind a reverse proxy that terminates on a public address.
 #
-# Exposing it beyond a trusted LAN requires all three of: AKASHA_AUTH=on,
-# TLS terminating in front, and the session cookie Secure
-# (AKASHA_COOKIE_SECURE=true). Authentication alone is not permission to
-# publish; see the runbook's auth section before changing any of this.
+# Exposing it beyond a trusted LAN requires all four of: AKASHA_AUTH=on, TLS
+# terminating in front, the session cookie Secure (AKASHA_COOKIE_SECURE=true),
+# and setup completed (or the admin bootstrapped from the environment) before
+# the hostname is published (DEC-180). Authentication alone is not permission
+# to publish. For the internet, use the compose.public.yaml overlay and the
+# runbook's "Publishing on the internet" section, not a port forward.
 #
 # A host that has joined a VPN or mesh network (WireGuard, Tailscale, ZeroTier
 # and the like) carries an extra interface, and AKASHA_BIND=0.0.0.0 publishes
 # on that one too — a port reachable from outside the building without anyone
 # having forwarded anything. To exclude it, bind AKASHA_BIND to one address
 # rather than to everything.
+#
+# Containment (Sprint 128): the root filesystem is read-only, every Linux
+# capability is dropped, privileges cannot be regained, and memory, CPU and
+# process count are capped. The process can write only /data, /backups and a
+# small /tmp; its own code is root's. A compromised process still holds the
+# library, so this bounds the damage, it does not undo it.
 #
 # Copy .env.example to .env and set USER_AGENT_CONTACT before the first start.
 
@@ -83,6 +91,8 @@ services:
       - AKASHA_SQLITE_BUSY_TIMEOUT_MS
       - AKASHA_PROVIDER_DAILY_LIMITS
       - AKASHA_METRICS
+      - AKASHA_CF_ACCESS_TEAM_DOMAIN
+      - AKASHA_CF_ACCESS_AUD
       - TMDB_READ_TOKEN
     volumes:
       - data:/data
@@ -96,11 +106,35 @@ services:
       - backups:/backups
       # Calibre is opened read-only in the mount and again in code.
       - "${CALIBRE_DIR:-./calibre}:/calibre:ro"
+    # Containment (Sprint 128, F20). Nothing here changes what the application
+    # does; it narrows what a compromised process could do to the host.
+    #
+    # The root filesystem is read-only: the process writes only to the volumes
+    # above and to this /tmp. The image points TMPDIR at /data/tmp, so uploads
+    # and imports spool to the data volume; /tmp is a small RAM-backed scratch
+    # space for libraries that insist on it, and nothing there can be executed.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777,noexec,nosuid,nodev
+    # No Linux capabilities at all — the process runs as an unprivileged user
+    # and binds port 8000, which needs none — and no way to gain any back
+    # through a setuid binary.
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    # Ceilings, not reservations: a runaway import or a decompression bomb
+    # stops at the cap instead of starving the rest of the server. Raise them
+    # in .env if a very large import needs more; the defaults are well above
+    # what a normal library uses. One CPU is all a single-worker Python
+    # process uses anyway, and is accepted on any host.
+    mem_limit: ${AKASHA_MEM_LIMIT:-1536m}
+    cpus: ${AKASHA_CPUS:-1.0}
+    pids_limit: ${AKASHA_PIDS_LIMIT:-256}
     restart: unless-stopped
     init: true
     stop_grace_period: 20s
     labels:
-      org.akasha.security-boundary: "Auth off by default; no internet-reachable proxy, DNS or port forward unless AKASHA_AUTH=on, TLS terminates in front, and the cookie is Secure"
+      org.akasha.security-boundary: "Auth off by default; no internet-reachable proxy, DNS or port forward unless AKASHA_AUTH=on, TLS terminates in front, the cookie is Secure, and setup is completed before publishing"
 
 volumes:
   data:

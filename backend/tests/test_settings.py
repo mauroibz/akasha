@@ -114,6 +114,9 @@ COMPOSE_SIDE = {
     "AKASHA_BACKUP_VOLUME",
     "AKASHA_LOG_MAX_SIZE",
     "AKASHA_LOG_MAX_FILE",
+    "AKASHA_MEM_LIMIT",
+    "AKASHA_CPUS",
+    "AKASHA_PIDS_LIMIT",
 }
 # Read by scripts/backup.sh from the process environment, not by the app.
 SCRIPT_SIDE = {"BACKUP_RETENTION"}

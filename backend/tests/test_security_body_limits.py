@@ -75,9 +75,14 @@ async def _chunked(data: bytes, size: int = 64 * 1024) -> AsyncIterator[bytes]:
 async def test_an_oversized_unauthenticated_login_is_refused_before_it_is_read(
     tmp_path: Path,
 ) -> None:
-    async with running(tmp_path, auth="on") as client:
+    async with running(tmp_path, auth="on", setup_token="body-limit-setup-code") as client:
         setup = await client.post(
-            "/api/auth/setup", json={"username": "admin", "password": "pw-123456789"}
+            "/api/auth/setup",
+            json={
+                "username": "admin",
+                "password": "pw-123456789",
+                "setup_code": "body-limit-setup-code",
+            },
         )
         assert setup.status_code in (200, 201), setup.text
         client.cookies.clear()
