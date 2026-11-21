@@ -505,10 +505,18 @@ export interface DetectedFile {
   matches: { importer: string; confidence: number }[];
 }
 
+/**
+ * How much of each file the server reads to recognise it (`SNIFF_BYTES`). Only that
+ * window is sent: the route caps its body at 50 such windows (Sprint 128, F7).
+ */
+const DETECT_WINDOW_BYTES = 64 * 1024;
+
 /** Which importer each file belongs to, most confident first (Sprint 095). */
 export async function detectImporters(files: File[]): Promise<DetectedFile[]> {
   const body = new FormData();
-  for (const file of files) body.append("files", file);
+  for (const file of files.slice(0, 50)) {
+    body.append("files", file.slice(0, DETECT_WINDOW_BYTES), file.name);
+  }
   const response = await request("/api/import/detect", {
     method: "POST",
     headers: { Accept: "application/json" },
