@@ -1,6 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
-  QueryClient,
   QueryClientProvider,
   useQuery,
   useQueryClient,
@@ -27,6 +26,7 @@ import { HomePage } from "@/pages/HomePage";
 import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
+import { createQueryClient } from "@/lib/queryClient";
 
 // `/` is the screen the application opens on, so it stays in the entry chunk.
 // Everything else is reached by a deliberate navigation and can arrive then:
@@ -126,7 +126,7 @@ function RouteFallback() {
   );
 }
 
-const queryClient = new QueryClient();
+const queryClient = createQueryClient();
 
 function authenticatedState(user: AuthUser): AuthState {
   return {
