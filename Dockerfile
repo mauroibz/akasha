@@ -63,4 +63,9 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 CMD ["pyt
 # forwarded headers from 127.0.0.1 only. Never set FORWARDED_ALLOW_IPS=*: every client
 # could then name its own address. The application reads a client address header only
 # from AKASHA_TRUSTED_PROXY_PEERS. --no-server-header drops the version banner.
-CMD ["uvicorn", "book_tracker.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-server-header"]
+#
+# --timeout-graceful-shutdown (Sprint 129): uvicorn waits for open responses before it
+# shuts the application down. The application ends its event streams as soon as the
+# stop signal arrives; this is the bound for anything else, and 10 s keeps the whole
+# stop inside compose's 20 s stop_grace_period, so it never ends in SIGKILL mid-job.
+CMD ["uvicorn", "book_tracker.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-server-header", "--timeout-graceful-shutdown", "10"]

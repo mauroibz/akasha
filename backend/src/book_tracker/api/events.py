@@ -9,6 +9,7 @@ browser's EventSource reconnects by itself, so no connection outlives its welcom
 """
 
 import asyncio
+import contextlib
 import json
 import time
 from collections.abc import AsyncIterator
@@ -33,6 +34,12 @@ async def events(request: Request, user: CurrentUser) -> StreamingResponse:
     lifetime = float(getattr(request.app.state, "event_stream_seconds", DEFAULT_STREAM_SECONDS))
     repo = JobRepository(request.app.state.engine)
     user_id = user.effective_user_id
+    # Set when the server is told to stop (Sprint 129). uvicorn waits for open
+    # responses before it shuts the application down, so a stream that kept going
+    # for its full lifetime held every restart until the container was killed.
+    shutting_down: asyncio.Event = getattr(request.app.state, "shutting_down", None) or (
+        asyncio.Event()
+    )
 
     async def stream() -> AsyncIterator[str]:
         deadline = time.monotonic() + lifetime
@@ -42,7 +49,7 @@ async def events(request: Request, user: CurrentUser) -> StreamingResponse:
         # what was already sent at the cursor's moment is not sent twice.
         sent_at_cursor: set[tuple[str, str]] = set()
         yield "retry: 3000\n\n"
-        while time.monotonic() < deadline:
+        while time.monotonic() < deadline and not shutting_down.is_set():
             if await request.is_disconnected():
                 return
             for job in await off_loop(repo.changes_for_user, user_id, since=cursor):
@@ -58,7 +65,10 @@ async def events(request: Request, user: CurrentUser) -> StreamingResponse:
             if time.monotonic() - last_sent > KEEPALIVE_SECONDS:
                 last_sent = time.monotonic()
                 yield ": keep-alive\n\n"
-            await asyncio.sleep(POLL_SECONDS)
+            # The poll interval, cut short by a stop: the stream ends and the
+            # browser's EventSource reconnects to whatever comes up next.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(shutting_down.wait(), POLL_SECONDS)
 
     return StreamingResponse(
         stream(),

@@ -4,11 +4,14 @@ import asyncio
 import contextlib
 import logging
 import secrets
+import signal
 import sqlite3
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+from types import FrameType
 from typing import Any
 
 from fastapi import FastAPI
@@ -180,6 +183,48 @@ def _warn_about_insecure_cookie(configured: Settings) -> None:
         )
 
 
+def _watch_for_stop(app: FastAPI) -> Callable[[], None]:
+    """Set `app.state.shutting_down` the moment the server is told to stop (Sprint 129).
+
+    uvicorn handles SIGTERM itself and only shuts the application down once every
+    open response has finished, which an event stream does after minutes. The
+    application cannot see the server's `should_exit`, so it chains onto the handler
+    the server installed: the event is set, and the server's handler then runs
+    exactly as before. Only a handler something else installed is chained, never
+    the interpreter's default, and only from the main thread, where signal handlers
+    live. Returns the undo, which puts the server's handler back.
+    """
+    event = asyncio.Event()
+    app.state.shutting_down = event
+    if threading.current_thread() is not threading.main_thread():
+        return lambda: None
+    loop = asyncio.get_running_loop()
+    installed: dict[int, tuple[Any, Any]] = {}
+
+    def chain(previous: Callable[[int, FrameType | None], Any]) -> Callable[..., Any]:
+        def handler(signum: int, frame: FrameType | None) -> Any:
+            with contextlib.suppress(RuntimeError):  # the loop may already be closed
+                loop.call_soon_threadsafe(event.set)
+            return previous(signum, frame)
+
+        return handler
+
+    for signum in (signal.SIGTERM, signal.SIGINT):
+        previous = signal.getsignal(signum)
+        if not callable(previous) or previous is signal.default_int_handler:
+            continue
+        handler = chain(previous)
+        signal.signal(signum, handler)
+        installed[signum] = (handler, previous)
+
+    def undo() -> None:
+        for signum, (handler, previous) in installed.items():
+            if signal.getsignal(signum) is handler:
+                signal.signal(signum, previous)
+
+    return undo
+
+
 def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -282,9 +327,11 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             job_runner.repo.reclaim_expired(datetime.now(UTC))
         # Nothing drove the runner before Sprint 014, so enqueued enrichment never ran.
         worker = asyncio.create_task(job_runner.run_forever())
+        stop_watching = _watch_for_stop(app)
         try:
             yield
         finally:
+            stop_watching()
             job_runner.stop()
             worker.cancel()
             with contextlib.suppress(asyncio.CancelledError):

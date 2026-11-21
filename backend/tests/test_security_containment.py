@@ -141,6 +141,9 @@ def test_the_image_does_not_hand_its_code_to_the_application_user() -> None:
     command = [line for line in dockerfile.splitlines() if line.startswith("CMD ")][-1]
     assert "proxy-headers" not in command
     assert "forwarded-allow-ips" not in command
+    # Sprint 129: a bound on how long open responses may hold up a stop, well inside
+    # compose's stop_grace_period, so a stop never ends in SIGKILL mid-job.
+    assert '"--timeout-graceful-shutdown", "10"' in command
 
 
 def test_compose_contains_the_container() -> None:
