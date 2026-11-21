@@ -58,6 +58,18 @@ jobs:
           name: playwright-traces
           path: /tmp/akasha-playwright-results
           retention-days: 7
+  # Known vulnerabilities in the shipped dependencies (Sprint 129). Its own job,
+  # so a new advisory reads as exactly that and not as a broken test.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with: { node-version: "22" }
+      - run: make audit
   container:
     runs-on: ubuntu-latest
     steps:
