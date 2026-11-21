@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel
 
+from book_tracker.api.identity import current_user
 from book_tracker.application.library import LibraryError
 from book_tracker.application.providers import (
     InvalidResolution,
@@ -16,7 +17,9 @@ from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
 from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import ProviderPayloadError
 
-router = APIRouter(prefix="/api")
+# Every route names its principal (Sprint 128): a request that slipped past the
+# middleware still answers 401 rather than reaching a handler.
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
 
 class SourceRefResponse(BaseModel):
