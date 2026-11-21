@@ -24,6 +24,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO
 
+from book_tracker.infrastructure.durable import fsync_directory
+
 ATTACHMENTS_DIR = "attachments"
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -112,6 +114,15 @@ class BlobWriter:
     def commit(self) -> StoredBlob:
         if self._handle is None or self._temporary is None:
             raise AttachmentError("attachment could not be stored")
+        try:
+            # The bytes reach the disk before the rename, and the rename before the
+            # row that names the blob commits (Sprint 129): SQLite fsyncs its commit,
+            # so without this a power loss can keep the row over a zero-length blob.
+            self._handle.flush()
+            os.fsync(self._handle.fileno())
+        except OSError as error:
+            self.abort()
+            raise AttachmentError("attachment could not be stored") from error
         self._handle.close()
         self._handle = None
         if self._written == 0:
@@ -121,12 +132,15 @@ class BlobWriter:
         target = blob_path(self._data_dir, digest)
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
-            if target.is_file():
+            if target.is_file() and _holds(target, digest, self._written):
                 # These bytes are already stored. Keep the copy that is there and
                 # let the temporary go: identical content is one blob (DEC-048).
                 self.abort()
-                return StoredBlob(sha256=digest, byte_size=target.stat().st_size)
+                return StoredBlob(sha256=digest, byte_size=self._written)
+            # Absent, or present but not the bytes its name promises (left empty by
+            # a power loss, or rotten): these bytes take its place.
             os.replace(self._temporary, target)
+            fsync_directory(target.parent)
         except OSError as error:
             self.abort()
             raise AttachmentError("attachment could not be stored") from error
@@ -147,6 +161,22 @@ class BlobWriter:
 
     def __exit__(self, *_: object) -> None:
         self.abort()
+
+
+def _holds(target: Path, digest: str, size: int) -> bool:
+    """Whether a stored blob is really the bytes its digest names.
+
+    The size check is free and catches the power-loss case (an empty blob); the
+    hash catches the rest. A blob is at most the upload cap, so hashing it is cheap
+    next to the upload that just arrived.
+    """
+    if target.stat().st_size != size:
+        return False
+    digest_now = hashlib.sha256()
+    with target.open("rb") as stored:
+        for chunk in iter(lambda: stored.read(1024 * 1024), b""):
+            digest_now.update(chunk)
+    return digest_now.hexdigest() == digest
 
 
 def store_blob(content: bytes, data_dir: Path) -> StoredBlob:

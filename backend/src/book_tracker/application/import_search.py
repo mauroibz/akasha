@@ -40,7 +40,7 @@ from book_tracker.domain.importers import Importer
 from book_tracker.domain.providers import SearchCandidate
 from book_tracker.domain.registry import DOMAINS, IMPORTERS
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
-from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
+from book_tracker.infrastructure.models import ImportBatchRow, ImportProposalRow, ImportRecordRow
 from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.infrastructure.repositories import ImportRepository
@@ -103,7 +103,7 @@ class ImportSearchHandler:
         loaded = await off_loop(self._load_batch, job_id, batch_id, user_id)
         if isinstance(loaded, dict):
             return loaded
-        importer, rows = loaded
+        importer, rows, answered = loaded
 
         imports = ImportRepository(self.engine, user_id)
         searched = 0
@@ -115,6 +115,13 @@ class ImportSearchHandler:
             await off_loop(
                 self.repo.record_progress, job_id, {"searched": index, "total": len(rows)}
             )
+            if row.id in answered:
+                # Answered by an earlier run of this job — one deferred on quota or
+                # reclaimed after a crash (Sprint 129). Searching it again would
+                # spend the budget the job waited for, and replace proposals the
+                # owner may already have picked from.
+                searched += 1
+                continue
             payload = json.loads(row.normalized_payload)
             title = str(payload.get("item", {}).get("title") or "").strip()
             creators = payload.get("item", {}).get("metadata", {}).get("creators") or []
@@ -225,8 +232,9 @@ class ImportSearchHandler:
 
     def _load_batch(
         self, job_id: str, batch_id: str, user_id: int
-    ) -> dict[str, Any] | tuple[Importer | None, list[ImportRecordRow]]:
-        """The batch's importer and rows, or the job's result when there is nothing to do."""
+    ) -> dict[str, Any] | tuple[Importer | None, list[ImportRecordRow], set[int]]:
+        """The batch's importer, its rows, and the rows that already have proposals;
+        or the job's result when there is nothing to do."""
         importer: Importer | None = None
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
@@ -245,13 +253,21 @@ class ImportSearchHandler:
             if batch.state == "undone":
                 self.repo.cancel(job_id)
                 return {"state": "cancelled"}
-            return importer, list(
+            rows = list(
                 session.scalars(
                     select(ImportRecordRow)
                     .where(ImportRecordRow.batch_id == batch_id)
                     .order_by(ImportRecordRow.row_number)
                 )
             )
+            answered = set(
+                session.scalars(
+                    select(ImportProposalRow.record_id)
+                    .where(ImportProposalRow.batch_id == batch_id)
+                    .distinct()
+                )
+            )
+            return importer, rows, answered
 
     def _reopen_batch(self, batch_id: str) -> None:
         with self.engine.begin() as connection:

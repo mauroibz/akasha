@@ -53,6 +53,9 @@ services:
       # sidecar's address; anyone else sending it is ignored.
       - AKASHA_CLIENT_IP_HEADER=CF-Connecting-IP
       - AKASHA_TRUSTED_PROXY_PEERS=["172.30.10.2"]
+      # A device left signed in on the internet stays signed in for a month of
+      # disuse, not 400 days (Sprint 129). Each day of use still extends it.
+      - AKASHA_SESSION_DAYS=${AKASHA_SESSION_DAYS:-30}
     dns:
       - 1.1.1.1
       - 9.9.9.9

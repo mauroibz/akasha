@@ -420,6 +420,44 @@ class TestTheJob:
         assert provider.queries == []
 
     @pytest.mark.anyio
+    async def test_a_resumed_job_does_not_search_rows_it_already_answered(
+        self, tmp_path: Path
+    ) -> None:
+        """Sprint 129: a job deferred on quota, or reclaimed after a crash, ran
+        again from row 0 — spending the budget it was waiting for on rows that
+        already had proposals, and replacing proposals the owner may have picked
+        from. A row with proposals is answered; the resumed job starts after it."""
+        engine = make_engine(tmp_path)
+        stage_preview(
+            engine,
+            [
+                {"title": "Rayuela", "author": "Julio Cortázar"},
+                {"title": "Ficciones", "author": "Jorge Luis Borges"},
+            ],
+        )
+        jobs = JobRepository(engine)
+        first = FakeProvider([candidate("Rayuela", "OL1M")])
+        quota = ProviderQuota(engine, limits={"openlibrary": 1})
+        job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
+        # One row's budget: the first row is answered, the second defers the job.
+        assert (await make_handler(engine, [first], quota=quota).process(job_id, NOW))[
+            "state"
+        ] == "deferred"
+        assert first.queries == ["Rayuela Julio Cortázar"]
+        before = ImportRepository(engine, 1).proposals_for_batch("b1")
+
+        tomorrow = NOW.replace(day=NOW.day + 1)
+        resumed = FakeProvider([candidate("Ficciones", "OL2M")])
+        result = await make_handler(engine, [resumed], quota=quota).process(job_id, tomorrow)
+
+        assert result["state"] == "succeeded"
+        assert resumed.queries == ["Ficciones Jorge Luis Borges"]
+        after = ImportRepository(engine, 1).proposals_for_batch("b1")
+        assert [p for p in after if p["record_id"] == before[0]["record_id"]] == before
+        assert result["progress"]["searched"] == 2
+        assert result["progress"]["total"] == 2
+
+    @pytest.mark.anyio
     async def test_progress_is_written_as_each_row_finishes(self, tmp_path: Path) -> None:
         """The screen reads the job's progress while it runs (Sprint 088); written
         only at completion, it said nothing until there was nothing left to say."""

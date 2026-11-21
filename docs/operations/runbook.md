@@ -90,6 +90,16 @@ cannot be written the application refuses to migrate and exits, which is
 deliberate: an unprotected schema rewrite on a database full of your own ratings
 is worse than downtime.
 
+The whole upgrade runs in one SQLite transaction, schema changes included: a
+migration that fails part-way (disk full, a killed container) leaves the
+database exactly at the revision it started from, and the next start simply
+tries again. Under `restart: unless-stopped` that retry loop does not pile up
+backups: a start reuses an existing pre-migration copy only while it still holds
+exactly what the live database holds (its manifest records a content digest).
+Once the library has changed since — for example after a rollback and some weeks
+on the previous version — the next upgrade takes a fresh copy, and the log line
+is `pre_migration_backup_written` rather than `pre_migration_backup_reused`.
+
 Migration `0007` rewrites every row in `items`. On a library of a few thousand
 books it takes well under a second; the log line to look for is
 `pre_migration_backup_written`.
@@ -414,7 +424,8 @@ and must never run with auth off; it has its own recovery path,
 [When you are locked out](#when-you-are-locked-out).
 
 **Sessions, and signing a device out.** Each sign-in lasts 400 days and slides
-forward while in use, so a regularly used device never asks again. The
+forward while in use, so a regularly used device never asks again
+(`AKASHA_SESSION_DAYS` changes the 400; the public overlay sets 30). The
 account section (top-right name → *Account*) lists every signed-in device with
 its last use and user agent: *Revoke* ends one, *Sign out everywhere* ends
 them all. Use it when a phone is lost.
@@ -733,6 +744,24 @@ command again; it removes the loopback port and restores the Access check.
 
 None of these stands alone, and none is a reason to skip another.
 
+### Watching for attacks
+
+Every refusal at Akasha's own door leaves one JSON line with
+`"category": "security"`: `login_failed`, `login_rate_limited`,
+`login_succeeded`, `setup_code_invalid`, `setup_rate_limited`,
+`password_change_failed`, `password_change_rate_limited` and
+`cross_site_request_refused`, each with the `client` address the limiter used
+and, for logins, the `username` tried (never a password). Requests refused by
+the Access check log `cloudflare_access_refused`.
+
+```bash
+docker compose logs akasha | grep '"category": "security"'
+```
+
+A burst of `login_failed` from one address, or `login_succeeded` from an
+address you do not recognise, is the reason to look at *Account → Sessions*
+and revoke. These lines are what a log alert or fail2ban filter should match.
+
 ## Metrics
 
 Set `AKASHA_METRICS=on` in `.env` and restart to serve Prometheus text at `/metrics`. It reports
@@ -747,6 +776,28 @@ forces `AKASHA_METRICS=off`.
 *Search is running on fewer providers* on the Add page now also names a configured provider that
 has stopped answering. That is a provider outage, not a fault in Akasha: searches keep working on
 the other providers, and the notice clears once the provider answers again.
+
+## Durability and caching (Sprint 129)
+
+- **Upgrades are one transaction.** A migration that fails leaves the database at the
+  revision it started from, so the next start retries cleanly instead of looping on a
+  half-applied schema.
+- **SQLite runs `synchronous=NORMAL` under WAL.** A power cut can lose the last few
+  commits but cannot corrupt the database. Covers and attachment files are synced to
+  disk before the rows that point at them commit, and a damaged attachment blob is
+  replaced when the same file is uploaded again.
+- **Interrupted imports finish themselves.** Covers and ebooks are installed after an
+  import commits; if the process dies part-way, the next start completes the install.
+  A batch's staging folder is never removed while it still holds uninstalled files (the
+  log says `import staging kept`, retried once an hour).
+- **Jobs:** a cancelled job stays cancelled; a job whose lease keeps expiring (it
+  crashes the process) is failed with `lease_expired` after its retries.
+- **Stopping** takes well under ten seconds even with a tab open (`/api/events` ends at
+  shutdown; uvicorn's graceful shutdown is bounded at 10 s).
+- **Caching and compression:** `/assets/*` is immutable for a year (file names carry a
+  content hash); the page shell, `sw.js` and `theme-init.js` revalidate every load.
+  Responses over 1 KB are gzip-compressed, except images, downloads and `/api/events`.
+  A reverse proxy or Cloudflare can pass compressed responses through unchanged.
 
 ## When something is wrong
 

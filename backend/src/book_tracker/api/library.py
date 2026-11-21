@@ -287,8 +287,12 @@ class FacetsResponse(BaseModel):
 class EntryListResponse(BaseModel):
     items: list[EntryResponse]
     next_cursor: str | None
-    total: int
-    facets: FacetsResponse
+    #: The filtered library's size and counts: on the first page only. A page asked
+    #: for with `after` carries `null` for both, because every screen reads them
+    #: from its first page and recounting the library per scroll was most of a
+    #: later page's cost (Sprint 129).
+    total: int | None
+    facets: FacetsResponse | None
 
 
 class InsightRowResponse(BaseModel):
@@ -1179,8 +1183,7 @@ def list_item_types() -> list[ItemTypeResponse]:
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
 def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
-    item = library_for(request, user).get_item(item_id)
-    if not item["cover_url"]:
+    if not library_for(request, user).has_cover(item_id):
         raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
     if not target.is_file():

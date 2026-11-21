@@ -67,13 +67,14 @@ export function PlaySection({
   });
 
   const games: Game[] = [];
-  if (score !== null && scored.data && scored.data.total >= 2)
+  const scoredTotal = scored.data?.total ?? 0;
+  if (score !== null && scored.data && scoredTotal >= 2)
     games.push({
       key: "best",
       to: `/rank/${type}/${score}`,
       question: `Which ${score} is your best ${score}?`,
       label: `Which ${score} is your best ${score}?`,
-      meta: `${countLabel(scored.data.total, type, types)} · pick one of two`,
+      meta: `${countLabel(scoredTotal, type, types)} · pick one of two`,
       covers: scored.data.items,
     });
   const old = revisit.data?.cards ?? [];
@@ -92,7 +93,7 @@ export function PlaySection({
       covers: old.slice(0, 3).map((card) => card.entry),
     });
   }
-  if (pile.data && pile.data.total > 0)
+  if (pile.data && (pile.data.total ?? 0) > 0)
     games.push({
       key: "pile",
       to: "/deck/planned",

@@ -75,7 +75,9 @@ from book_tracker.infrastructure.models import (
 )
 
 #: What tells one edition's title from another's, as `work_key` sets it aside.
-_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
+# No bracket inside the note: a run of unclosed ones then stops at the next one
+# instead of rescanning to the end of the title (linear, Sprint 129).
+_EDITION_NOTE = re.compile(r"[(\[][^()\[\]]*[)\]]")
 
 #: The room a score leaves for ranks inside it in the library's score sort (Sprint 116).
 SCORE_RANK_SPAN = 1_000_000
@@ -83,6 +85,16 @@ SCORE_RANK_SPAN = 1_000_000
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+#: How many ids one `IN (...)` list carries. SQLite builds before 3.32 cap a
+#: statement at 999 bound variables; 500 leaves room for the other parameters.
+_IN_CHUNK = 500
+
+
+def _chunked(values: Sequence[int]) -> Iterator[Sequence[int]]:
+    for start in range(0, len(values), _IN_CHUNK):
+        yield values[start : start + _IN_CHUNK]
 
 
 MAX_FILENAME_LENGTH = 255
@@ -334,6 +346,24 @@ class LibraryService:
     def _entry_dict(self, session: Session, entry: EntryRow) -> dict[str, Any]:
         item = self._item(session, entry.item_id)
         domain = self._domain(session, entry)
+        return self._entry_payload(
+            entry,
+            self._item_dict(session, item),
+            loan=self._open_loan(session, entry.id),
+            shelves=self._shelves_for_entry(session, entry.id),
+            formats=self._formats_for_entry(session, entry.id, domain),
+        )
+
+    @staticmethod
+    def _entry_payload(
+        entry: EntryRow,
+        item: dict[str, Any],
+        *,
+        loan: dict[str, Any] | None,
+        shelves: list[dict[str, Any]],
+        formats: list[str],
+    ) -> dict[str, Any]:
+        """The entry as the API shows it, from parts already read (one entry or many)."""
         return {
             "id": entry.id,
             "item_id": entry.item_id,
@@ -351,11 +381,124 @@ class LibraryService:
             "location": entry.location,
             "score_rank": entry.score_rank,
             "unknown_fields": json.loads(entry.unknown_fields) if entry.unknown_fields else [],
-            "loan": self._open_loan(session, entry.id),
-            "item": self._item_dict(session, item),
-            "shelves": self._shelves_for_entry(session, entry.id),
-            "formats": self._formats_for_entry(session, entry.id, domain),
+            "loan": loan,
+            "item": item,
+            "shelves": shelves,
+            "formats": formats,
         }
+
+    def _entry_dicts(self, session: Session, entries: Sequence[EntryRow]) -> list[dict[str, Any]]:
+        """`_entry_dict` for many entries at once, in the order given (Sprint 129).
+
+        The same payload, built by the same two builders, from one `IN (...)` query
+        per related table instead of seven queries per entry: a library page of a
+        hundred went from about 700 queries to six. The entries must already be this
+        person's (every caller selects them by `user_id`), which is all `_item`'s
+        ownership join would check one at a time.
+        """
+        if not entries:
+            return []
+        entry_ids = list(dict.fromkeys(entry.id for entry in entries))
+        item_ids = list(dict.fromkeys(entry.item_id for entry in entries))
+        items: dict[int, ItemRow] = {}
+        identifiers: dict[int, list[Any]] = {}
+        sources: dict[int, list[Any]] = {}
+        for chunk in _chunked(item_ids):
+            items.update(
+                (row.id, row)
+                for row in session.scalars(select(ItemRow).where(ItemRow.id.in_(chunk)))
+            )
+            # Ordered as the per-item queries read their covering indexes, so a kind
+            # held twice resolves to the value the single-entry path shows.
+            for row in session.execute(
+                select(
+                    ItemIdentifierRow.item_id,
+                    ItemIdentifierRow.kind,
+                    ItemIdentifierRow.normalized_value,
+                )
+                .where(ItemIdentifierRow.item_id.in_(chunk))
+                .order_by(
+                    ItemIdentifierRow.item_id,
+                    ItemIdentifierRow.kind,
+                    ItemIdentifierRow.normalized_value,
+                )
+            ):
+                identifiers.setdefault(row.item_id, []).append(row)
+            for source_row in session.execute(
+                select(
+                    ItemSourceRow.item_id,
+                    ItemSourceRow.source,
+                    ItemSourceRow.source_id,
+                    ItemSourceRow.is_primary,
+                )
+                .where(ItemSourceRow.item_id.in_(chunk))
+                .order_by(ItemSourceRow.item_id, ItemSourceRow.source)
+            ):
+                sources.setdefault(source_row.item_id, []).append(source_row)
+        loans: dict[int, dict[str, Any]] = {}
+        shelves: dict[int, list[dict[str, Any]]] = {}
+        formats: dict[int, set[str]] = {}
+        for chunk in _chunked(entry_ids):
+            for loan in session.scalars(
+                select(LoanRow).where(LoanRow.entry_id.in_(chunk), LoanRow.returned_on.is_(None))
+            ):
+                loans[loan.entry_id] = self._loan_dict(loan)
+            for entry_id, shelf in session.execute(
+                select(EntryShelfRow.entry_id, ShelfRow)
+                .join(ShelfRow, ShelfRow.id == EntryShelfRow.shelf_id)
+                .where(EntryShelfRow.entry_id.in_(chunk))
+                .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
+            ):
+                shelves.setdefault(entry_id, []).append(self._shelf_dict(shelf))
+            for entry_id, value in session.execute(
+                select(EntryFormatRow.entry_id, EntryFormatRow.format).where(
+                    EntryFormatRow.entry_id.in_(chunk)
+                )
+            ):
+                formats.setdefault(entry_id, set()).add(value)
+        payloads = []
+        for entry in entries:
+            item = items.get(entry.item_id)
+            if item is None:
+                raise LibraryError("item_not_found", "Item was not found", status_code=404)
+            domain = DOMAINS.get(str(item.type))
+            if domain is None:
+                raise LibraryError("unknown_item_type", f"No domain describes {item.type!r}")
+            held = formats.get(entry.id, set())
+            payloads.append(
+                self._entry_payload(
+                    entry,
+                    # Built per entry, as the single-entry path does: no two payloads
+                    # share a nested dict a caller could edit through the other.
+                    self._item_payload(
+                        item, identifiers.get(item.id, []), sources.get(item.id, [])
+                    ),
+                    loan=dict(loans[entry.id]) if entry.id in loans else None,
+                    shelves=[dict(shelf) for shelf in shelves.get(entry.id, [])],
+                    formats=[row.value for row in domain.formats if row.value in held],
+                )
+            )
+        return payloads
+
+    def _entry_dicts_by_id(
+        self, session: Session, entry_ids: Sequence[int]
+    ) -> list[dict[str, Any]]:
+        """This person's entries by id, in the order asked (Sprint 129).
+
+        An id that is not theirs is a 404, as `get_entry` answers one at a time.
+        """
+        unique = list(dict.fromkeys(entry_ids))
+        rows: dict[int, EntryRow] = {}
+        for chunk in _chunked(unique):
+            rows.update(
+                (row.id, row)
+                for row in session.scalars(
+                    select(EntryRow).where(EntryRow.id.in_(chunk), EntryRow.user_id == self.user_id)
+                )
+            )
+        if len(rows) != len(unique):
+            raise LibraryError("entry_not_found", "Entry was not found", status_code=404)
+        return self._entry_dicts(session, [rows[entry_id] for entry_id in entry_ids])
 
     @staticmethod
     def _item_dict(session: Session, item: ItemRow) -> dict[str, Any]:
@@ -369,6 +512,13 @@ class LibraryService:
                 ItemSourceRow.item_id == item.id
             )
         ).all()
+        return LibraryService._item_payload(item, identifiers, sources)
+
+    @staticmethod
+    def _item_payload(
+        item: ItemRow, identifiers: Sequence[Any], sources: Sequence[Any]
+    ) -> dict[str, Any]:
+        """The item as the API shows it, from rows already read (one item or many)."""
         metadata = json.loads(item.metadata_json)
         legacy_publishers = metadata.pop("publishers", None)
         if not metadata.get("publisher") and isinstance(legacy_publishers, list):
@@ -492,7 +642,7 @@ class LibraryService:
                     params,
                 )
             ]
-        return [self.get_entry(entry_id) for entry_id in ids]
+        return self._get_entries(ids)
 
     def diary(self, year: int) -> dict[str, Any]:
         """What was finished in `year`, by month, newest first (Sprint 098).
@@ -523,10 +673,11 @@ class LibraryService:
                 {"user": self.user_id, "prefix": f"{year:04d}-%"},
             ).all()
         months: dict[str, dict[str, Any]] = {}
-        for entry_id, month, item_type in rows:
+        built = self._get_entries([row[0] for row in rows])
+        for (_entry_id, month, item_type), entry in zip(rows, built, strict=True):
             bucket = months.setdefault(month, {"month": month, "counts": {}, "entries": []})
             bucket["counts"][item_type] = bucket["counts"].get(item_type, 0) + 1
-            bucket["entries"].append(self.get_entry(entry_id))
+            bucket["entries"].append(entry)
         return {"year": year, "years": years, "months": list(months.values())}
 
     #: How long a score looked at rests before it comes back (Sprint 121, DEC-178).
@@ -569,10 +720,7 @@ class LibraryService:
                 if undated or formatless:
                     found.append(entry_id)
             return {
-                "entries": [
-                    self._entry_dict(session, self._entry(session, entry_id))
-                    for entry_id in found[:limit]
-                ],
+                "entries": self._entry_dicts_by_id(session, found[:limit]),
                 "total": len(found),
             }
 
@@ -615,13 +763,12 @@ class LibraryService:
                 ),
                 parameters,
             ).all()
+            shown = rows[:limit]
+            built = self._entry_dicts_by_id(session, [row[0] for row in shown])
             return {
                 "cards": [
-                    {
-                        "entry": self._entry_dict(session, self._entry(session, entry_id)),
-                        "scored_at": scored_at,
-                    }
-                    for entry_id, scored_at in rows[:limit]
+                    {"entry": entry, "scored_at": scored_at}
+                    for (_entry_id, scored_at), entry in zip(shown, built, strict=True)
                 ],
                 "total": len(rows),
             }
@@ -662,8 +809,14 @@ class LibraryService:
 
             def entry(entry_id: int) -> dict[str, Any]:
                 if entry_id not in entries:
-                    entries[entry_id] = self._entry_dict(session, self._entry(session, entry_id))
+                    prefetch([entry_id])
                 return entries[entry_id]
+
+            def prefetch(entry_ids: Sequence[int]) -> None:
+                wanted = [
+                    entry_id for entry_id in dict.fromkeys(entry_ids) if entry_id not in entries
+                ]
+                entries.update(zip(wanted, self._entry_dicts_by_id(session, wanted), strict=True))
 
             counts: dict[str, int] = {}
             scores = [0] * 10
@@ -684,6 +837,13 @@ class LibraryService:
             )[:5]
             leader = max(creators.values(), key=len, default=[])
             notes_said = [row for row in changed if row[4]]
+            written_ids = [row[0] for row in rows if row[5] and row[5].strip()]
+            # Every entry this answer shows, read in one batch rather than one by one.
+            prefetch(
+                [row[0] for row in best]
+                + [row[0] for row in changed]
+                + ([notes_said[-1][0]] if notes_said else written_ids[-1:])
+            )
             quote = None
             if notes_said:
                 said = notes_said[-1]
@@ -774,10 +934,10 @@ class LibraryService:
             more = len(rows) > limit
             rows = rows[:limit]
             entries: dict[int, dict[str, Any]] = {}
+            wanted = list(dict.fromkeys(row[3] for row in rows))
+            entries.update(zip(wanted, self._entry_dicts_by_id(session, wanted), strict=True))
             events = []
             for _key, kind, at, entry_id, score, previous, reason, note in rows:
-                if entry_id not in entries:
-                    entries[entry_id] = self._entry_dict(session, self._entry(session, entry_id))
                 entry = entries[entry_id]
                 events.append(
                     {
@@ -836,11 +996,16 @@ class LibraryService:
                     )
                     if row[0] not in ids
                 )
-        return [self.get_entry(entry_id) for entry_id in ids[:limit]]
+        return self._get_entries(ids[:limit])
 
     def get_entry(self, entry_id: int) -> dict[str, Any]:
         with Session(self.engine) as session:
             return self._entry_dict(session, self._entry(session, entry_id))
+
+    def _get_entries(self, entry_ids: Sequence[int]) -> list[dict[str, Any]]:
+        """`get_entry` for many ids: one session and one batch, not one of each per id."""
+        with Session(self.engine) as session:
+            return self._entry_dicts_by_id(session, entry_ids)
 
     def update_entry(self, entry_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
@@ -995,6 +1160,23 @@ class LibraryService:
     def get_item(self, item_id: int) -> dict[str, Any]:
         with Session(self.engine) as session:
             return self._item_dict(session, self._item(session, item_id))
+
+    def has_cover(self, item_id: int) -> bool:
+        """Whether a reachable item has a stored cover: one column, one query.
+
+        The cover route's check (Sprint 129). The same reach as `_item`: an item is
+        found only through this person's entry when that is required, else a 404.
+        """
+        query = select(ItemRow.cover_path).where(ItemRow.id == item_id)
+        if self.item_access_requires_entry:
+            query = query.join(EntryRow, EntryRow.item_id == ItemRow.id).where(
+                EntryRow.user_id == self.user_id
+            )
+        with self.engine.connect() as connection:
+            row = connection.execute(query).first()
+        if row is None:
+            raise LibraryError("item_not_found", "Item was not found", status_code=404)
+        return bool(row.cover_path)
 
     def update_item(self, item_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
@@ -1330,12 +1512,11 @@ class LibraryService:
             )
             if open_only:
                 query = query.where(LoanRow.returned_on.is_(None))
+            loans = list(session.scalars(query))
+            entries = self._entry_dicts_by_id(session, [loan.entry_id for loan in loans])
             return [
-                {
-                    **self._loan_dict(loan),
-                    "entry": self._entry_dict(session, self._entry(session, loan.entry_id)),
-                }
-                for loan in session.scalars(query)
+                {**self._loan_dict(loan), "entry": entry}
+                for loan, entry in zip(loans, entries, strict=True)
             ]
 
     def locations(self) -> list[dict[str, Any]]:
@@ -1372,7 +1553,7 @@ class LibraryService:
                 entry.score_rank = place
                 entry.updated_at = _now()
             session.flush()
-            return [self._entry_dict(session, entry) for entry in entries]
+            return self._entry_dicts(session, entries)
 
     # -- Duplicates (Sprint 113, DEC-176) ------------------------------------------
 
@@ -1416,10 +1597,8 @@ class LibraryService:
                 for high in ids[index + 1 :]
                 if (low, high) not in dismissed
             ]
-            entries = {
-                entry_id: self._entry_dict(session, self._entry(session, entry_id))
-                for entry_id in {entry_id for pair in pairs for entry_id in pair}
-            }
+            wanted = sorted({entry_id for pair in pairs for entry_id in pair})
+            entries = dict(zip(wanted, self._entry_dicts_by_id(session, wanted), strict=True))
             return [
                 {"a": entries[low], "b": entries[high], "reason": "Same title and creator"}
                 for low, high in sorted(pairs)
@@ -2026,9 +2205,13 @@ class LibraryService:
         lent: bool = False,
         missing_cover: bool = False,
         exact_score: int | None = None,
+        columns: Sequence[Any] = (EntryRow,),
     ) -> Any:
+        # `columns` lets a count aggregate over this join directly instead of
+        # wrapping it in a subquery and joining `items` a second time (Sprint 129).
         query = (
-            select(EntryRow)
+            select(*columns)
+            .select_from(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
@@ -2208,8 +2391,13 @@ class LibraryService:
             entries = list(session.scalars(query))
             has_more = len(entries) > limit
             entries = entries[:limit]
-            total_query = select(func.count()).select_from(
-                self._filtered_entries(
+            # The counts describe the whole filtered library, not a page, and every
+            # screen reads them from its first page; a page asked for with a cursor
+            # carries `None` rather than recounting the library per scroll (Sprint 129).
+            total: int | None = None
+            facets: dict[str, Any] | None = None
+            if state is None:
+                total_query = self._filtered_entries(
                     statuses,
                     shelves,
                     q,
@@ -2221,63 +2409,66 @@ class LibraryService:
                     lent=lent,
                     missing_cover=missing_cover,
                     exact_score=exact_score,
+                    columns=(func.count(),),
                 )
-                .order_by(None)
-                .subquery()
-            )
-            total = session.scalar(total_query) or 0
-            # Each facet clears its own dimension, so a count reads as "what you would
-            # get if you clicked this" rather than as a count of the current page.
-            # `type` is deliberately *cleared* here while every other filter is kept.
-            # The two consumers below both need to see across the selected domain:
-            # `status_counts` is the whole-library total the inbox badge means, and
-            # narrowing it would make the badge disagree with `/triage`, which is
-            # domain-agnostic; `status_counts_by_type` is already split by type, so a
-            # tab that is *not* selected still has a live count to show.
-            facet_base = self._filtered_entries(
-                [],
-                shelves,
-                q,
-                formats,
-                location=location,
-                lent=lent,
-                missing_cover=missing_cover,
-                exact_score=exact_score,
-            ).subquery()
-            # Grouped by the item's type as well as the status, because a status two
-            # domains share is not one number on a screen that lists them separately:
-            # a wishlisted record counted under "Book · Wishlist" is a wrong answer
-            # the walkthrough caught. `status_counts` stays the whole-library total,
-            # which is what the inbox badge means.
-            facet_rows = session.execute(
-                select(facet_base.c.status, ItemRow.type, func.count())
-                .join(ItemRow, ItemRow.id == facet_base.c.item_id)
-                .group_by(facet_base.c.status, ItemRow.type)
-            ).all()
-            status_counts: dict[str, int] = {}
-            by_type: dict[str, dict[str, int]] = {}
-            for status_value, item_type, count in facet_rows:
-                status_counts[status_value] = status_counts.get(status_value, 0) + count
-                by_type.setdefault(item_type, {})[status_value] = count
-            # The format selector sits *under* the tab, so this one keeps the type
-            # filter: offering "Physical 312" while the library is showing records is
-            # an answer to a question nobody asked.
-            format_base = self._filtered_entries(
-                statuses,
-                shelves,
-                q,
-                (),
-                types,
-                location=location,
-                lent=lent,
-                missing_cover=missing_cover,
-                exact_score=exact_score,
-            ).subquery()
-            format_rows = session.execute(
-                select(EntryFormatRow.format, func.count())
-                .join(format_base, format_base.c.id == EntryFormatRow.entry_id)
-                .group_by(EntryFormatRow.format)
-            ).all()
+                total = session.scalar(total_query) or 0
+                # Each facet clears its own dimension, so a count reads as "what you would
+                # get if you clicked this" rather than as a count of the current page.
+                # `type` is deliberately *cleared* here while every other filter is kept.
+                # The two consumers below both need to see across the selected domain:
+                # `status_counts` is the whole-library total the inbox badge means, and
+                # narrowing it would make the badge disagree with `/triage`, which is
+                # domain-agnostic; `status_counts_by_type` is already split by type, so a
+                # tab that is *not* selected still has a live count to show.
+                facet_base = self._filtered_entries(
+                    [],
+                    shelves,
+                    q,
+                    formats,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
+                    exact_score=exact_score,
+                    columns=(EntryRow.status, ItemRow.type, func.count()),
+                )
+                # Grouped by the item's type as well as the status, because a status two
+                # domains share is not one number on a screen that lists them separately:
+                # a wishlisted record counted under "Book · Wishlist" is a wrong answer
+                # the walkthrough caught. `status_counts` stays the whole-library total,
+                # which is what the inbox badge means.
+                facet_rows = session.execute(
+                    facet_base.group_by(EntryRow.status, ItemRow.type)
+                ).all()
+                status_counts: dict[str, int] = {}
+                by_type: dict[str, dict[str, int]] = {}
+                for status_value, item_type, count in facet_rows:
+                    status_counts[status_value] = status_counts.get(status_value, 0) + count
+                    by_type.setdefault(item_type, {})[status_value] = count
+                # The format selector sits *under* the tab, so this one keeps the type
+                # filter: offering "Physical 312" while the library is showing records is
+                # an answer to a question nobody asked.
+                format_base = self._filtered_entries(
+                    statuses,
+                    shelves,
+                    q,
+                    (),
+                    types,
+                    location=location,
+                    lent=lent,
+                    missing_cover=missing_cover,
+                    exact_score=exact_score,
+                    columns=(EntryFormatRow.format, func.count()),
+                )
+                format_rows = session.execute(
+                    format_base.join(
+                        EntryFormatRow, EntryFormatRow.entry_id == EntryRow.id
+                    ).group_by(EntryFormatRow.format)
+                ).all()
+                facets = {
+                    "status_counts": status_counts,
+                    "status_counts_by_type": by_type,
+                    "format_counts": {row[0]: row[1] for row in format_rows},
+                }
             next_cursor = None
             if has_more and entries:
                 last = entries[-1]
@@ -2309,14 +2500,10 @@ class LibraryService:
                     )
                 )
             return {
-                "items": [self._entry_dict(session, entry) for entry in entries],
+                "items": self._entry_dicts(session, entries),
                 "next_cursor": next_cursor,
                 "total": total,
-                "facets": {
-                    "status_counts": status_counts,
-                    "status_counts_by_type": by_type,
-                    "format_counts": {row[0]: row[1] for row in format_rows},
-                },
+                "facets": facets,
             }
 
     def _insight_explode(

@@ -141,6 +141,9 @@ def test_the_image_does_not_hand_its_code_to_the_application_user() -> None:
     command = [line for line in dockerfile.splitlines() if line.startswith("CMD ")][-1]
     assert "proxy-headers" not in command
     assert "forwarded-allow-ips" not in command
+    # Sprint 129: a bound on how long open responses may hold up a stop, well inside
+    # compose's stop_grace_period, so a stop never ends in SIGKILL mid-job.
+    assert '"--timeout-graceful-shutdown", "10"' in command
 
 
 def test_compose_contains_the_container() -> None:
@@ -168,6 +171,7 @@ def test_the_public_overlay_publishes_nothing_and_forces_the_exposure_conditions
         "- AKASHA_METRICS=off",
         "- AKASHA_CLIENT_IP_HEADER=CF-Connecting-IP",
         '- AKASHA_TRUSTED_PROXY_PEERS=["172.30.10.2"]',
+        "- AKASHA_SESSION_DAYS=${AKASHA_SESSION_DAYS:-30}",
         "ipv4_address: 172.30.10.2",
         "internal: true",
         "com.docker.network.bridge.name: br-akasha-eg",

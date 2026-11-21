@@ -1,9 +1,17 @@
 import re
 import unicodedata
+from functools import lru_cache
 from html import unescape
 from html.parser import HTMLParser
 
+#: How many distinct strings each folding function remembers (Sprint 129). They are
+#: pure functions of one string, run per row by the insights UDFs and per title by
+#: duplicate detection, where a library repeats the same creators and publishers.
+#: 65,536 short strings is a few megabytes at most.
+_FOLD_CACHE = 65536
 
+
+@lru_cache(maxsize=_FOLD_CACHE)
 def normalize_text(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value)
     unaccented = "".join(c for c in decomposed if not unicodedata.combining(c))
@@ -15,6 +23,7 @@ def normalize_text(value: str) -> str:
 _GENERIC_QUALIFIER = " general"
 
 
+@lru_cache(maxsize=_FOLD_CACHE)
 def insight_group(value: str) -> str:
     """The value an insight ranking groups on (Sprint 102).
 
@@ -131,9 +140,12 @@ def strip_html(value: str) -> str:
     return "\n\n".join(line for line in lines if line).strip()
 
 
-_EDITION_NOTE = re.compile(r"[(\[][^)\]]*[)\]]")
+# No bracket inside the note: a run of unclosed ones then stops at the next one
+# instead of rescanning to the end of the title (linear, Sprint 129).
+_EDITION_NOTE = re.compile(r"[(\[][^()\[\]]*[)\]]")
 
 
+@lru_cache(maxsize=_FOLD_CACHE)
 def work_key(title: str) -> str:
     """A title as the work's name, without what tells one edition from another.
 

@@ -73,6 +73,10 @@ def _is_usable(payload: ItemPayload) -> bool:
     )
 
 
+class _BatchUndone(Exception):
+    """The job's batch was undone before its fill could be written."""
+
+
 class EnrichmentHandler:
     """Processes enrich_item jobs: fetches provider data and fills only empty fields.
 
@@ -316,7 +320,13 @@ class EnrichmentHandler:
                 return {"state": "deferred", "available_at": until.isoformat()}
             return failure
 
-        written = await off_loop(self._fill_empty_fields, item_id, batch_id, payload_data)
+        try:
+            written = await off_loop(self._fill_empty_fields, item_id, batch_id, payload_data)
+        except _BatchUndone:
+            # Undone while the provider was answering: the same late-job rule as
+            # above, applied at the moment that matters, inside the write.
+            await off_loop(self.repo.cancel, job_id)
+            return {"state": "cancelled"}
         if written is None:
             return {
                 "state": "failed",
@@ -354,6 +364,14 @@ class EnrichmentHandler:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
             session = Session(bind=connection)
             try:
+                # Re-checked under the write lock (Sprint 129): `process` checked
+                # before the provider call, and an undo can land while it answers.
+                # Under BEGIN IMMEDIATE no undo can commit between this read and
+                # the fill below.
+                if batch_id is not None:
+                    batch = session.get(ImportBatchRow, batch_id)
+                    if batch is not None and batch.state == "undone":
+                        raise _BatchUndone(batch_id)
                 item = session.get(ItemRow, item_id)
                 if item is not None:
                     needs_cover = not item.cover_path
