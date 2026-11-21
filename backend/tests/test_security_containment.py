@@ -168,6 +168,7 @@ def test_the_public_overlay_publishes_nothing_and_forces_the_exposure_conditions
         "- AKASHA_METRICS=off",
         "- AKASHA_CLIENT_IP_HEADER=CF-Connecting-IP",
         '- AKASHA_TRUSTED_PROXY_PEERS=["172.30.10.2"]',
+        "- AKASHA_SESSION_DAYS=${AKASHA_SESSION_DAYS:-30}",
         "ipv4_address: 172.30.10.2",
         "internal: true",
         "com.docker.network.bridge.name: br-akasha-eg",
