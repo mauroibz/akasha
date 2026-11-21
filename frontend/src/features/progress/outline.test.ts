@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemType, LibraryEntry } from "@/api/library";
-import { localDay, passageDates } from "@/features/progress/outline";
+import { ApiError } from "@/api/request";
+import {
+  localDay,
+  outlineFailure,
+  passageDates,
+} from "@/features/progress/outline";
 
 const types = [
   { id: "series", entry_fields: ["date_started", "date_finished"] },
@@ -63,5 +68,24 @@ describe("passageDates", () => {
 
   it("reads the day in the reader's own time zone", () => {
     expect(localDay(new Date(2026, 0, 5, 0, 10))).toBe("2026-01-05");
+  });
+});
+
+describe("outlineFailure", () => {
+  it("says why a shared item cannot be changed, in the server's words", () => {
+    const shared = new ApiError(
+      "Other people track this item; ask an admin to change its shared details",
+      "item_shared",
+      { status: 403 },
+    );
+    expect(outlineFailure(shared, "episode")).toBe(
+      "Other people track this item; ask an admin to change its shared details",
+    );
+  });
+
+  it("keeps the generic sentence for a provider that could not be reached", () => {
+    expect(outlineFailure(new Error("boom"), "episode")).toBe(
+      "The episode list could not be reached. Try again later.",
+    );
   });
 });

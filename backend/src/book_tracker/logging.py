@@ -10,6 +10,7 @@ import structlog
 # gets copied around, pasted into an issue and kept forever.
 REDACTED_KEYS = frozenset(
     {
+        "admin_password",
         "api_key",
         "authorization",
         "body",
@@ -28,6 +29,7 @@ REDACTED_KEYS = frozenset(
         "row",
         "rows",
         "secret",
+        "tmdb_read_token",
         "token",
     }
 )
@@ -37,14 +39,26 @@ _HANDLER_NAME = "book-tracker-json"
 # key, because the failure this guards against is someone logging a provider
 # response under `data` and nobody noticing for a year.
 MAX_VALUE_LENGTH = 512
+# A rendered traceback is not a payload, and its last line is the one that says
+# what went wrong, so it gets a larger cap and keeps its tail rather than its head.
+MAX_EXCEPTION_LENGTH = 8192
+# Loggers uvicorn configures for itself before the application starts — with
+# their own handlers and propagation off, so their lines (an unhandled request
+# exception among them) bypassed the JSON handler and the scrubber (Sprint 128, F19).
+UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access")
 
 _scrub_values: tuple[str, ...] = ()
 
 
+def _scrub(value: str) -> str:
+    for secret in _scrub_values:
+        value = value.replace(secret, REDACTION)
+    return value
+
+
 def _redact_value(value: Any) -> Any:
     if isinstance(value, str):
-        for secret in _scrub_values:
-            value = value.replace(secret, REDACTION)
+        value = _scrub(value)
         if len(value) > MAX_VALUE_LENGTH:
             return f"{value[:MAX_VALUE_LENGTH]}…[truncated {len(value)} chars]"
         return value
@@ -52,11 +66,23 @@ def _redact_value(value: Any) -> Any:
         return {key: _redact_entry(key, inner) for key, inner in value.items()}
     if isinstance(value, (list, tuple)):
         return [_redact_value(inner) for inner in value]
-    return value
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    # Anything else would be rendered by the JSON renderer's `repr` fallback after
+    # this step, unscrubbed — an exception passed as a field carries its message,
+    # and that message is where a key in a URL ends up. Render it here instead.
+    return _redact_value(repr(value))
 
 
 def _redact_entry(key: str, value: Any) -> Any:
-    return REDACTION if key.lower() in REDACTED_KEYS else _redact_value(value)
+    if key.lower() in REDACTED_KEYS:
+        return REDACTION
+    if key == "exception" and isinstance(value, str):
+        value = _scrub(value)
+        if len(value) > MAX_EXCEPTION_LENGTH:
+            return f"[truncated {len(value)} chars]…{value[-MAX_EXCEPTION_LENGTH:]}"
+        return value
+    return _redact_value(value)
 
 
 def redact_sensitive(
@@ -66,6 +92,8 @@ def redact_sensitive(
 
     Applied as the last processor before rendering so it also covers the `extra`
     fields stdlib callers attach, which is where most of this data would arrive.
+    Exceptions are rendered to text before this runs (`format_exc_info`), so a
+    traceback is scrubbed like any other string.
     """
     return {key: _redact_entry(key, value) for key, value in event_dict.items()}
 
@@ -93,6 +121,9 @@ def configure_logging(level: str, *, scrub: tuple[str, ...] = ()) -> None:
         foreign_pre_chain=[*shared, structlog.stdlib.ExtraAdder()],
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            # Before redaction, not after: `exc_info` is a tuple holding the
+            # exception object, which the scrubber cannot see into.
+            structlog.processors.format_exc_info,
             redact_sensitive,
             structlog.processors.JSONRenderer(),
         ],
@@ -108,6 +139,11 @@ def configure_logging(level: str, *, scrub: tuple[str, ...] = ()) -> None:
         root.removeHandler(existing)
     root.addHandler(handler)
     root.setLevel(level.upper())
+    for name in UVICORN_LOGGERS:
+        uvicorn_logger = logging.getLogger(name)
+        for existing in list(uvicorn_logger.handlers):
+            uvicorn_logger.removeHandler(existing)
+        uvicorn_logger.propagate = True
 
     structlog.configure(
         processors=[

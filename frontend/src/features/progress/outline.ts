@@ -59,6 +59,9 @@ export function isAbandoned(
 export function outlineFailure(error: Error, unit: string): string {
   if (error instanceof ApiError && error.code === "outline_unavailable")
     return `No ${unit} list was found for this one.`;
+  // Another person tracks it too, so only an admin may change it (DEC-180).
+  if (error instanceof ApiError && error.code === "item_shared")
+    return error.message;
   return `The ${unit} list could not be reached. Try again later.`;
 }
 

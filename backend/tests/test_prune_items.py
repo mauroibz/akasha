@@ -112,6 +112,7 @@ def attach(data_dir: Path, item_id: int, content: bytes = CONTENT) -> str:
         session.add(
             AttachmentRow(
                 item_id=item_id,
+                user_id=1,
                 filename="book.epub",
                 byte_size=stored.byte_size,
                 sha256=stored.sha256,

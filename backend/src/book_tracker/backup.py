@@ -150,6 +150,12 @@ def verify_backup(path: Path) -> dict[str, Any]:
     return manifest
 
 
+def _is_empty_scratch(child: Path) -> bool:
+    """The image's empty TMPDIR (`/data/tmp`, Sprint 128) seeds every new named
+    volume; on its own it does not make a restore target occupied."""
+    return child.name == "tmp" and child.is_dir() and not any(child.iterdir())
+
+
 def restore_backup(path: Path, *, into: Path) -> dict[str, Any]:
     """Restore a verified backup into an empty directory.
 
@@ -161,7 +167,7 @@ def restore_backup(path: Path, *, into: Path) -> dict[str, Any]:
     hand-edited manifest.
     """
     manifest = verify_backup(path)
-    if into.exists() and any(into.iterdir()):
+    if into.exists() and any(not _is_empty_scratch(child) for child in into.iterdir()):
         raise BackupError(f"{into} is not empty; restore into an empty directory")
     into.mkdir(parents=True, exist_ok=True)
     (into / DATABASE_NAME).write_bytes((path / DATABASE_NAME).read_bytes())

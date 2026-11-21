@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import ipaddress
+import hmac
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -15,7 +15,17 @@ from pydantic import BaseModel, Field, SecretStr, field_validator
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
-from book_tracker.api.identity import AdminUser, CurrentUser
+from book_tracker.api.identity import (
+    SECURE_SESSION_COOKIE_NAME,
+    AdminUser,
+    CurrentUser,
+    client_address,
+    peer_is_trusted,
+    request_uses_https,
+    session_cookie_name,
+    session_store,
+    session_token,
+)
 from book_tracker.api.library import ErrorResponse
 from book_tracker.application.library import LibraryError
 from book_tracker.application.passwords import hash_password, verify_password
@@ -23,13 +33,25 @@ from book_tracker.application.sessions import (
     SESSION_COOKIE_NAME,
     SESSION_LIFETIME,
     SessionIdentity,
-    SessionStore,
     timestamp,
     utc_now,
 )
 from book_tracker.infrastructure.offload import off_loop
 
 COOKIE_NAME = SESSION_COOKIE_NAME
+SECURE_COOKIE_NAME = SECURE_SESSION_COOKIE_NAME
+#: The shortest password a new credential may have (Sprint 128, F11). Sign-in
+#: keeps accepting whatever was set before, so no existing account is locked out.
+MIN_PASSWORD_LENGTH = 12
+
+__all__ = [
+    "COOKIE_NAME",
+    "SECURE_COOKIE_NAME",
+    "LoginRateLimiter",
+    "client_address",
+    "peer_is_trusted",
+    "request_uses_https",
+]
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 users_router = APIRouter(prefix="/api/users", tags=["users"])
 
@@ -53,8 +75,14 @@ class LoginBody(BaseModel):
         return value
 
 
+NewPassword = Annotated[SecretStr, Field(min_length=MIN_PASSWORD_LENGTH, max_length=1024)]
+
+
 class SetupBody(LoginBody):
+    password: NewPassword
     display_name: str | None = Field(default=None, max_length=100)
+    #: Printed in the server log at start (F4); without it setup answers 403.
+    setup_code: SecretStr | None = Field(default=None, max_length=200)
 
 
 class MeResponse(BaseModel):
@@ -79,6 +107,7 @@ class UserSummary(UserResponse):
 
 
 class CreateUserBody(LoginBody):
+    password: NewPassword
     display_name: str | None = Field(default=None, max_length=100)
     is_admin: bool = False
 
@@ -86,12 +115,12 @@ class CreateUserBody(LoginBody):
 class UpdateUserBody(BaseModel):
     display_name: str | None = Field(default=None, max_length=100)
     is_admin: bool | None = None
-    password: SecretStr | None = Field(default=None, min_length=1, max_length=1024)
+    password: NewPassword | None = None
 
 
 class ChangePasswordBody(BaseModel):
     current_password: SecretStr = Field(min_length=1, max_length=1024)
-    new_password: SecretStr = Field(min_length=1, max_length=1024)
+    new_password: NewPassword
 
 
 class DeleteUserBody(BaseModel):
@@ -156,22 +185,6 @@ def _acting_as_response(identity: SessionIdentity) -> UserResponse | None:
     )
 
 
-def peer_is_trusted(request: Request, configured_peers: list[str]) -> bool:
-    if request.client is None:
-        return False
-    try:
-        peer = ipaddress.ip_address(request.client.host)
-    except ValueError:
-        return False
-    for configured in configured_peers:
-        try:
-            if peer in ipaddress.ip_network(configured, strict=False):
-                return True
-        except ValueError:
-            continue
-    return False
-
-
 def strip_untrusted_identity_header(
     request: Request, configured_header: str | None, configured_peers: list[str]
 ) -> None:
@@ -184,22 +197,13 @@ def strip_untrusted_identity_header(
     ]
 
 
-def request_uses_https(request: Request) -> bool:
-    override = request.app.state.cookie_secure
-    if override is not None:
-        return bool(override)
-    scheme = request.url.scheme
-    forwarded = request.headers.get("x-forwarded-proto")
-    if forwarded and peer_is_trusted(request, request.app.state.trusted_proxy_peers):
-        scheme = forwarded.split(",", 1)[0].strip().casefold()
-    return scheme == "https"
-
-
 def set_session_cookie(response: Response, request: Request, token: str) -> None:
+    # `__Host-` when Secure: Path=/ and no Domain, which the browser enforces (F12).
+    lifetime = getattr(request.app.state, "session_lifetime", SESSION_LIFETIME)
     response.set_cookie(
-        COOKIE_NAME,
+        session_cookie_name(request),
         token,
-        max_age=int(SESSION_LIFETIME.total_seconds()),
+        max_age=int(lifetime.total_seconds()),
         path="/",
         secure=request_uses_https(request),
         httponly=True,
@@ -209,7 +213,7 @@ def set_session_cookie(response: Response, request: Request, token: str) -> None
 
 def clear_session_cookie(response: Response, request: Request) -> None:
     response.set_cookie(
-        COOKIE_NAME,
+        session_cookie_name(request),
         "",
         max_age=0,
         expires=0,
@@ -221,7 +225,19 @@ def clear_session_cookie(response: Response, request: Request) -> None:
 
 
 class LoginRateLimiter:
-    """A per-username and per-peer fixed window for failed logins."""
+    """Failed password checks, counted per (username, client), username and client.
+
+    Sprint 128 (F3, F10, F21) redesigned it around four rules:
+
+    - a limited request is refused *before* any password is verified, so a 429
+      says nothing about whether the guess was right, and it is still counted;
+    - the lock that stops a guesser is the (username, client) pair, so the owner
+      signing in from another address is not refused while someone else is;
+    - a username-wide cap (``username_factor`` times the pair maximum) bounds a
+      distributed attack, and a per-client cap bounds one client spraying names;
+    - memory is bounded: checks never create a bucket, expired buckets are
+      dropped, and past ``max_keys`` the oldest bucket is evicted.
+    """
 
     def __init__(
         self,
@@ -229,29 +245,87 @@ class LoginRateLimiter:
         window_seconds: int,
         *,
         clock: Callable[[], float] = time.monotonic,
+        username_factor: int = 10,
+        client_factor: int = 4,
+        max_keys: int = 10_000,
     ) -> None:
         self.maximum = maximum
         self.window_seconds = window_seconds
         self.clock = clock
-        self.failures: defaultdict[str, deque[float]] = defaultdict(deque)
+        self.username_maximum = maximum * username_factor
+        self.client_maximum = maximum * client_factor
+        self.max_keys = max_keys
+        self._buckets: OrderedDict[str, deque[float]] = OrderedDict()
 
-    def _bucket(self, key: str) -> deque[float]:
-        now = self.clock()
-        bucket = self.failures[key]
+    def _keys(self, username: str, client: str) -> tuple[tuple[str, int], ...]:
+        return (
+            (f"pair:{username}\x00{client}", self.maximum),
+            (f"username:{username}", self.username_maximum),
+            (f"client:{client}", self.client_maximum),
+        )
+
+    def _count(self, key: str, now: float) -> int:
+        bucket = self._buckets.get(key)
+        if bucket is None:
+            return 0
         while bucket and bucket[0] <= now - self.window_seconds:
             bucket.popleft()
-        return bucket
+        if not bucket:
+            del self._buckets[key]
+            return 0
+        return len(bucket)
 
-    def username_limited(self, username: str) -> bool:
-        return len(self._bucket(f"username:{username}")) >= self.maximum
+    def _record(self, key: str, limit: int, now: float) -> None:
+        self._count(key, now)
+        bucket = self._buckets.get(key)
+        if bucket is None:
+            while len(self._buckets) >= self.max_keys:
+                self._buckets.popitem(last=False)
+            bucket = self._buckets[key] = deque(maxlen=limit)
+        else:
+            self._buckets.move_to_end(key)
+        bucket.append(now)
 
-    def peer_limited(self, peer: str) -> bool:
-        return len(self._bucket(f"peer:{peer}")) >= self.maximum
-
-    def fail(self, username: str, peer: str) -> None:
+    def limited(self, username: str, client: str) -> bool:
         now = self.clock()
-        self._bucket(f"username:{username}").append(now)
-        self._bucket(f"peer:{peer}").append(now)
+        return any(self._count(key, now) >= limit for key, limit in self._keys(username, client))
+
+    def fail(self, username: str, client: str) -> None:
+        now = self.clock()
+        for key, limit in self._keys(username, client):
+            self._record(key, limit, now)
+
+    def refused(self, username: str, client: str) -> None:
+        """Count an attempt made while limited, without verifying it.
+
+        The pair and client buckets keep filling, so a client that keeps
+        hammering stays refused; the username-wide bucket does not, so one
+        refused client cannot by itself lock the owner out from everywhere.
+        """
+        now = self.clock()
+        pair, _username, client_key = self._keys(username, client)
+        for key, limit in (pair, client_key):
+            self._record(key, limit, now)
+
+    def succeed(self, username: str, client: str) -> None:
+        self._buckets.pop(self._keys(username, client)[0][0], None)
+
+    def prune(self) -> None:
+        now = self.clock()
+        for key in list(self._buckets):
+            self._count(key, now)
+
+    def key_count(self) -> int:
+        return len(self._buckets)
+
+
+#: The limiter's "username" for setup-code guesses, which no real account can
+#: have (usernames are normalized visible text; this holds a NUL).
+SETUP_LIMIT_KEY = "\x00setup"
+
+
+def rate_limited() -> JSONResponse:
+    return error_response(429, "login_rate_limited", "Too many failed login attempts")
 
 
 def _lookup_user(engine: Engine, username: str) -> dict[str, Any] | None:
@@ -381,20 +455,29 @@ async def login(
 ) -> UserResponse | JSONResponse:
     require_auth_mode(request)
     username = normalize_username(body.username)
-    user = await off_loop(_lookup_user, request.app.state.engine, username)
-    peer = request.client.host if request.client is not None else "unknown"
+    client = client_address(request)
     limiter: LoginRateLimiter = request.app.state.login_limiter
-    if limiter.username_limited(username) or (user is None and limiter.peer_limited(peer)):
-        return error_response(429, "login_rate_limited", "Too many failed login attempts")
+    # Refused before any verification, and counted: a 429 never says whether
+    # the guess was right (F3).
+    if limiter.limited(username, client):
+        limiter.refused(username, client)
+        return rate_limited()
+    user = await off_loop(_lookup_user, request.app.state.engine, username)
     password_matches = await _credentials_match(user, body.password.get_secret_value())
     if not password_matches:
-        if limiter.peer_limited(peer):
-            return error_response(429, "login_rate_limited", "Too many failed login attempts")
-        limiter.fail(username, peer)
+        limiter.fail(username, client)
         return unauthenticated()
     assert user is not None
+    limiter.succeed(username, client)
+    store = session_store(request)
+    presented = session_token(request)
+    if presented:
+        # A session the browser arrived with is never carried across a sign-in:
+        # it may have been planted (session fixation, F21).
+        await off_loop(store.delete, presented)
+    request.state.suppress_session_cookie = True
     created = await off_loop(
-        SessionStore(request.app.state.engine).create,
+        store.create,
         int(user["id"]),
         user_agent=request.headers.get("user-agent"),
     )
@@ -415,9 +498,9 @@ async def login(
 )
 def logout(request: Request) -> Response:
     require_auth_mode(request)
-    token = request.cookies.get(COOKIE_NAME)
+    token = session_token(request)
     if token:
-        SessionStore(request.app.state.engine).delete(token)
+        session_store(request).delete(token)
     response = Response(status_code=204)
     clear_session_cookie(response, request)
     return response
@@ -439,7 +522,7 @@ def list_sessions(request: Request, user: CurrentUser) -> list[SessionResponse]:
             user_agent=session.user_agent,
             current=session.id == current_session_id,
         )
-        for session in SessionStore(request.app.state.engine).list_for_user(user.user_id)
+        for session in session_store(request).list_for_user(user.user_id)
     ]
 
 
@@ -452,7 +535,7 @@ def list_sessions(request: Request, user: CurrentUser) -> list[SessionResponse]:
 )
 def logout_everywhere(request: Request, user: CurrentUser) -> Response:
     require_auth_mode(request)
-    SessionStore(request.app.state.engine).delete_all(user.user_id)
+    session_store(request).delete_all(user.user_id)
     request.state.suppress_session_cookie = True
     response = Response(status_code=204)
     clear_session_cookie(response, request)
@@ -468,7 +551,7 @@ def logout_everywhere(request: Request, user: CurrentUser) -> Response:
 )
 def revoke_session(session_id: str, request: Request, user: CurrentUser) -> Response:
     require_auth_mode(request)
-    if SessionStore(request.app.state.engine).delete_for_user(user.user_id, session_id) != 1:
+    if session_store(request).delete_for_user(user.user_id, session_id) != 1:
         raise LibraryError("session_not_found", "Session was not found", status_code=404)
     response = Response(status_code=204)
     if session_id == getattr(request.state, "session_id", None):
@@ -483,8 +566,8 @@ def me(request: Request) -> MeResponse:
     needs_setup = not has_credentialed_user(request.app.state.engine)
     identity = getattr(request.state, "session_identity", None)
     if not isinstance(identity, SessionIdentity):
-        token = request.cookies.get(COOKIE_NAME)
-        identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        token = session_token(request)
+        identity = session_store(request).lookup(token) if token else None
     return MeResponse(
         auth="on",
         authenticated=identity is not None,
@@ -497,12 +580,36 @@ def me(request: Request) -> MeResponse:
 @router.post(
     "/setup",
     response_model=UserResponse,
-    responses={409: {"model": ErrorResponse}},
+    responses={
+        403: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        429: {"model": ErrorResponse},
+    },
 )
 async def setup(
     body: SetupBody, request: Request, response: Response
 ) -> UserResponse | JSONResponse:
     require_auth_mode(request)
+    if await off_loop(has_credentialed_user, request.app.state.engine):
+        return error_response(409, "setup_already_completed", "Initial setup is already complete")
+    client = client_address(request)
+    limiter: LoginRateLimiter = request.app.state.login_limiter
+    if limiter.limited(SETUP_LIMIT_KEY, client):
+        limiter.refused(SETUP_LIMIT_KEY, client)
+        return rate_limited()
+    expected = getattr(request.app.state, "setup_code", None)
+    provided = body.setup_code.get_secret_value().strip() if body.setup_code else ""
+    if not (
+        isinstance(expected, str)
+        and expected
+        and hmac.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+    ):
+        limiter.fail(SETUP_LIMIT_KEY, client)
+        return error_response(
+            403,
+            "setup_code_invalid",
+            "Enter the setup code printed in the server log when Akasha started",
+        )
     credential = await off_loop(hash_password, body.password.get_secret_value())
     user_id = await off_loop(
         _create_admin,
@@ -514,8 +621,9 @@ async def setup(
     )
     if user_id is None:
         return error_response(409, "setup_already_completed", "Initial setup is already complete")
+    request.app.state.setup_code = None
     created = await off_loop(
-        SessionStore(request.app.state.engine).create,
+        session_store(request).create,
         user_id,
         user_agent=request.headers.get("user-agent"),
     )
@@ -671,10 +779,10 @@ async def update_user(
                     text(f"UPDATE users SET {','.join(assignments)} WHERE id=:user_id"), values
                 )
             if credential is not None:
-                SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
-                SessionStore(request.app.state.engine).delete_all(user_id)
+                session_store(request).clear_acting_as_for_user(user_id)
+                session_store(request).delete_all(user_id)
             elif demoting:
-                SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
+                session_store(request).clear_acting_as_for_user(user_id)
         row = _user_by_id(request.app.state.engine, user_id)
         assert row is not None
         return row
@@ -688,19 +796,25 @@ async def update_user(
     status_code=204,
     response_class=Response,
     response_model=None,
-    responses={401: {"model": ErrorResponse}},
+    responses={401: {"model": ErrorResponse}, 429: {"model": ErrorResponse}},
 )
 async def change_password(
     body: ChangePasswordBody, request: Request, user: CurrentUser
 ) -> Response | JSONResponse:
     require_auth_mode(request)
+    client = client_address(request)
+    limiter: LoginRateLimiter = request.app.state.login_limiter
+    if limiter.limited(user.username, client):
+        limiter.refused(user.username, client)
+        return rate_limited()
     row = await off_loop(_user_by_id, request.app.state.engine, user.user_id)
     if not await _credentials_match(row, body.current_password.get_secret_value()):
+        limiter.fail(user.username, client)
         return unauthenticated()
     credential = await off_loop(hash_password, body.new_password.get_secret_value())
-    token = request.cookies.get(COOKIE_NAME)
+    store = session_store(request)
 
-    def persist() -> None:
+    def persist() -> str:
         with request.app.state.engine.begin() as connection:
             connection.execute(
                 text(
@@ -714,12 +828,17 @@ async def change_password(
                     "user_id": user.user_id,
                 },
             )
-        SessionStore(request.app.state.engine).clear_acting_as_for_user(user.user_id)
-        if token:
-            SessionStore(request.app.state.engine).delete_other(user.user_id, token)
+        # Every session ends, the current one included, and the device doing
+        # this gets a fresh one: a token stolen before the change is worth nothing
+        # after it (F21).
+        store.delete_all(user.user_id)
+        return store.create(user.user_id, user_agent=request.headers.get("user-agent")).token
 
-    await off_loop(persist)
-    return Response(status_code=204)
+    new_token = await off_loop(persist)
+    request.state.suppress_session_cookie = True
+    response = Response(status_code=204)
+    set_session_cookie(response, request, new_token)
+    return response
 
 
 @router.post(
@@ -742,8 +861,8 @@ def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Respons
         raise LibraryError(
             "invalid_acting_user", "Choose another person's library", status_code=422
         )
-    token = request.cookies.get(COOKIE_NAME)
-    if token is None or SessionStore(request.app.state.engine).set_acting_as(token, user_id) != 1:
+    token = session_token(request)
+    if token is None or session_store(request).set_acting_as(token, user_id) != 1:
         return unauthenticated()
     return Response(status_code=204)
 
@@ -757,10 +876,10 @@ def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Respons
 )
 def stop_acting_as(request: Request, _admin: AdminUser) -> Response:
     require_auth_mode(request)
-    token = request.cookies.get(COOKIE_NAME)
+    token = session_token(request)
     if token is None:
         return unauthenticated()
-    SessionStore(request.app.state.engine).clear_acting_as(token)
+    session_store(request).clear_acting_as(token)
     return Response(status_code=204)
 
 
@@ -832,6 +951,9 @@ def delete_user(
                 "import_records",
                 "import_effects",
                 "jobs",
+                # Owned since migration 0034 (DEC-180); without this the cascade on the
+                # deleted user would take the transferred library's files with it.
+                "attachments",
             ):
                 connection.execute(
                     text(f"UPDATE {table} SET user_id=:target WHERE user_id=:source"),

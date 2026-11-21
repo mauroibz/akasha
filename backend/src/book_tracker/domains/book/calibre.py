@@ -1,5 +1,7 @@
 import hashlib
 import json
+import re
+import shutil
 import sqlite3
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -26,13 +28,64 @@ from book_tracker.domain.importers import (
 from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
 from book_tracker.domains.book import DOMAIN
-from book_tracker.infrastructure.covers import CoverError, prepare_uploaded_cover
+from book_tracker.infrastructure.covers import (
+    MAX_COVER_BYTES,
+    CoverError,
+    prepare_uploaded_cover,
+)
 
 #: The ebook formats a Calibre library may hand over, in the order one file per book
 #: is picked when a book has several. Epub leads because it is the open one and,
 #: measured on the owner's library, the cheaper one: 95.4 MB against 163 MB for every
 #: format of the same 18 books (DEC-083).
 EBOOK_FORMATS = ("epub", "azw3", "mobi", "pdf", "cbz", "cbr", "txt")
+
+
+#: A Calibre format is a bare extension ("EPUB", "AZW3"). Anything else in the uploaded
+#: `data.format` column is attacker text, never a path fragment (Sprint 128, F1).
+_SAFE_FORMAT = re.compile(r"[A-Za-z0-9]{1,10}")
+
+#: Longest file stem accepted from `data.name`; Calibre caps its own well under this.
+_MAX_FILE_STEM = 200
+
+#: Read and copy size for anything that may be gigabytes long (F21): never one read.
+_COPY_CHUNK = 1024 * 1024
+
+
+def safe_data_file(name: object, book_format: object) -> str | None:
+    """`<name>.<format>` when both are plain, one-segment values; otherwise None.
+
+    `data.name` and `data.format` come straight from an uploaded metadata.db, so they
+    are untrusted. A name is accepted only as a single path segment — no separator of
+    either kind, no NUL, not `.` or `..`, not absolute, of reasonable length — and a
+    format only as a short alphanumeric extension. Callers still confine the resolved
+    path to the book folder; this is the first of two checks, not the only one.
+    """
+    if not isinstance(name, str) or not isinstance(book_format, str):
+        return None
+    stem = name.strip()
+    if (
+        not stem
+        or len(stem) > _MAX_FILE_STEM
+        or stem in (".", "..")
+        or any(character in stem for character in ("/", "\\", "\x00"))
+        or PurePosixPath(stem).is_absolute()
+        or not _SAFE_FORMAT.fullmatch(book_format)
+    ):
+        return None
+    return f"{stem}.{book_format.lower()}"
+
+
+def _connect_untrusted(database: Path) -> sqlite3.Connection:
+    """A read-only connection to a metadata.db someone else may have written.
+
+    `trusted_schema=OFF` stops a crafted schema (views, triggers, generated columns)
+    from calling SQL functions with side effects while it is merely read (F21).
+    """
+    connection = sqlite3.connect(f"file:{quote(str(database))}?mode=ro", uri=True)
+    connection.execute("PRAGMA trusted_schema=OFF")
+    connection.execute("PRAGMA query_only=ON")
+    return connection
 
 
 class CalibreError(ImportReadError):
@@ -148,11 +201,13 @@ class CalibreAdapter:
             ) from error
         if not database.is_relative_to(library) or not database.is_file():
             raise CalibreError("invalid_calibre_path", "Calibre library path is not allowed")
-        data = database.read_bytes()
+        fingerprint = hashlib.sha256()
+        with database.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(_COPY_CHUNK), b""):
+                fingerprint.update(chunk)
         try:
-            connection = sqlite3.connect(f"file:{quote(str(database))}?mode=ro", uri=True)
+            connection = _connect_untrusted(database)
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA query_only=ON")
             query_only = bool(connection.execute("PRAGMA query_only").fetchone()[0])
             tables = {
                 row[0]
@@ -170,7 +225,7 @@ class CalibreAdapter:
         finally:
             if "connection" in locals():
                 connection.close()
-        return CalibreSnapshot(hashlib.sha256(data).hexdigest(), library, records)
+        return CalibreSnapshot(fingerprint.hexdigest(), library, records)
 
     def _records(
         self, connection: sqlite3.Connection, tables: set[str], library: Path, query_only: bool
@@ -206,6 +261,13 @@ class CalibreAdapter:
                 if row[0] and row[1]
             }
             errors: list[dict[str, Any]] = []
+            book_path = str(book["path"] or "") if "path" in columns else ""
+            formats, unsafe_files = self._formats(connection, tables, book_id, book_path)
+            if unsafe_files:
+                # A file name or format that is not one plain path segment refuses the
+                # whole book (F1): that is a crafted database, not a real one.
+                errors.append({"field": "file", "code": "malformed_row"})
+                formats = []
             isbn = None
             if identifiers.get("isbn"):
                 try:
@@ -251,9 +313,7 @@ class CalibreAdapter:
                         score = None
             pubdate = book["pubdate"] if "pubdate" in columns else None
             year = int(str(pubdate)[:4]) if pubdate and str(pubdate)[:4].isdigit() else None
-            book_path = str(book["path"] or "") if "path" in columns else ""
             cover_source = self._cover(library, book_path)
-            formats = self._formats(connection, tables, book_id, book_path)
             records.append(
                 {
                     "row_number": row_number,
@@ -296,8 +356,9 @@ class CalibreAdapter:
     @staticmethod
     def _formats(
         connection: sqlite3.Connection, tables: set[str], book_id: int, book_path: str
-    ) -> list[dict[str, Any]]:
-        """This book's files, in the order one of them would be picked.
+    ) -> tuple[list[dict[str, Any]], int]:
+        """This book's files, in the order one of them would be picked, and how many
+        rows were refused because their name or format is not a plain file name.
 
         Calibre's `data` table holds the format, the stem and the uncompressed size of
         every file it manages, so the whole file list — and what it would cost to send
@@ -306,22 +367,29 @@ class CalibreAdapter:
         has no formats and no files to offer.
         """
         if not book_path or "data" not in tables:
-            return []
-        rows = [
-            {
-                "path": f"{book_path}/{name}.{str(row['format']).lower()}",
-                "size": int(row["uncompressed_size"] or 0),
-                "format": str(row["format"]).lower(),
-            }
-            for row in connection.execute(
-                "SELECT format, name, uncompressed_size FROM data WHERE book=? ORDER BY format",
-                (book_id,),
+            return [], 0
+        rows = []
+        unsafe = 0
+        for row in connection.execute(
+            "SELECT format, name, uncompressed_size FROM data WHERE book=? ORDER BY format",
+            (book_id,),
+        ):
+            if not str(row["name"] or "").strip() or not row["format"]:
+                continue
+            filename = safe_data_file(row["name"], row["format"])
+            if filename is None:
+                unsafe += 1
+                continue
+            rows.append(
+                {
+                    "path": f"{book_path}/{filename}",
+                    "size": int(row["uncompressed_size"] or 0),
+                    "format": str(row["format"]).lower(),
+                }
             )
-            if (name := str(row["name"] or "").strip()) and row["format"]
-        ]
         order = {extension: index for index, extension in enumerate(EBOOK_FORMATS)}
         rows.sort(key=lambda row: (order.get(str(row["format"]), len(order)), row["path"]))
-        return rows
+        return rows, unsafe
 
     @staticmethod
     def _cover(library: Path, book_path: str) -> Path | None:
@@ -409,7 +477,7 @@ def _export_library_key(manifest: Mapping[str, Any]) -> str:
     return candidates[0]
 
 
-def _export_slice(parts_by_number: Mapping[int, Path], entry: Any) -> bytes:
+def _export_slice(parts_by_number: Mapping[int, Path], entry: Any, destination: Path) -> None:
     """One file's bytes, sliced out of the part the manifest says holds them.
 
     The offset is relative to the start of *that* part, never a concatenation across
@@ -417,6 +485,10 @@ def _export_slice(parts_by_number: Mapping[int, Path], entry: Any) -> bytes:
     offset 15186659 length 1216439 matched its manifest SHA-1 exactly. Bounds- and
     hash-checked before a caller ever sees the bytes, because this is the one place an
     untrusted upload's own numbers are trusted enough to seek and read with.
+
+    Copied and hashed in chunks (F21): a slice may legitimately be gigabytes long, and
+    reading it whole would hold all of it in memory. A slice whose checksum fails is
+    removed before the refusal, so nothing unverified is ever left behind.
     """
     try:
         part_number, offset, length, sha1_hex, _mtime = entry
@@ -431,12 +503,20 @@ def _export_slice(parts_by_number: Mapping[int, Path], entry: Any) -> bytes:
     size = part.stat().st_size
     if offset < 0 or length < 0 or offset + length > size:
         raise CalibreError("invalid_calibre_export", "Export manifest entry is out of range")
-    with part.open("rb") as handle:
+    digest = hashlib.sha1()
+    remaining = length
+    with part.open("rb") as handle, destination.open("wb") as out:
         handle.seek(offset)
-        data = handle.read(length)
-    if not isinstance(sha1_hex, str) or hashlib.sha1(data).hexdigest() != sha1_hex.lower():
+        while remaining:
+            chunk = handle.read(min(_COPY_CHUNK, remaining))
+            if not chunk:
+                break
+            digest.update(chunk)
+            out.write(chunk)
+            remaining -= len(chunk)
+    if not isinstance(sha1_hex, str) or digest.hexdigest() != sha1_hex.lower():
+        destination.unlink(missing_ok=True)
         raise CalibreError("invalid_calibre_export", "Export data does not match its checksum")
-    return data
 
 
 class CalibreImporter:
@@ -742,23 +822,26 @@ class CalibreImporter:
         if not isinstance(library_manifest, dict):
             raise CalibreError("invalid_calibre_export", "Export manifest is malformed")
 
-        def slice_of(key: object) -> bytes:
+        def write_slice(key: object, destination: Path) -> None:
             entry = file_metadata.get(key) if isinstance(key, str) else None
             if entry is None:
                 raise CalibreError(
                     "invalid_calibre_export", "Export manifest is missing a required file"
                 )
-            return _export_slice(parts_by_number, entry)
+            _export_slice(parts_by_number, entry, destination)
 
         library = export / "library"
         library.mkdir(parents=True, exist_ok=True)
-        (library / "metadata.db").write_bytes(slice_of(library_manifest.get("metadata.db")))
+        root = library.resolve()
+        write_slice(library_manifest.get("metadata.db"), library / "metadata.db")
 
-        connection = sqlite3.connect(
-            f"file:{quote(str((library / 'metadata.db').resolve()))}?mode=ro", uri=True
-        )
         try:
-            connection.execute("PRAGMA query_only=ON")
+            connection = _connect_untrusted((library / "metadata.db").resolve())
+        except sqlite3.DatabaseError as error:
+            raise CalibreError(
+                "invalid_calibre_export", "Export's metadata.db could not be read"
+            ) from error
+        try:
             tables = {
                 row[0]
                 for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
@@ -769,12 +852,12 @@ class CalibreImporter:
             }
             # Optional, same as `CalibreAdapter._formats` already tolerates: a hand-built
             # or older database simply has no formats and no files to reconstruct.
-            data_rows: dict[int, list[tuple[str, str]]] = {}
+            data_rows: dict[int, list[tuple[object, object]]] = {}
             if "data" in tables:
                 for book_id, book_format, name in connection.execute(
                     "SELECT book, format, name FROM data"
                 ):
-                    data_rows.setdefault(int(book_id), []).append((str(book_format), str(name)))
+                    data_rows.setdefault(int(book_id), []).append((book_format, name))
         except sqlite3.DatabaseError as error:
             raise CalibreError(
                 "invalid_calibre_export", "Export's metadata.db could not be read"
@@ -798,28 +881,33 @@ class CalibreImporter:
                     "invalid_calibre_export", "Export names a book path outside the library"
                 )
             book_dir = (library / book_path).resolve()
-            if not book_dir.is_relative_to(library.resolve()):
+            if not book_dir.is_relative_to(root):
                 raise CalibreError(
                     "invalid_calibre_export", "Export names a book path outside the library"
                 )
             cover_key = formats.get(".cover")
             if isinstance(cover_key, str):
                 book_dir.mkdir(parents=True, exist_ok=True)
-                (book_dir / "cover.jpg").write_bytes(slice_of(cover_key))
+                write_slice(cover_key, book_dir / "cover.jpg")
+            # Only rows whose name and format are a plain file name are ever written
+            # (F1). A refused row is reported by `CalibreAdapter._formats`, which reads
+            # the same table and marks the book, so it is skipped here silently.
             candidates = sorted(
                 (
-                    (book_format, name)
+                    (str(book_format), filename)
                     for book_format, name in data_rows.get(book_id, ())
-                    if book_format.upper() in formats
+                    if (filename := safe_data_file(name, book_format)) is not None
+                    and str(book_format).upper() in formats
                 ),
                 key=lambda row: preference.get(row[0].upper(), len(preference)),
             )
             if candidates:
-                book_format, name = candidates[0]
+                book_format, filename = candidates[0]
+                target = (book_dir / filename).resolve()
+                if target.parent != book_dir or not target.is_relative_to(root):
+                    continue
                 book_dir.mkdir(parents=True, exist_ok=True)
-                (book_dir / f"{name}.{book_format.lower()}").write_bytes(
-                    slice_of(formats[book_format.upper()])
-                )
+                write_slice(formats[book_format.upper()], target)
         return export
 
     def stage(self, snapshot: ImportSnapshot, directory: Path, data_dir: Path) -> ImportSnapshot:
@@ -828,6 +916,10 @@ class CalibreImporter:
             relative = None
             if record.cover_source:
                 try:
+                    # Size first: a crafted export's cover slice may be gigabytes, and
+                    # it is refused before it is read rather than after (F21).
+                    if Path(record.cover_source).stat().st_size > MAX_COVER_BYTES:
+                        raise CoverError("cover exceeds byte limit")
                     prepared = prepare_uploaded_cover(
                         Path(record.cover_source).read_bytes(), "image/jpeg", data_dir
                     )
@@ -843,7 +935,11 @@ class CalibreImporter:
                     suffix = PurePosixPath(record.attachment_name).suffix
                     attachment_staged = directory / "files" / f"{record.row_number}{suffix}"
                     attachment_staged.parent.mkdir(parents=True, exist_ok=True)
-                    attachment_staged.write_bytes(Path(record.attachment_source).read_bytes())
+                    with (
+                        Path(record.attachment_source).open("rb") as source_file,
+                        attachment_staged.open("wb") as staged_file,
+                    ):
+                        shutil.copyfileobj(source_file, staged_file, _COPY_CHUNK)
                     attachment_relative = str(attachment_staged.relative_to(data_dir))
                 except OSError:
                     pass

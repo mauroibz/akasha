@@ -168,3 +168,144 @@ async def test_log_lines_written_while_a_job_runs_carry_the_job_id(
     assert len(spoke) == 1
     assert spoke[0]["job_id"] == job_id
     assert spoke[0]["job_kind"] == "talk"
+
+
+# Sprint 128, F19: a configured secret reached the log through the one path the
+# scrubber did not walk — an exception. `exc_info` arrived as a tuple, the
+# traceback was rendered after redaction (or not at all: `<traceback object>`),
+# and the exception's own text went out raw.
+SECRET = "configured-secret-value-0123456789"
+
+
+def _fail_with_secret() -> None:
+    raise RuntimeError(f"provider refused https://example.invalid/?key={SECRET}")
+
+
+def test_a_stdlib_exception_traceback_is_rendered_and_scrubbed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import logging
+
+    from book_tracker.logging import REDACTION, configure_logging
+
+    configure_logging("INFO", scrub=(SECRET,))
+    try:
+        _fail_with_secret()
+    except RuntimeError:
+        logging.getLogger("book_tracker.test").exception("provider_failed")
+    line = _json_lines(capsys.readouterr().err)[-1]
+
+    assert line["event"] == "provider_failed"
+    assert SECRET not in json.dumps(line)
+    exception = line["exception"]
+    assert exception.startswith("Traceback (most recent call last):")
+    assert "_fail_with_secret" in exception
+    # The line that says what went wrong is the last one; it must survive any cap.
+    assert f"RuntimeError: provider refused https://example.invalid/?key={REDACTION}" in exception
+    assert "<traceback object" not in json.dumps(line)
+
+
+def test_a_structlog_exception_traceback_is_rendered_and_scrubbed(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import structlog
+
+    from book_tracker.logging import configure_logging
+
+    configure_logging("INFO", scrub=(SECRET,))
+    try:
+        _fail_with_secret()
+    except RuntimeError:
+        structlog.get_logger("book_tracker.test").exception("provider_failed")
+    line = _json_lines(capsys.readouterr().err)[-1]
+
+    assert line["event"] == "provider_failed"
+    assert "Traceback (most recent call last):" in line["exception"]
+    assert SECRET not in json.dumps(line)
+
+
+def test_an_exception_passed_as_a_field_is_scrubbed(capsys: pytest.CaptureFixture[str]) -> None:
+    import logging
+
+    from book_tracker.logging import configure_logging
+
+    configure_logging("INFO", scrub=(SECRET,))
+    try:
+        _fail_with_secret()
+    except RuntimeError as error:
+        logging.getLogger("book_tracker.test").warning(
+            "provider_failed", extra={"error": error, "errors": [error]}
+        )
+    line = _json_lines(capsys.readouterr().err)[-1]
+
+    assert "RuntimeError" in line["error"]
+    assert SECRET not in json.dumps(line)
+
+
+def test_uvicorn_loggers_go_through_the_same_redacting_handler(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The container runs `uvicorn` without `--log-config`, so uvicorn installs its
+    own handlers (with propagation off) before the application starts. Its error
+    logger is the one that reports an unhandled exception in a request, so it
+    must reach the JSON handler and the scrubber, not a plain formatter."""
+    import logging
+    import logging.config
+
+    from uvicorn.config import LOGGING_CONFIG
+
+    from book_tracker.logging import configure_logging
+
+    logging.config.dictConfig(LOGGING_CONFIG)
+    configure_logging("INFO", scrub=(SECRET,))
+    try:
+        _fail_with_secret()
+    except RuntimeError:
+        logging.getLogger("uvicorn.error").exception("Exception in ASGI application")
+    logging.getLogger("uvicorn.access").info(
+        '%s - "%s %s HTTP/%s" %d', "127.0.0.1:1", "GET", f"/api/x?k={SECRET}", "1.1", 200
+    )
+    logging.getLogger("uvicorn").info("Started server process [%d]", 1)
+    err = capsys.readouterr().err
+
+    assert SECRET not in err
+    events = [line["event"] for line in _json_lines(err)]
+    assert "Exception in ASGI application" in events
+    assert "Started server process [1]" in events
+    assert any(event.startswith("127.0.0.1:1 - ") for event in events)
+    # Nothing was printed past the JSON handler in uvicorn's own format.
+    assert all(line.startswith("{") for line in err.splitlines() if line.strip())
+
+
+@pytest.mark.anyio
+async def test_every_configured_secret_is_scrubbed_once_the_app_starts(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import logging
+
+    secrets = {
+        "google": "google-books-key-value-0123456789",
+        "tmdb": "tmdb-read-token-value-0123456789",
+        "admin": "admin-bootstrap-password-0123456789",
+    }
+    app = create_app(
+        Settings(
+            data_dir=tmp_path,
+            user_agent_contact="test@example.invalid",
+            GOOGLE_BOOKS_API_KEY=secrets["google"],
+            TMDB_READ_TOKEN=secrets["tmdb"],
+            auth="on",
+            admin_username="admin",
+            admin_password=secrets["admin"],
+        )
+    )
+    async with app.router.lifespan_context(app):
+        capsys.readouterr()
+        logging.getLogger("book_tracker.test").warning(
+            "leak_probe", extra={"detail": " ".join(secrets.values())}
+        )
+    line = next(
+        line for line in _json_lines(capsys.readouterr().err) if line.get("event") == "leak_probe"
+    )
+    for value in secrets.values():
+        assert value not in line["detail"]

@@ -75,6 +75,7 @@ def attach(data_dir: Path, item_id: int, content: bytes, filename: str = "book.e
         session.add(
             AttachmentRow(
                 item_id=item_id,
+                user_id=1,
                 filename=filename,
                 byte_size=stored.byte_size,
                 sha256=stored.sha256,
@@ -286,6 +287,7 @@ def test_a_row_committed_during_the_walk_keeps_its_blob(tmp_path: Path) -> None:
             session.add(
                 AttachmentRow(
                     item_id=item_id,
+                    user_id=1,
                     filename="book.epub",
                     byte_size=len(CONTENT),
                     sha256=digest,

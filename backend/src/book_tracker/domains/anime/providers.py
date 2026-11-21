@@ -139,7 +139,7 @@ _KITSU_AIRING = {
     "upcoming": "Not yet aired",
 }
 
-_TAG = re.compile(r"<[^>]+>")
+_TAG = re.compile(r"<[^<>]+>")  # `[^<>]`, not `[^>]`: linear on a run of `<` (F14)
 _BLANK_LINES = re.compile(r"\n{3,}")
 
 

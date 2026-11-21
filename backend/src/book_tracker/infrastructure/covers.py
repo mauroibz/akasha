@@ -12,6 +12,9 @@ MAX_COVER_BYTES = 10 * 1024 * 1024
 MAX_COVER_PIXELS = 40_000_000
 MAX_COVER_EDGE = 600
 MAX_COVER_REDIRECTS = 3
+# The only decoders a cover ever reaches (F6): the three content types the upload and
+# download paths accept. Every other Pillow plugin stays out of reach of a crafted file.
+COVER_FORMATS = ("JPEG", "PNG", "WEBP")
 # Providers answer "image not available" with a wide, short banner rather than a 404.
 # Google Books' is 575x92 — 6.25:1 — where real covers measured 0.66:1 and 0.77:1
 # (DEC-044). The threshold sits far from both: no book cover is three times as wide as
@@ -68,7 +71,7 @@ def prepare_uploaded_cover(content: bytes, content_type: str, data_dir: Path) ->
         ) as output:
             temporary = Path(output.name)
             output.write(content)
-        with Image.open(temporary) as image:
+        with Image.open(temporary, formats=COVER_FORMATS) as image:
             width, height = image.size
             if width <= 0 or height <= 0 or width * height > MAX_COVER_PIXELS:
                 raise CoverError("cover exceeds pixel limit")
@@ -137,10 +140,15 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
         current = url
         response: httpx.Response | None = None
         for redirect_count in range(MAX_COVER_REDIRECTS + 1):
-            response = await client.send(client.build_request("GET", current), stream=True)
+            # The shared client follows redirects on its own; here every hop must come
+            # back to this loop so the allowlist and HTTPS checks see it (F15).
+            response = await client.send(
+                client.build_request("GET", current), stream=True, follow_redirects=False
+            )
             if response.status_code not in {301, 302, 303, 307, 308}:
                 break
             if redirect_count == MAX_COVER_REDIRECTS:
+                await response.aclose()
                 raise CoverError("cover exceeded redirect limit")
             location = response.headers.get("location")
             if not location:
@@ -191,7 +199,7 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
 
 def _normalize_provider_cover(temporary: Path) -> Path:
     """Check a downloaded cover's shape and re-encode it as the stored JPEG."""
-    with Image.open(temporary) as image:
+    with Image.open(temporary, formats=COVER_FORMATS) as image:
         width, height = image.size
         if width < 10 or height < 10 or width * height > MAX_COVER_PIXELS:
             raise CoverError("cover exceeds pixel limit")

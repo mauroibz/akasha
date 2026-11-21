@@ -1,0 +1,127 @@
+# Akasha on the internet, through Cloudflare Tunnel (Sprint 128, DEC-180).
+#
+#   docker compose -f compose.yaml -f compose.public.yaml up -d
+#
+# Read the runbook's "Publishing on the internet (Cloudflare Tunnel and Access)"
+# section first, and finish setup on the LAN before using this file: the
+# exposure rule's fourth condition is that setup is completed before the
+# hostname is published.
+#
+# What this overlay changes:
+#
+# - The application publishes NO port, on the host or the LAN. The only way in
+#   is the `cloudflared` sidecar, over a Docker network with no route out
+#   (`akasha_ingress`, internal). Visitors reach Cloudflare; Cloudflare Access
+#   checks who they are; the tunnel carries what Access let through.
+# - Authentication is forced on, the cookie Secure, metrics off, and the client
+#   address for login limiting is read from CF-Connecting-IP — but only on
+#   requests whose peer is the sidecar's fixed address (172.30.10.2).
+# - The application reaches the internet (metadata providers, covers) through
+#   its own network, `akasha_egress`, whose bridge has a fixed name
+#   (br-akasha-eg) so scripts/akasha-egress-firewall.sh can keep it off the
+#   LAN, off Tailscale, off the cloud metadata address and off the host itself.
+#   The sidecar gets a separate network, `akasha_tunnel` (br-akasha-cf), for
+#   the same treatment. Run that script; without it these networks reach the
+#   LAN like any other container.
+# - DNS for both goes to public resolvers. Docker's embedded resolver forwards
+#   from inside the container, so a LAN resolver (your router) would be
+#   blocked by the firewall above, and asking it would reveal the LAN anyway.
+#
+# Requires Docker Compose 2.24 or later (`!reset`); `docker compose version`
+# says which you have. The subnets 172.30.10.0/24, 172.30.11.0/24 and
+# 172.30.12.0/24 must be free on the host (`docker network ls`, `ip route`);
+# if one collides, change it here, in AKASHA_TRUSTED_PROXY_PEERS below, and in
+# the firewall script's settings.
+#
+# Set in .env: TUNNEL_TOKEN (from the Cloudflare dashboard), and, for the
+# application-side check of Access, AKASHA_CF_ACCESS_TEAM_DOMAIN and
+# AKASHA_CF_ACCESS_AUD.
+
+services:
+  akasha:
+    # Remove the LAN port compose.yaml publishes. Recovery from a lockout
+    # (runbook) is temporarily publishing 127.0.0.1:4441 instead.
+    ports: !reset []
+    environment:
+      # Fixed here, not left to .env: this file is the public deployment, and
+      # each of these is a condition of it.
+      - AKASHA_AUTH=on
+      - AKASHA_COOKIE_SECURE=true
+      - AKASHA_METRICS=off
+      # Every visitor arrives from the sidecar, so without this the login
+      # limiter would see one client. The header is believed only from the
+      # sidecar's address; anyone else sending it is ignored.
+      - AKASHA_CLIENT_IP_HEADER=CF-Connecting-IP
+      - AKASHA_TRUSTED_PROXY_PEERS=["172.30.10.2"]
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    networks:
+      akasha_ingress:
+        ipv4_address: 172.30.10.10
+      akasha_egress:
+        ipv4_address: 172.30.11.10
+
+  cloudflared:
+    # Pinned by tag and digest, like the base images in the Dockerfile. Refresh:
+    #   docker buildx imagetools inspect cloudflare/cloudflared:<new tag>
+    # and copy the top-level Digest. Upgrading is editing this line; the
+    # sidecar never updates itself (--no-autoupdate).
+    image: cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    # Metrics stay on the sidecar's own loopback, not on the network the
+    # application shares with it.
+    command: ["tunnel", "--no-autoupdate", "--metrics", "127.0.0.1:20241", "run"]
+    environment:
+      # The tunnel's credential: whoever holds it can serve your hostname.
+      # Keep it in .env (chmod 600), never in this file or a commit.
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env (Cloudflare Zero Trust > Networks > Tunnels)}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - "no-new-privileges:true"
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 64
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    logging:
+      driver: json-file
+      options:
+        max-size: "${AKASHA_LOG_MAX_SIZE:-10m}"
+        max-file: "${AKASHA_LOG_MAX_FILE:-5}"
+    restart: unless-stopped
+    networks:
+      akasha_ingress:
+        ipv4_address: 172.30.10.2
+      akasha_tunnel: {}
+
+networks:
+  # Application <-> sidecar only. `internal`: no route to anywhere else.
+  akasha_ingress:
+    name: akasha_ingress
+    internal: true
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-akasha-in
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  # The application's way out, to metadata providers.
+  akasha_egress:
+    name: akasha_egress
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-akasha-eg
+    ipam:
+      config:
+        - subnet: 172.30.11.0/24
+  # The sidecar's way out, to Cloudflare.
+  akasha_tunnel:
+    name: akasha_tunnel
+    enable_ipv6: false
+    driver_opts:
+      com.docker.network.bridge.name: br-akasha-cf
+    ipam:
+      config:
+        - subnet: 172.30.12.0/24

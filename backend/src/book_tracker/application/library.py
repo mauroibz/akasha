@@ -163,11 +163,22 @@ def _search_expression(q: str) -> str | None:
 
 class LibraryService:
     def __init__(
-        self, engine: Engine, user_id: int, *, item_access_requires_entry: bool = False
+        self,
+        engine: Engine,
+        user_id: int,
+        *,
+        item_access_requires_entry: bool = False,
+        may_edit_shared_items: bool = True,
     ) -> None:
         self.engine = engine
         self.user_id = user_id
         self.item_access_requires_entry = item_access_requires_entry
+        #: Whether this caller may rewrite an item another person also holds
+        #: (DEC-180 §2). The signed-in identity decides, not whose rows are open:
+        #: an admin keeps it, a plain user has it only while they are an item's
+        #: sole holder. Defaults to True for in-process callers (imports,
+        #: enrichment) that are not acting for a person at the HTTP boundary.
+        self.may_edit_shared_items = may_edit_shared_items
 
     @contextmanager
     def _write(self) -> Iterator[Session]:
@@ -205,6 +216,33 @@ class LibraryService:
         if item is None:
             raise LibraryError("item_not_found", "Item was not found", status_code=404)
         return item
+
+    def _editable_item(self, session: Session, item_id: int) -> ItemRow:
+        """The item, for a write to the row every holder sees (DEC-180 §2).
+
+        Items are shared; their edits are not. A caller who may not edit shared items
+        may still edit one nobody else holds, which is every item in a single-person
+        library. Anyone else gets `403 item_shared` and the row stays as it was.
+        """
+        item = self._item(session, item_id)
+        if not self.may_edit_shared_items:
+            other = session.scalar(
+                select(EntryRow.id)
+                .where(EntryRow.item_id == item_id, EntryRow.user_id != self.user_id)
+                .limit(1)
+            )
+            if other is not None:
+                raise LibraryError(
+                    "item_shared",
+                    "Other people track this item; ask an admin to change its shared details",
+                    status_code=403,
+                )
+        return item
+
+    def ensure_item_editable(self, item_id: int) -> None:
+        """Refuse before any provider is asked or any byte is read, not after."""
+        with Session(self.engine) as session:
+            self._editable_item(session, item_id)
 
     def _domain(self, session: Session, entry: EntryRow) -> Domain:
         """The domain of the item this entry hangs on.
@@ -960,7 +998,7 @@ class LibraryService:
 
     def update_item(self, item_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
-            item = self._item(session, item_id)
+            item = self._editable_item(session, item_id)
             for field in ("title", "subtitle", "year"):
                 if field in changes:
                     setattr(item, field, changes[field])
@@ -995,7 +1033,7 @@ class LibraryService:
             self._item(session, item_id)
             rows = session.execute(
                 select(AttachmentRow)
-                .where(AttachmentRow.item_id == item_id)
+                .where(AttachmentRow.item_id == item_id, AttachmentRow.user_id == self.user_id)
                 .order_by(AttachmentRow.created_at, AttachmentRow.id)
             ).scalars()
             return [self._attachment_dict(row) for row in rows]
@@ -1021,18 +1059,22 @@ class LibraryService:
         with self._write() as session:
             existing = session.execute(
                 select(AttachmentRow).where(
-                    AttachmentRow.item_id == item_id, AttachmentRow.sha256 == stored.sha256
+                    AttachmentRow.item_id == item_id,
+                    AttachmentRow.user_id == self.user_id,
+                    AttachmentRow.sha256 == stored.sha256,
                 )
             ).scalar_one_or_none()
             if existing is not None:
-                # Same bytes on the same item. Refresh the name the owner chose and
-                # return the row that already exists rather than duplicating it.
+                # Same bytes on the same item, from the same person. Refresh the name
+                # they chose and return the row that already exists rather than
+                # duplicating it.
                 existing.filename = filename
                 existing.updated_at = now
                 session.flush()
                 return self._attachment_dict(existing)
             row = AttachmentRow(
                 item_id=item_id,
+                user_id=self.user_id,
                 filename=filename,
                 byte_size=stored.byte_size,
                 sha256=stored.sha256,
@@ -1061,7 +1103,9 @@ class LibraryService:
             self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
-                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                    AttachmentRow.id == attachment_id,
+                    AttachmentRow.item_id == item_id,
+                    AttachmentRow.user_id == self.user_id,
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -1074,12 +1118,15 @@ class LibraryService:
             return self._attachment_dict(row)
 
     def get_attachment(self, item_id: int, attachment_id: int) -> dict[str, Any]:
-        """Scoped by item on purpose: an id alone must not reach another item's file."""
+        """Scoped by item and owner: an id alone must not reach another item's file, and
+        a shared item must not reach another person's (DEC-180 §2)."""
         with Session(self.engine) as session:
             self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
-                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                    AttachmentRow.id == attachment_id,
+                    AttachmentRow.item_id == item_id,
+                    AttachmentRow.user_id == self.user_id,
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -1094,7 +1141,9 @@ class LibraryService:
             self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
-                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                    AttachmentRow.id == attachment_id,
+                    AttachmentRow.item_id == item_id,
+                    AttachmentRow.user_id == self.user_id,
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -1158,7 +1207,7 @@ class LibraryService:
 
     def overwrite_provider_fields(self, item_id: int, values: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
-            item = self._item(session, item_id)
+            item = self._editable_item(session, item_id)
             for field in ("title", "subtitle", "year"):
                 if field in values and values[field] is not None:
                     setattr(item, field, values[field])
@@ -1498,7 +1547,7 @@ class LibraryService:
         empty: tuple[Any, ...] = (None, "", [], {})
         filled: list[str] = []
         with self._write() as session:
-            item = self._item(session, item_id)
+            item = self._editable_item(session, item_id)
             for field in ("subtitle", "year"):
                 if getattr(item, field) in empty and values.get(field) not in empty:
                     setattr(item, field, values[field])

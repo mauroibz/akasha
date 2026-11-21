@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import text
 
+from book_tracker.api.identity import AdminUser
 from book_tracker.config import Settings
 
 
@@ -95,6 +96,8 @@ def install_metrics(app: FastAPI, configured: Settings) -> None:
     if configured.metrics != "on":
         return
 
+    # Behind the authentication boundary, and admin-only with it on (Sprint 128,
+    # F18); with it off the implicit user is the admin, so nothing changes there.
     @app.get("/metrics", include_in_schema=False)
-    def metrics() -> PlainTextResponse:
+    def metrics(_admin: AdminUser) -> PlainTextResponse:
         return PlainTextResponse(render(app), media_type="text/plain; version=0.0.4")

@@ -705,3 +705,40 @@ def test_a_backup_taken_at_the_identity_head_restores_the_owned_rows(tmp_path: P
     assert any(row[1] == "token_hash" for row in sessions)
     assert database.execute("PRAGMA foreign_key_check").fetchall() == []
     database.close()
+
+
+def test_restore_accepts_a_fresh_volume_seeded_with_the_empty_temp_folder(
+    tmp_path: Path,
+) -> None:
+    """Sprint 128: the image ships `/data/tmp` (its TMPDIR), so a brand-new named
+    volume is seeded with that one empty folder. The runbook's restore drill
+    restores into exactly such a volume, and it must still count as empty."""
+    data_dir = populated_data_dir(tmp_path)
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        label="nightly",
+    )
+    fresh = tmp_path / "fresh-volume"
+    (fresh / "tmp").mkdir(parents=True)
+
+    restore_backup(result.path, into=fresh)
+
+    assert (fresh / "books.db").is_file()
+
+
+def test_restore_still_refuses_a_temp_folder_with_something_in_it(tmp_path: Path) -> None:
+    data_dir = populated_data_dir(tmp_path)
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        label="nightly",
+    )
+    used = tmp_path / "used-volume"
+    (used / "tmp").mkdir(parents=True)
+    (used / "tmp" / "upload.part").write_bytes(b"half an upload")
+
+    with pytest.raises(BackupError, match="not empty"):
+        restore_backup(result.path, into=used)

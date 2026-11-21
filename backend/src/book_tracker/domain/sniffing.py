@@ -45,8 +45,10 @@ def is_epub(head: bytes) -> bool:
 def text_of(head: bytes) -> str:
     """The head as text: gunzipped when it is gzip, decoded leniently either way."""
     if head[:2] == b"\x1f\x8b":
+        # Never more than the sniff window out: 64 KiB of gzip can inflate to tens of
+        # megabytes, and only the head is ever looked at (F14).
         try:
-            head = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(head)
+            head = zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(head, SNIFF_BYTES)
         except zlib.error:
             return ""
     if b"\x00" in head[:1024]:
@@ -61,14 +63,52 @@ def csv_header(head: bytes) -> list[str] | None:
     if not first:
         return None
     try:
-        dialect = csv.Sniffer().sniff(first, delimiters=",;\t")
+        row = next(csv.reader(io.StringIO(first), delimiter=_header_delimiter(first)), None)
     except csv.Error:
-        dialect = csv.excel
-    row = next(csv.reader(io.StringIO(first), dialect), None)
+        return None
     return [cell.strip() for cell in row] if row else None
 
 
+def _header_delimiter(line: str) -> str:
+    """Comma, semicolon or tab — whichever the header holds most of outside quotes.
+
+    One linear pass. `csv.Sniffer` did the same job with regexes that are quadratic
+    on a crafted 64 KiB line, about 40 s of CPU holding the GIL (F14).
+    """
+    counts = {",": 0, ";": 0, "\t": 0}
+    quoted = False
+    for character in line:
+        if character == '"':
+            quoted = not quoted
+        elif not quoted and character in counts:
+            counts[character] += 1
+    best = max(counts, key=lambda key: counts[key])
+    return best if counts[best] > 0 else ","
+
+
+_ELEMENT_NAME = re.compile(r"[A-Za-z_][\w.-]*")
+
+
 def xml_root(head: bytes) -> str | None:
-    """The first element's name, skipping the declaration and comments."""
-    match = re.search(r"<([A-Za-z_][\w.-]*)", re.sub(r"<[?!][^>]*>", "", text_of(head)))
-    return match.group(1) if match else None
+    """The first element's name, skipping the declaration, comments and doctype.
+
+    A forward scan that never revisits a byte: the regex substitution it replaces was
+    quadratic on a run of unclosed `<!` (F14). An unclosed prolog construct means the
+    head holds no element yet, so it answers `None`.
+    """
+    text = text_of(head)
+    position = text.find("<")
+    while position >= 0:
+        following = text[position + 1 : position + 2]
+        if following in ("?", "!"):
+            closer = "-->" if text.startswith("<!--", position) else ">"
+            end = text.find(closer, position + 2)
+            if end < 0:
+                return None
+            position = text.find("<", end + len(closer))
+            continue
+        match = _ELEMENT_NAME.match(text, position + 1)
+        if match:
+            return match.group(0)
+        position = text.find("<", position + 1)
+    return None

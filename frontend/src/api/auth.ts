@@ -29,6 +29,16 @@ export interface AuthSession {
 
 export const AUTH_STATE_QUERY_KEY = ["auth", "me"] as const;
 
+/** The server refuses shorter new passwords (Sprint 128); sign-in accepts old ones. */
+export const MIN_PASSWORD_LENGTH = 12;
+export const PASSWORD_TOO_SHORT = `Use at least ${MIN_PASSWORD_LENGTH} characters for a new password.`;
+
+/** Throws the message a form shows when a new password is too short. */
+export function requireNewPassword(password: string): void {
+  if (password.length < MIN_PASSWORD_LENGTH)
+    throw new Error(PASSWORD_TOO_SHORT);
+}
+
 export class AuthRequestError extends ApiError {
   constructor(
     code: string,
@@ -64,6 +74,7 @@ export function setup(
   username: string,
   displayName: string,
   password: string,
+  setupCode: string,
 ): Promise<AuthUser> {
   return fetch("/api/auth/setup", {
     method: "POST",
@@ -72,6 +83,7 @@ export function setup(
       username,
       display_name: displayName,
       password,
+      setup_code: setupCode,
     }),
   }).then(authJson<AuthUser>);
 }

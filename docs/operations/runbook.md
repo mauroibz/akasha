@@ -7,7 +7,14 @@ with the Compose plugin installed; nothing else is needed.
 **Authentication is off by default.** With `AKASHA_AUTH=off` anyone who can
 reach the port can read and change every rating, note and shelf — keep it on a
 trusted LAN. Turning authentication on is its own section below:
-[Turning authentication on](#turning-authentication-on).
+[Turning authentication on](#turning-authentication-on). Publishing it on the
+internet is another:
+[Publishing on the internet](#publishing-on-the-internet-cloudflare-tunnel-and-access).
+
+**The exposure rule.** No internet-reachable proxy, DNS name or port forward
+unless all four hold: `AKASHA_AUTH=on`; TLS terminating in front; the session
+cookie `Secure`; and setup completed (or the admin bootstrapped from the
+environment) *before* the hostname is published (DEC-180).
 
 ## First install
 
@@ -402,7 +409,9 @@ LAN — the published port still serves the ordinary login screen, and password
 login is never disabled by the trusted-header settings. Worst case, set
 `AKASHA_AUTH=off` in `.env` and `docker compose up -d` again: the account
 system stays in the database untouched, and turning auth back on later returns
-to exactly this section.
+to exactly this section. An install published on the internet has no LAN port
+and must never run with auth off; it has its own recovery path,
+[When you are locked out](#when-you-are-locked-out).
 
 **Sessions, and signing a device out.** Each sign-in lasts 400 days and slides
 forward while in use, so a regularly used device never asks again. The
@@ -419,14 +428,22 @@ three settings in `.env`:
 ```ini
 AKASHA_AUTH=on
 AKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login
-AKASHA_TRUSTED_PROXY_PEERS=["127.0.0.1"]
+# the address the access log shows for Serve's requests — see below
+AKASHA_TRUSTED_PROXY_PEERS=["172.18.0.1"]
 ```
 
-- The peer allowlist is the address Akasha sees the proxy coming from. With
-  `tailscale serve` on the same machine as the published port, that is
-  `127.0.0.1`. **Akasha refuses to start with a header configured and no peer
-  allowlist** — an unbounded allowlist is an authentication bypass, which is
-  exactly what the refusal prevents.
+- The peer allowlist is the address Akasha sees the proxy coming from — and
+  through Docker's port publishing that is usually **not** `127.0.0.1`. A
+  connection `tailscale serve` makes to `127.0.0.1:4441` on the host reaches
+  the container from the Docker network's gateway (an address such as
+  `172.18.0.1`), because Docker forwards it across the bridge. Check before
+  trusting: sign in once through Serve, then read the peer address in the
+  access log (`docker compose logs akasha | tail`), and put that address in
+  the allowlist. Every process on the host that connects to the published
+  port arrives from the same gateway, which is one more reason to keep the
+  port on loopback. **Akasha refuses to start with a header configured and no
+  peer allowlist** — an unbounded allowlist is an authentication bypass, which
+  is exactly what the refusal prevents.
 - The header value must match a username (it is matched case-insensitively
   after trimming). Your tailnet login `you@example.com` matches a user created
   with that exact name. An unknown identity is refused with `403` unless
@@ -460,9 +477,16 @@ AKASHA_TRUSTED_PROXY_PEERS=["127.0.0.1"]
 Nginx Proxy Manager on the same LAN, e.g. `books.home.lan` → `http://<host>:4441`.
 Do not expose that hostname beyond the LAN, do not forward a port to it, and do
 not put it behind a proxy that terminates on a public address — unless all
-three exposure conditions hold: `AKASHA_AUTH=on`, TLS terminating in front,
-and the session cookie `Secure`. With auth off there is no login to stop
-anyone who arrives.
+four exposure conditions hold: `AKASHA_AUTH=on`, TLS terminating in front,
+the session cookie `Secure`, and setup completed before the hostname is
+published. With auth off there is no login to stop anyone who arrives. For the
+internet, prefer the Cloudflare route below to a port forward: it publishes no
+port at all.
+
+Whatever the proxy, do not set uvicorn's `FORWARDED_ALLOW_IPS` (and never to
+`*`): it would let any client name its own address. Akasha reads a forwarded
+scheme, an identity header or a client address header only from the peers in
+`AKASHA_TRUSTED_PROXY_PEERS`.
 
 Set `AKASHA_BIND=127.0.0.1` if the proxy runs on the same machine, so the
 container port is not reachable from the network directly. And note what
@@ -477,14 +501,248 @@ particular one.
 For Tailscale specifically — including the zero-tap identity-header login —
 see [Running behind `tailscale serve`](#running-behind-tailscale-serve) above.
 
+## Publishing on the internet (Cloudflare Tunnel and Access)
+
+This is how to open Akasha at a name such as `https://akasha.example.com` from
+anywhere, without forwarding a port on the router and without putting the rest
+of the home server at risk (DEC-180). It takes about an hour the first time.
+Do the steps in order; each one assumes the ones before it.
+
+The shape of it: a visitor reaches Cloudflare. **Cloudflare Access** asks who
+they are (a code mailed to an allowed address, or a Google sign-in) and turns
+everyone else away. What Access lets through travels down a **Cloudflare
+Tunnel** — an outbound connection that a small `cloudflared` container on your
+server keeps open to Cloudflare — to the Akasha container, which then shows its
+own login. Nothing on your server listens on the internet, and the router stays
+closed.
+
+### What you need
+
+- A domain whose DNS is managed by Cloudflare (a free account is enough).
+- Docker Compose 2.24 or later on the server (`docker compose version`).
+- Some time in the Cloudflare dashboard. Its menus get renamed now and then;
+  the names below are the ones it used when this was written, and the things
+  to look for stay the same whatever they are called.
+
+### 1. Finish setup on the LAN first
+
+The fourth exposure condition: the admin account exists before the hostname
+does. Whoever completes setup becomes the admin and owns the library.
+
+```bash
+echo "AKASHA_AUTH=on" >> .env
+docker compose up -d
+docker compose logs akasha | grep -i setup     # the one-time setup code
+```
+
+Open `http://<server>:4441` on the LAN, enter the setup code from the log, and
+create the admin with a long password from a password manager (new passwords
+need at least 12 characters). Sign out and in once to check it works.
+
+### 2. Create the tunnel
+
+In the Cloudflare dashboard, open **Zero Trust → Networks → Tunnels** and create
+a tunnel of type **Cloudflared**, named `akasha`. When it offers install
+commands, choose **Docker** and copy only the long token after `--token`. Do not
+run the command it shows: `compose.public.yaml` runs `cloudflared` for you,
+hardened.
+
+Put the token in `.env` and make the file readable by you alone — whoever holds
+the token can serve your hostname:
+
+```bash
+echo "TUNNEL_TOKEN=<the token>" >> .env
+chmod 600 .env
+```
+
+Then add the tunnel's **public hostname** (also called a *published application
+route*): subdomain `akasha`, your domain, service type **HTTP**, URL
+`akasha:8000`. `akasha` is the application container's name on the private
+network it shares with `cloudflared`.
+
+### 3. Put Cloudflare Access in front of the whole hostname
+
+Open **Zero Trust → Access → Applications** and add a **Self-hosted**
+application:
+
+- **Domain:** `akasha.example.com`, with the path left **empty**, so it covers
+  every page and every API route. Add no second, narrower application and no
+  *Bypass* policy for any path: an exception is a door around the gate.
+- **Session duration:** how often Access asks again. 24 hours is a sensible
+  start; a week is fine for a household.
+- **Login methods:** **One-time PIN** (a code mailed to the address) needs no
+  setup; **Google** works too once added under *Settings → Authentication*.
+- **Policy:** action **Allow**, include **Emails**, listing each person's
+  address. Never *Everyone*, and never a whole email domain such as
+  `gmail.com`.
+
+Save, then copy two values into `.env`: the application's **Application
+Audience (AUD) Tag**, from its overview, and your **team domain**,
+`<team>.cloudflareaccess.com`, from *Settings → Custom Pages* (it is also in the
+address bar of the Access sign-in page).
+
+```ini
+AKASHA_CF_ACCESS_TEAM_DOMAIN=<team>.cloudflareaccess.com
+AKASHA_CF_ACCESS_AUD=<the AUD tag>
+```
+
+With these two set, Akasha checks Cloudflare's signature on every request
+itself and refuses anything Access did not sign (`403 access_denied`). A
+mistake in the Access configuration, or another container on the server, then
+still cannot reach the login screen around Access. The container's own
+healthcheck is the one request exempt from it.
+
+### 4. Start the public stack
+
+```bash
+docker compose -f compose.yaml -f compose.public.yaml up -d
+docker compose -f compose.yaml -f compose.public.yaml ps   # akasha healthy, cloudflared up
+```
+
+Every later command for this install names both files the same way — or put
+`COMPOSE_FILE=compose.yaml:compose.public.yaml` in `.env` and leave them out,
+which also keeps `scripts/backup.sh` and upgrades on the right files.
+
+The overlay publishes **no port**: `http://<server>:4441` stops answering on the
+LAN, on purpose. It also forces `AKASHA_AUTH=on`, a `Secure` cookie and
+`AKASHA_METRICS=off`, and reads each visitor's address from Cloudflare's
+`CF-Connecting-IP` header — believed only from the `cloudflared` container — so
+the login limiter counts each visitor separately rather than all of them as one.
+
+Check from a private browser window: `https://akasha.example.com` shows
+Cloudflare's sign-in first, then Akasha's. The tunnel shows *Healthy* in the
+dashboard. Then check that the application's own gate is on — a request that
+did not come through Access must be refused:
+
+```bash
+docker run --rm --network akasha_ingress --entrypoint python \
+  ghcr.io/mauroibz/akasha:2.8.0 -c \
+  "import urllib.request as u; u.urlopen('http://akasha:8000/api/auth/me')"
+# expected: urllib.error.HTTPError: HTTP Error 403: Forbidden
+```
+
+(Use the version you run in place of `2.8.0`.)
+
+### 5. Keep the containers off the LAN
+
+A container can, by default, reach everything the server can: the router's admin
+page, the NAS, the Tailscale network, the server's own services.
+`scripts/akasha-egress-firewall.sh` narrows that for the two public containers
+to what they need — Akasha to web sites (metadata, covers) and DNS, `cloudflared`
+to Cloudflare — and refuses new connections from them to the server itself.
+
+```bash
+sudo scripts/akasha-egress-firewall.sh --dry-run   # read what it will do
+sudo scripts/akasha-egress-firewall.sh
+sudo iptables -L AKASHA-EGRESS -n -v               # the rules, with counters
+```
+
+It needs Docker's default iptables firewall; with `ufw` or `firewalld` managing
+the host, read its comments and translate the rules rather than run it. It
+relies on IPv6 staying off on these networks, which the overlay sets.
+
+The rules vanish on reboot. Make them permanent with a systemd unit — edit the
+path to where the repository lives. The script runs as root, so keep it owned by
+root and writable by no one else:
+
+```ini
+# /etc/systemd/system/akasha-egress-firewall.service
+[Unit]
+Description=Akasha egress firewall
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/akasha/scripts/akasha-egress-firewall.sh
+ExecStop=/opt/akasha/scripts/akasha-egress-firewall.sh --remove
+
+[Install]
+WantedBy=docker.service
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now akasha-egress-firewall
+```
+
+Check it from inside the application container: your router's address must be
+refused, a public site must answer.
+
+```bash
+docker compose -f compose.yaml -f compose.public.yaml exec akasha python -c \
+  "import socket; socket.create_connection(('192.168.1.1', 80), 3)"   # refused
+docker compose -f compose.yaml -f compose.public.yaml exec akasha python -c \
+  "import urllib.request as u; print(u.urlopen('https://openlibrary.org').status)"   # 200
+```
+
+### 6. Cloudflare settings for this hostname
+
+- **Rate-limit the login.** *Security → WAF → Rate limiting rules*: when the URI
+  path equals `/api/auth/login` and the method is `POST`, block an address that
+  exceeds about 5 requests a minute. The free plan offers shorter periods; pick
+  the longest it allows. Akasha limits sign-in attempts itself as well; this
+  stops a flood before it reaches the server.
+- **Never cache the application.** No *Cache Everything* cache rule or page rule
+  on this hostname. The API answers `no-store`, but such a rule overrides it and
+  could serve one person's library to another.
+- **Leave the page's scripts alone.** Turn off *Rocket Loader* and *Email
+  Address Obfuscation* for this hostname (a *Configuration Rule* does it per
+  hostname): both inject scripts, which Akasha's Content-Security-Policy blocks.
+- **Always Use HTTPS** on.
+
+### 7. Backups go where the server cannot delete them
+
+If the application were ever taken over, whoever held it could delete
+`/backups` too: the application writes there, so it can. A backup that survives
+that lives on another machine and is **pulled** from the server, never pushed
+by it — for example a NAS or another computer that copies the backups volume
+over SSH every night (`rsync`, see [Nightly backups](#nightly-backups)) and
+keeps dated snapshots on its own side. The server holds no credential for that
+machine.
+
+### When you are locked out
+
+If Cloudflare, the tunnel or a policy breaks, reach Akasha from the server
+itself. Start it without the public overlay, on the server's loopback only, and
+with the Access check off for this run:
+
+```bash
+AKASHA_BIND=127.0.0.1 AKASHA_CF_ACCESS_TEAM_DOMAIN= AKASHA_CF_ACCESS_AUD= \
+  docker compose -f compose.yaml up -d --remove-orphans
+```
+
+From your computer, `ssh -L 4441:127.0.0.1:4441 <server>` and open
+`http://localhost:4441`: the ordinary login screen. When done, run step 4's
+command again; it removes the loopback port and restores the Access check.
+
+### What each layer protects
+
+| Layer | Stops |
+|---|---|
+| Cloudflare Access | Strangers: they never see Akasha's login page. |
+| Akasha's own Access check (`AKASHA_CF_ACCESS_*`) | A request that went around Access: a policy mistake, another container on the server. |
+| Akasha's login | Someone Access let in who has no Akasha account; guesses are counted and limited per visitor. |
+| Setup before publishing, and the setup code | A stranger claiming the first admin account. |
+| No published port | Anyone on the LAN or the internet reaching the container directly. |
+| Read-only, unprivileged container | A compromised application rewriting its own code or gaining privileges. |
+| Egress firewall | A compromised application reaching the router, the NAS, Tailscale or the server. |
+| Pulled, off-host backups | A compromised application deleting the library and its backups together. |
+
+None of these stands alone, and none is a reason to skip another.
+
 ## Metrics
 
 Set `AKASHA_METRICS=on` in `.env` and restart to serve Prometheus text at `/metrics`. It reports
 jobs waiting or running, jobs by kind and state, provider calls by outcome with time spent, and
 API request latency by route template. Provider counters reset when the process restarts.
 
-The route is unauthenticated, like the health checks, and it names providers and routes. Scrape it
-from the LAN and do not proxy it to the internet.
+With `AKASHA_AUTH=off` the route is open to whoever reaches the port, and it names providers and
+routes: scrape it from the LAN and do not proxy it to the internet. With auth on it answers only an
+admin's session (Sprint 128), so a Prometheus scraper cannot read it there. A public install keeps it off; `compose.public.yaml`
+forces `AKASHA_METRICS=off`.
 
 *Search is running on fewer providers* on the Add page now also names a configured provider that
 has stopped answering. That is a provider outage, not a fault in Akasha: searches keep working on
@@ -499,6 +757,9 @@ the other providers, and the notice clears once the provider answers again.
 | `/api/health/ready` returns 503 `schema_not_current` | migrations have not finished, or failed; check the logs |
 | Search finds nothing and the UI says degraded | no `GOOGLE_BOOKS_API_KEY`, or no outbound network |
 | The backup script says the service is not running | start the stack; an online backup needs a live database |
+| Every request answers `403 access_denied` | `AKASHA_CF_ACCESS_*` is set and the request did not carry a valid Cloudflare Access token: a wrong AUD tag or team domain, the hostname not covered by the Access application, or a request that did not come through Cloudflare. The log line `cloudflare_access_refused` names the reason |
+| `Read-only file system` in the logs | something wrote outside `/data`, `/backups` and `/tmp`; the root filesystem is read-only since Sprint 128. Report it; as a stopgap, `read_only: false` in an override file |
+| `cloudflared` keeps restarting | `TUNNEL_TOKEN` is missing or wrong; `docker compose -f compose.yaml -f compose.public.yaml logs cloudflared` says which |
 
 On the default named-volume mounts, neither ownership row above is reachable —
 there's no host directory to get wrong. Bring a host directory in for either

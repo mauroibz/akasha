@@ -271,10 +271,10 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 connection.execute(
                     text(
                         "INSERT INTO attachments "
-                        "(item_id,filename,byte_size,sha256,created_at,updated_at) "
-                        "VALUES (:item,'notes.txt',4,:sha,:now,:now)"
+                        "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                        "VALUES (:item,:user,'notes.txt',4,:sha,:now,:now)"
                     ),
-                    {"item": owned.item_id, "sha": "a" * 64, "now": now},
+                    {"item": owned.item_id, "user": second["id"], "sha": "a" * 64, "now": now},
                 )
             missing = await client.request("DELETE", f"/api/users/{second['id']}", json={})
             assert missing.status_code == 422
@@ -303,12 +303,14 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 ).scalar_one()
                 == 1
             )
+            # The item is the shared cache and stays; the file was the deleted
+            # person's own and goes with them (DEC-180).
             assert (
                 connection.execute(
                     text("SELECT count(*) FROM attachments WHERE item_id=:item"),
                     {"item": owned.item_id},
                 ).scalar_one()
-                == 1
+                == 0
             )
             for table in ("import_batches", "import_records", "import_effects", "jobs"):
                 assert (
@@ -338,6 +340,16 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
                 owned.entry_id, shelf_id
             )
             batch_id = seed_import_ledger(app, int(second["id"]), owned.entry_id, owned.item_id)
+            now = datetime.now(UTC).isoformat()
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO attachments "
+                        "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                        "VALUES (:item,:user,'notes.txt',4,:sha,:now,:now)"
+                    ),
+                    {"item": owned.item_id, "user": second["id"], "sha": "b" * 64, "now": now},
+                )
             transferred = await client.request(
                 "DELETE",
                 f"/api/users/{second['id']}",
@@ -348,6 +360,13 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
             assert (
                 connection.execute(
                     text("SELECT count(*) FROM entries WHERE user_id=1")
+                ).scalar_one()
+                == 1
+            )
+            # A transferred library keeps its files (DEC-180: attachments are owned).
+            assert (
+                connection.execute(
+                    text("SELECT count(*) FROM attachments WHERE user_id=1")
                 ).scalar_one()
                 == 1
             )
@@ -462,6 +481,10 @@ async def test_acting_as_ends_on_logout_target_deletion_and_either_password_chan
                 json={"current_password": ADMIN_PASSWORD, "new_password": "admin changed"},
             )
             assert changed.status_code == 204
+            # Sprint 128 (F21): the change rotates the session, so the old token is
+            # gone and the device carries on with the one the response issued.
+            assert SessionStore(app.state.engine).lookup(token) is None
+            token = changed.cookies[COOKIE_NAME]
             assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
 
             assert (await admin.post(f"/api/auth/act-as/{second['id']}")).status_code == 204

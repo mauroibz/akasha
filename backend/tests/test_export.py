@@ -725,10 +725,11 @@ async def test_export_json_returns_only_the_requesting_users_entries(tmp_path: P
 
     assert _entry_titles(first) == ["Rayuela"]
     assert _entry_titles(second) == ["Ficciones"]
-    # The cache is not the leak the sprint fixed: both dumps still describe every
-    # item. Scoping travels the entry walk, not the item walk.
-    assert len(first["items"]) == 2
-    assert len(second["items"]) == 2
+    # Sprint 128 (F8, DEC-180): the item walk is scoped too. The whole cache listed
+    # other people's catalogues and the source ids that let a hand-typed item be
+    # claimed, so each dump now carries only the items its own entries hold.
+    assert [item["title"] for item in first["items"]] == ["Rayuela"]
+    assert [item["title"] for item in second["items"]] == ["Ficciones"]
 
 
 @pytest.mark.anyio
@@ -755,10 +756,10 @@ async def test_iter_export_rows_is_scoped_the_same_way(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_iter_items_is_not_scoped_the_cache_is_shared(tmp_path: Path) -> None:
-    """The sprint's explicit carve-out: `iter_items` keeps walking the whole
-    table, because an item describes the work and every owner's dump may carry
-    it; the owner's opinion is the row that is scoped."""
+async def test_iter_items_walks_only_the_items_the_owner_holds(tmp_path: Path) -> None:
+    """Sprint 076 left `iter_items` walking the whole table; Sprint 128 (F8)
+    reversed that carve-out: the cache is the install, so an owner's dump carries
+    only the items that owner's entries hold."""
     from sqlalchemy.orm import Session
 
     from book_tracker.application.export import iter_items
@@ -773,9 +774,11 @@ async def test_iter_items_is_not_scoped_the_cache_is_shared(tmp_path: Path) -> N
             title="Ficciones", creators=("Jorge Luis Borges",)
         )
         with Session(app.state.engine) as session:
-            titles = {item["title"] for item in iter_items(session)}
+            mine = {item["title"] for item in iter_items(session, 1)}
+            theirs = {item["title"] for item in iter_items(session, bruno)}
 
-    assert titles == {"Rayuela", "Ficciones"}
+    assert mine == {"Rayuela"}
+    assert theirs == {"Ficciones"}
 
 
 @pytest.mark.anyio

@@ -12,7 +12,7 @@ from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, model_validator
 
-from book_tracker.api.identity import CurrentUser
+from book_tracker.api.identity import CurrentUser, current_user
 from book_tracker.application.add import AddService
 from book_tracker.application.enrichment import (
     enqueue_enrichment_backfill,
@@ -48,7 +48,9 @@ from book_tracker.infrastructure.repositories import DomainRepository
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api")
+# Every route names its principal (Sprint 128): a request that slipped past the
+# middleware still answers 401 rather than reaching a handler.
+router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
 # One chunk in flight at a time on the way in; FileResponse does the same on the
 # way out. Large enough that a 25 MiB upload is 25 reads, small enough that a
@@ -61,6 +63,9 @@ def library_for(request: Request, user: CurrentUser) -> LibraryService:
         request.app.state.engine,
         user.effective_user_id,
         item_access_requires_entry=getattr(request.app.state, "auth", "off") == "on",
+        # The signed-in identity, not `acting_as`: an admin viewing someone's
+        # library keeps the admin's say over the shared item (DEC-180 §2).
+        may_edit_shared_items=user.is_admin,
     )
 
 
@@ -1124,6 +1129,7 @@ def get_item(item_id: int, library: Library) -> ItemResponse:
     responses=ERRORS,
 )
 def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
+    library.ensure_item_editable(item_id)
     changes = body.model_dump(exclude_unset=True)
     if body.metadata is not None:
         item_type = str(library.get_item(item_id)["type"])
@@ -1284,7 +1290,7 @@ async def replace_cover(
     cover if anything fails.
     """
     library = library_for(request, user)
-    await off_loop(library.get_item, item_id)
+    await off_loop(library.ensure_item_editable, item_id)
     await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
     chosen: str | None = None
     upload: tuple[bytes, str] | None = None
@@ -1532,6 +1538,7 @@ async def refresh_item(
     item_id: int, body: RefreshBody, request: Request, user: CurrentUser
 ) -> ItemResponse:
     library = library_for(request, user)
+    await off_loop(library.ensure_item_editable, item_id)
     provider, source_id = await off_loop(_primary_provider, request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     metadata = dict(payload.metadata)
@@ -1581,6 +1588,8 @@ async def fill_item(item_id: int, request: Request, user: CurrentUser) -> FillRe
     queued for it instead, which fills the same way in the background.
     """
     library = library_for(request, user)
+    # Before the queued fallback as well: the background fill writes the same row.
+    await off_loop(library.ensure_item_editable, item_id)
     try:
         provider, source_id = await off_loop(_primary_provider, request, library, item_id)
     except LibraryError as error:
@@ -1639,6 +1648,7 @@ async def fetch_outline(item_id: int, request: Request, user: CurrentUser) -> It
     returned as it is, so a chapter count the owner typed is never replaced.
     """
     library = library_for(request, user)
+    await off_loop(library.ensure_item_editable, item_id)
     item = await off_loop(library.get_item, item_id)
     domain = DOMAINS.get(str(item["type"]))
     if domain is None:
@@ -1738,6 +1748,7 @@ async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> Item
     `overwrite` flag.
     """
     library = library_for(request, user)
+    await off_loop(library.ensure_item_editable, item_id)
     provider, source_id = await off_loop(_primary_provider, request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     if not await _install_cover_from_payload(request, payload, item_id, user):

@@ -955,7 +955,8 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
   not a distributed security boundary.
 - No CORS by default in the single-origin deployment.
 - The exposure rule: no internet-reachable proxy, DNS or port forward unless
-  `AKASHA_AUTH=on`, TLS terminates in front, and the session cookie is `Secure`.
+  `AKASHA_AUTH=on`, TLS terminates in front, the session cookie is `Secure`, and
+  setup is completed before the hostname is published (DEC-180).
   Auth-off means no public exposure of any kind. Authentication alone does not
   authorize an internet-facing deployment; the operator contract for both
   modes is `docs/operations/runbook.md`'s auth and reverse-proxy sections.

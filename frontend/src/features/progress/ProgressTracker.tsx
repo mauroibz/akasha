@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { queryKeys } from "@/api/keys";
+import { ApiError } from "@/api/request";
 import {
   fetchOutline,
   patchEntry,
@@ -313,7 +314,14 @@ function AddTotal({
     mutationFn: (count: number) =>
       patchItem(itemId, { metadata: { [field]: count } }),
     onSuccess: onSaved,
-    onError: () => toast.error(`The ${unit} count could not be saved`),
+    onError: (error: Error) =>
+      toast.error(`The ${unit} count could not be saved`, {
+        // A shared item says why it was refused (DEC-180).
+        description:
+          error instanceof ApiError && error.code === "item_shared"
+            ? error.message
+            : undefined,
+      }),
   });
   const count = Number(value);
   const valid = Number.isInteger(count) && count >= 1 && count <= 2000;
