@@ -1054,6 +1054,25 @@ class ImportService:
                 session.commit()
         return attachment
 
+    def _may_replace_cover(self, item_id: int) -> bool:
+        """Whether this import may put its cover on the item (DEC-180 §2).
+
+        The item is shared: an import fills a missing cover for everyone, but replaces
+        an existing one only when nobody else holds an entry on it, the same rule a
+        person editing the cover by hand is held to.
+        """
+        with Session(self.engine) as session:
+            return bool(
+                session.execute(
+                    text(
+                        "SELECT (SELECT cover_path FROM items WHERE id = :item) IS NULL"
+                        " OR NOT EXISTS (SELECT 1 FROM entries"
+                        "   WHERE item_id = :item AND user_id <> :user)"
+                    ),
+                    {"item": item_id, "user": self.user_id},
+                ).scalar_one()
+            )
+
     def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
         result = self.imports.commit(
             batch_id,
@@ -1079,7 +1098,7 @@ class ImportService:
         for item_id, cover_relative, attachment_relative, attachment_name in installs:
             if cover_relative:
                 staged = self.data_dir / cover_relative
-                if staged.is_file():
+                if staged.is_file() and self._may_replace_cover(item_id):
                     try:
                         install_cover(staged, self.data_dir, item_id)
                         self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")

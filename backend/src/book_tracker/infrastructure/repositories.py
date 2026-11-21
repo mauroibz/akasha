@@ -249,6 +249,9 @@ class DomainRepository:
                     .where(
                         ItemIdentifierRow.kind == kind,
                         ItemIdentifierRow.normalized_value.in_(chunk),
+                        # Whose files: an item is shared, an attachment is not
+                        # (DEC-180), so another person's epub is not "already here".
+                        AttachmentRow.user_id == self.user_id,
                     )
                 )
                 for value, filename in rows:

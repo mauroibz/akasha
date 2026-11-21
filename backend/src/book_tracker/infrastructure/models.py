@@ -302,6 +302,8 @@ class AttachmentRow(Base):
     __tablename__ = "attachments"
     id: Mapped[int] = mapped_column(primary_key=True)
     item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    #: Whose file it is (migration 0034, DEC-180): the item is shared, the file is not.
+    user_id: Mapped[int]
     filename: Mapped[str]
     byte_size: Mapped[int]
     sha256: Mapped[str]

@@ -245,8 +245,8 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
             connection.execute(
                 text(
                     "INSERT INTO attachments "
-                    "(item_id,filename,byte_size,sha256,created_at,updated_at) "
-                    "VALUES (:item,'private.txt',18,:sha,:now,:now) RETURNING id"
+                    "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                    "VALUES (:item,1,'private.txt',18,:sha,:now,:now) RETURNING id"
                 ),
                 {"item": owned.item_id, "sha": digest, "now": now},
             ).scalar_one()

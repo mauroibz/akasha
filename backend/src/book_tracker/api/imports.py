@@ -5,13 +5,13 @@ from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request
 from fastapi import UploadFile as DroppedFile
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
-from book_tracker.api.identity import CurrentUser
+from book_tracker.api.identity import AdminUser, CurrentUser, Principal, current_user
 from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError, clean_attachment_filename
 from book_tracker.domain.importers import (
@@ -42,9 +42,14 @@ from book_tracker.infrastructure.repositories import DomainRepository
 #: in memory (DEC-049).
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
-router = APIRouter(prefix="/api/import", tags=["imports"])
-catalog_router = APIRouter(prefix="/api/importers", tags=["imports"])
-enrichment_router = APIRouter(prefix="/api/enrichment", tags=["enrichment"])
+# Every route names its principal (Sprint 128): a request that slipped past the
+# middleware still answers 401 rather than reaching a handler.
+_PRINCIPAL = [Depends(current_user)]
+router = APIRouter(prefix="/api/import", tags=["imports"], dependencies=_PRINCIPAL)
+catalog_router = APIRouter(prefix="/api/importers", tags=["imports"], dependencies=_PRINCIPAL)
+enrichment_router = APIRouter(
+    prefix="/api/enrichment", tags=["enrichment"], dependencies=_PRINCIPAL
+)
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 MAX_IMPORT_FILES = 1000
 
@@ -368,8 +373,23 @@ def _targets(value: object) -> tuple[str, ...] | None:
     )
 
 
+def _require_operator(user: Principal) -> None:
+    """The server-side mount is the operator's (DEC-180 §3).
+
+    A path input reads a folder on the server (`CALIBRE_DIR`), not something the
+    person sent, so it is the admin's to browse and import; the upload variants of
+    the same connector stay open to everyone. Auth off has one user, an admin.
+    """
+    if not user.is_admin:
+        raise LibraryError(
+            "forbidden",
+            "Only an administrator can read the server's library folder",
+            status_code=403,
+        )
+
+
 async def _source(
-    request: Request, importer_name: str
+    request: Request, importer_name: str, user: Principal
 ) -> tuple[ImportSource, tuple[str, ...] | None]:
     importer = IMPORTERS[importer_name]
     bundle_inputs = [spec for spec in _inputs(importer) if spec.kind in ("directory", "export")]
@@ -429,6 +449,7 @@ async def _source(
             ImportSource(data=b"".join(chunks), filename=upload.filename, options=options or None),
             targets,
         )
+    _require_operator(user)
     try:
         body = await request.json()
         value = body.get(spec.field) if isinstance(body, dict) else None
@@ -635,7 +656,7 @@ async def detect(files: Annotated[list[DroppedFile], File()]) -> DetectResponse:
 async def preview(importer_name: str, request: Request, user: CurrentUser) -> PreviewResponse:
     await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
     import_service = service(request, importer_name, user.effective_user_id)
-    source, targets = await _source(request, importer_name)
+    source, targets = await _source(request, importer_name, user)
     try:
         # Reading and staging a whole export is the longest synchronous thing a
         # preview does: a large Goodreads file or Calibre library (Sprint 087).
@@ -820,6 +841,7 @@ def _file_too_large(cap: int) -> LibraryError:
 def browse(
     importer_name: str,
     request: Request,
+    user: CurrentUser,
     path: str = Query("", max_length=500),
 ) -> ImportBrowseResponse:
     """List what one folder under a browsable connector's source holds.
@@ -835,6 +857,7 @@ def browse(
         raise LibraryError(
             "importer_not_browsable", "This importer has no browsable source", status_code=404
         )
+    _require_operator(user)
     try:
         result = importer.browse(path, ImportReadContext(path_root=request.app.state.calibre_dir))
     except ImportReadError as error:
@@ -1038,7 +1061,7 @@ def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobPro
 
     repo = JobRepository(request.app.state.engine)
     job = repo.get_job(job_id)
-    if job is None or (job["user_id"] is not None and job["user_id"] != user.effective_user_id):
+    if job is None or not repo.visible_to(job, user.effective_user_id, is_admin=user.is_admin):
         raise LibraryError("job_not_found", "Job was not found", status_code=404)
     return JobProgressResponse.model_validate(job)
 
@@ -1050,7 +1073,7 @@ def retry_job(job_id: str, request: Request, user: CurrentUser) -> JobProgressRe
 
     repo = JobRepository(request.app.state.engine)
     job = repo.get_job(job_id)
-    if job is None or (job["user_id"] is not None and job["user_id"] != user.effective_user_id):
+    if job is None or not repo.visible_to(job, user.effective_user_id, is_admin=user.is_admin):
         raise LibraryError("job_not_found", "Job was not found", status_code=404)
     if not repo.retry(job_id):
         raise LibraryError("job_not_failed", "Only a failed job can be retried", status_code=409)
@@ -1058,10 +1081,11 @@ def retry_job(job_id: str, request: Request, user: CurrentUser) -> JobProgressRe
 
 
 @enrichment_router.post("/backfill", status_code=202, response_model=BackfillResponse)
-def backfill_enrichment(request: Request) -> BackfillResponse:
+def backfill_enrichment(request: Request, admin: AdminUser) -> BackfillResponse:
     """Queue enrichment for persisted items a provider lookup could still improve.
 
-    Explicit and operator-driven: it only queues work, and the handler it queues fills
+    Explicit and operator-driven, so admin-only (DEC-180 §3): it walks every item in
+    the install, not the caller's. It only queues work, and the handler it queues fills
     empty fields only, so it can never overwrite a hand edit. Each domain is asked on
     its own identifier and its own incompleteness rule (DEC-067 row 3).
     """

@@ -333,6 +333,26 @@ class JobRepository:
                 for row in rows
             ]
 
+    def visible_to(self, job: Mapping[str, Any], user_id: int, *, is_admin: bool) -> bool:
+        """Whether one person may read or retry this job (Sprint 128, finding F21).
+
+        The rule `changes_for_user` streams by: a person's own jobs, and owner-less
+        jobs chained to one of their import batches. An owner-less job with no batch
+        (an install-wide enrichment backfill) is nobody's, so only an admin sees it.
+        """
+        if job["user_id"] is not None:
+            return bool(job["user_id"] == user_id)
+        batch_id = job.get("batch_id")
+        if batch_id is None:
+            return is_admin
+        from book_tracker.infrastructure.models import ImportBatchRow
+
+        with Session(self.engine) as session:
+            owner = session.scalar(
+                select(ImportBatchRow.user_id).where(ImportBatchRow.id == batch_id)
+            )
+        return owner == user_id
+
     def retry(self, job_id: str) -> bool:
         """Queue a dead-lettered job again with its attempts reset. False if not failed."""
         now_iso = _now()
