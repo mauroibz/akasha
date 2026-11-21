@@ -75,7 +75,7 @@ async def test_cover_rejects_excessive_pixels_before_loading(
             self.loaded = True
 
     huge = HugeImage()
-    monkeypatch.setattr(Image, "open", lambda _path: huge)
+    monkeypatch.setattr(Image, "open", lambda _path, **_kwargs: huge)
 
     async def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=b"jpeg")
