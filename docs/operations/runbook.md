@@ -414,7 +414,8 @@ and must never run with auth off; it has its own recovery path,
 [When you are locked out](#when-you-are-locked-out).
 
 **Sessions, and signing a device out.** Each sign-in lasts 400 days and slides
-forward while in use, so a regularly used device never asks again. The
+forward while in use, so a regularly used device never asks again
+(`AKASHA_SESSION_DAYS` changes the 400; the public overlay sets 30). The
 account section (top-right name → *Account*) lists every signed-in device with
 its last use and user agent: *Revoke* ends one, *Sign out everywhere* ends
 them all. Use it when a phone is lost.
@@ -732,6 +733,24 @@ command again; it removes the loopback port and restores the Access check.
 | Pulled, off-host backups | A compromised application deleting the library and its backups together. |
 
 None of these stands alone, and none is a reason to skip another.
+
+### Watching for attacks
+
+Every refusal at Akasha's own door leaves one JSON line with
+`"category": "security"`: `login_failed`, `login_rate_limited`,
+`login_succeeded`, `setup_code_invalid`, `setup_rate_limited`,
+`password_change_failed`, `password_change_rate_limited` and
+`cross_site_request_refused`, each with the `client` address the limiter used
+and, for logins, the `username` tried (never a password). Requests refused by
+the Access check log `cloudflare_access_refused`.
+
+```bash
+docker compose logs akasha | grep '"category": "security"'
+```
+
+A burst of `login_failed` from one address, or `login_succeeded` from an
+address you do not recognise, is the reason to look at *Account → Sessions*
+and revoke. These lines are what a log alert or fail2ban filter should match.
 
 ## Metrics
 
