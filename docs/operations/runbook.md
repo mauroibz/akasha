@@ -90,6 +90,16 @@ cannot be written the application refuses to migrate and exits, which is
 deliberate: an unprotected schema rewrite on a database full of your own ratings
 is worse than downtime.
 
+The whole upgrade runs in one SQLite transaction, schema changes included: a
+migration that fails part-way (disk full, a killed container) leaves the
+database exactly at the revision it started from, and the next start simply
+tries again. Under `restart: unless-stopped` that retry loop does not pile up
+backups: a start reuses an existing pre-migration copy only while it still holds
+exactly what the live database holds (its manifest records a content digest).
+Once the library has changed since — for example after a rollback and some weeks
+on the previous version — the next upgrade takes a fresh copy, and the log line
+is `pre_migration_backup_written` rather than `pre_migration_backup_reused`.
+
 Migration `0007` rewrites every row in `items`. On a library of a few thousand
 books it takes well under a second; the log line to look for is
 `pre_migration_backup_written`.
