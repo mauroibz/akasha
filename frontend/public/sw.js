@@ -6,7 +6,11 @@
 const SHELL = "akasha-shell-v1";
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(SHELL).then((cache) => cache.addAll(["/"])));
+  // theme-init.js is the shell's one classic script (Sprint 128 moved it out of
+  // index.html for the Content-Security-Policy), so it is kept with the shell.
+  event.waitUntil(
+    caches.open(SHELL).then((cache) => cache.addAll(["/", "/theme-init.js"])),
+  );
   self.skipWaiting();
 });
 
@@ -38,6 +42,19 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match("/")),
+    );
+    return;
+  }
+  if (url.pathname === "/theme-init.js") {
+    // Network first like the shell, so a changed script is picked up at once.
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(SHELL).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request)),
     );
     return;
   }

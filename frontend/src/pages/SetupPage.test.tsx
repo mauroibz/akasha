@@ -48,7 +48,8 @@ describe("SetupPage", () => {
     ).toBeVisible();
     await user.type(screen.getByLabelText("Username"), "mauro");
     await user.type(screen.getByLabelText("Display name"), "Mauro");
-    await user.type(screen.getByLabelText("Password"), "correct horse");
+    await user.type(screen.getByLabelText("Password"), "correct horse battery");
+    await user.type(screen.getByLabelText("Setup code"), " k7mq-3xwd-p9hz ");
     await user.click(screen.getByRole("button", { name: "Claim library" }));
 
     expect(
@@ -64,7 +65,8 @@ describe("SetupPage", () => {
       body: JSON.stringify({
         username: "mauro",
         display_name: "Mauro",
-        password: "correct horse",
+        password: "correct horse battery",
+        setup_code: "k7mq-3xwd-p9hz",
       }),
     });
     expect(localStorage).toHaveLength(0);
@@ -95,5 +97,70 @@ describe("SetupPage", () => {
     expect(password).toHaveAttribute("name", "password");
     expect(password).toHaveAttribute("type", "password");
     expect(password).toHaveAttribute("autocomplete", "new-password");
+    const code = screen.getByLabelText("Setup code");
+    expect(code).toHaveAttribute("name", "setup_code");
+    expect(code).toHaveAccessibleDescription(
+      "Printed in the server log when Akasha starts (docker compose logs akasha).",
+    );
+  });
+
+  it("refuses a short password before asking the server", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <SetupPage onAuthenticated={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByLabelText("Username"), "mauro");
+    await user.type(screen.getByLabelText("Display name"), "Mauro");
+    await user.type(screen.getByLabelText("Password"), "elevenchars");
+    await user.type(screen.getByLabelText("Setup code"), "code");
+    await user.click(screen.getByRole("button", { name: "Claim library" }));
+
+    expect(
+      await screen.findByText("Use at least 12 characters for a new password."),
+    ).toBeVisible();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("says plainly when the setup code is wrong", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "setup_code_invalid",
+                message: "Enter the setup code",
+                details: {},
+              },
+            }),
+            { status: 403 },
+          ),
+      ),
+    );
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <SetupPage onAuthenticated={vi.fn()} />
+      </MemoryRouter>,
+    );
+    await user.type(screen.getByLabelText("Username"), "mauro");
+    await user.type(screen.getByLabelText("Display name"), "Mauro");
+    await user.type(
+      screen.getByLabelText("Password"),
+      "a long enough password",
+    );
+    await user.type(screen.getByLabelText("Setup code"), "wrong");
+    await user.click(screen.getByRole("button", { name: "Claim library" }));
+
+    expect(
+      await screen.findByText(
+        "That setup code is not right. Copy it again from the server log.",
+      ),
+    ).toBeVisible();
   });
 });

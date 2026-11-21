@@ -50,6 +50,21 @@ export async function stubAuth(page: Page, initial: AuthMode) {
     }),
   );
   await page.route("**/api/auth/setup", async (route) => {
+    // The server refuses setup without the code printed in its log (Sprint 128).
+    const body = route.request().postDataJSON() as { setup_code?: string };
+    if (!body.setup_code) {
+      await route.fulfill({
+        status: 403,
+        json: {
+          error: {
+            code: "setup_code_invalid",
+            message: "Enter the setup code printed in the server log",
+            details: {},
+          },
+        },
+      });
+      return;
+    }
     setupRequired = false;
     authenticated = true;
     actingAs = null;

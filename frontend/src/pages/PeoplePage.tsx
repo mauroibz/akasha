@@ -8,6 +8,7 @@ import {
   createUser,
   deleteUser,
   getUsers,
+  requireNewPassword,
   updateUser,
   type AuthUser,
   type ManagedUser,
@@ -54,12 +55,14 @@ function PersonRow({
   const [target, setTarget] = useState("");
   const users = cache.getQueryData<ManagedUser[]>(queryKeys.users) ?? [];
   const save = useMutation({
-    mutationFn: () =>
-      updateUser(person.id, {
+    mutationFn: () => {
+      if (password) requireNewPassword(password);
+      return updateUser(person.id, {
         display_name: name,
         is_admin: isAdmin,
         ...(password ? { password } : {}),
-      }),
+      });
+    },
     onSuccess: () => {
       if (
         actingAs?.id === person.id &&
@@ -170,6 +173,11 @@ function PersonRow({
           </Button>
         ) : null}
       </div>
+      {save.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {save.error.message}
+        </p>
+      ) : null}
       <AlertDialog open={deleting} onOpenChange={setDeleting}>
         <AlertDialogContent className="max-h-[90vh] max-w-[calc(100%-2rem)] overflow-y-auto rounded-xl">
           <AlertDialogHeader>
@@ -270,13 +278,15 @@ export function PeoplePage({
     enabled: user.is_admin,
   });
   const create = useMutation({
-    mutationFn: () =>
-      createUser({
+    mutationFn: () => {
+      requireNewPassword(password);
+      return createUser({
         username,
         display_name: displayName,
         password,
         is_admin: admin,
-      }),
+      });
+    },
     onSuccess: () => {
       setUsername("");
       setDisplayName("");

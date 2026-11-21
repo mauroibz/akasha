@@ -39,6 +39,7 @@ test("first-run setup claims the library by keyboard at 390px", async ({
     setupUsername,
     page.getByLabel("Display name"),
     page.getByLabel("Password"),
+    page.getByLabel("Setup code"),
     page.getByRole("button", { name: "Claim library" }),
   ]) {
     expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
@@ -47,6 +48,7 @@ test("first-run setup claims the library by keyboard at 390px", async ({
     setupUsername,
     page.getByLabel("Display name"),
     page.getByLabel("Password"),
+    page.getByLabel("Setup code"),
   ]) {
     expect(
       await input.evaluate((node) =>
@@ -66,6 +68,10 @@ test("first-run setup claims the library by keyboard at 390px", async ({
   await expect(page.getByLabel("Password")).toBeFocused();
   await expectFocusRing(page.getByLabel("Password"));
   await page.keyboard.type("right password");
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Setup code")).toBeFocused();
+  await expectFocusRing(page.getByLabel("Setup code"));
+  await page.keyboard.type("k7mq-3xwd-p9hz");
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("button", { name: "Claim library" }),
