@@ -500,19 +500,22 @@ class JobRunner:
         every request in the process for as long as it waited (Sprint 087).
         """
         self._running = True
-        if self.data_dir is not None:
-            # A commit installs its staged covers and ebooks after the database
-            # commit; a process killed in between left them behind. The first thing a
-            # new process does is finish that (Sprint 129).
-            try:
-                await off_loop(self._resume_interrupted_installs, self.data_dir)
-            except Exception:
-                logger.exception("interrupted import installs could not be resumed")
+        resumed = False
         while self._running:
             try:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
                     await off_loop(self.repo.reclaim_expired, now, max_retries=self.max_retries)
+                    if self.data_dir is not None and not resumed:
+                        # A commit installs its staged covers and ebooks after the
+                        # database commit; a process killed in between left them
+                        # behind. A new process finishes that on its first idle pass
+                        # (Sprint 129) — once, and never ahead of queued work.
+                        resumed = True
+                        try:
+                            await off_loop(self._resume_interrupted_installs, self.data_dir)
+                        except Exception:
+                            logger.exception("interrupted import installs could not be resumed")
                     if self.data_dir is not None:
                         await off_loop(
                             reclaim_import_batches,
