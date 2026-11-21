@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { logout, stopActingAs, type AuthUser } from "@/api/auth";
 import { ActivityIndicator } from "@/features/activity/ActivityIndicator";
 import { JobEventsProvider } from "@/features/activity/JobEvents";
+import { isActive, useJobEvent } from "@/features/activity/jobEvents";
 import { DataCredit } from "@/components/DataCredit";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,7 @@ import { useCommandBar } from "@/features/command/commandBar";
 import { Kbd } from "@/components/ui/kbd";
 import { queryKeys } from "@/api/keys";
 import { getInboxCount } from "@/api/library";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface NavItem {
   readonly to: string;
@@ -75,11 +76,21 @@ const navItems: readonly NavItem[] = [
  * import's results are one click from anywhere, and an empty Inbox says nothing.
  */
 function InboxBadge() {
+  const queryClient = useQueryClient();
   const count = useQuery({
     queryKey: queryKeys.triage.count,
     queryFn: ({ signal }) => getInboxCount(signal),
-    staleTime: 15_000,
+    // The count changes when an import lands, which this tab learns from its own
+    // writes (they invalidate it) or from a job finishing on the events stream
+    // (below). Coming back to the window still recounts once it is a minute old,
+    // for the import another device ran meanwhile: one `limit=1` request.
+    staleTime: 60_000,
+    refetchOnWindowFocus: true,
     retry: false,
+  });
+  useJobEvent((event) => {
+    if (!isActive(event))
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
   });
   if (!count.data) return null;
   return (

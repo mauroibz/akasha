@@ -1,11 +1,15 @@
 """The application factory. Each concern lives in `book_tracker.app` (Sprint 088)."""
 
 from datetime import timedelta
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from starlette.datastructures import Headers
+from starlette.middleware.gzip import DEFAULT_EXCLUDED_CONTENT_TYPES, GZipMiddleware
+from starlette.staticfiles import NotModifiedResponse
 
 from book_tracker.api.auth import router as auth_router
 from book_tracker.api.auth import users_router
@@ -28,6 +32,53 @@ from book_tracker.config import Settings
 
 #: Kept under its old name for the migration tests that call it directly.
 _back_up_before_migrating = back_up_before_migrating
+
+#: Vite names every file under `assets/` after its content, so a name never
+#: changes meaning: a year, and no revalidation (Sprint 129).
+IMMUTABLE = "public, max-age=31536000, immutable"
+#: Everything else at the static root keeps its name across deployments (the
+#: service worker above all), so the browser revalidates it on every use.
+REVALIDATE = "no-cache"
+#: Below this a compressed body saves less than the work costs.
+GZIP_MINIMUM_BYTES = 1024
+#: Close to level 9's size on text bundles and JSON, at a fraction of the CPU.
+GZIP_LEVEL = 5
+#: Starlette's own list (the event stream, archives, raster images, fonts) plus
+#: attachments, which are served as opaque octet streams and are mostly EPUBs and
+#: PDFs: already compressed, up to the attachment cap in size, and a download
+#: keeps its `Content-Length` only uncompressed.
+GZIP_EXCLUDED = (
+    *DEFAULT_EXCLUDED_CONTENT_TYPES,
+    "application/octet-stream",
+    "application/pdf",
+    "application/epub+zip",
+)
+
+
+def _not_modified(response: Response, request: Headers) -> bool:
+    """Whether the request's validators match the file's, read as StaticFiles reads them."""
+    if if_none_match := request.get("if-none-match"):
+        if if_none_match.strip() == "*":
+            return True
+        etag = response.headers["etag"]
+        return etag in {tag.strip().removeprefix("W/") for tag in if_none_match.split(",")}
+    if_modified_since = request.get("if-modified-since")
+    if if_modified_since is None:
+        return False
+    try:
+        since = parsedate_to_datetime(if_modified_since)
+        modified = parsedate_to_datetime(response.headers["last-modified"])
+    except (TypeError, ValueError, IndexError):
+        return False
+    return since >= modified
+
+
+def _static_file(path: Path, request: Request, cache_control: str) -> Response:
+    """A file from the static root, answering a conditional request with 304."""
+    response = FileResponse(path, stat_result=path.stat(), headers={"Cache-Control": cache_control})
+    if _not_modified(response, request.headers):
+        return NotModifiedResponse(response.headers)
+    return response
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -57,6 +108,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_lifetime = timedelta(days=configured.session_days)
 
     install_error_handlers(app)
+    # Innermost (Sprint 129), where it sees each route's own response: the
+    # function middlewares above re-stream every body in chunks, and a streamed
+    # body is compressed whatever its size. Starlette leaves `text/event-stream`
+    # (`/api/events` must arrive event by event) and compressed images alone.
+    app.add_middleware(
+        GZipMiddleware,
+        minimum_size=GZIP_MINIMUM_BYTES,
+        compresslevel=GZIP_LEVEL,
+        exclude_content_types=GZIP_EXCLUDED,
+    )
     install_body_limits(app)
     install_middleware(app, configured)
     install_security_headers(app)
@@ -88,14 +149,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     static_dir = configured.static_dir
     if static_dir is not None:
-        index = Path(static_dir) / "index.html"
+        root = Path(static_dir).resolve()
+        index = root / "index.html"
+        hashed = root / "assets"
 
         @app.get("/{path:path}", include_in_schema=False, response_model=None)
-        def spa(path: str) -> Response:
-            root = Path(static_dir).resolve()
+        def spa(path: str, request: Request) -> Response:
             candidate = (root / path).resolve()
             if candidate.is_relative_to(root) and candidate.is_file() and candidate != index:
-                return FileResponse(candidate)
+                immutable = candidate.is_relative_to(hashed)
+                return _static_file(candidate, request, IMMUTABLE if immutable else REVALIDATE)
             # The shell must be revalidated on every load, so a deployment's new
             # asset names (and security headers) reach the browser at once.
             return HTMLResponse(
