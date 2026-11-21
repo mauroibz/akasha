@@ -951,6 +951,9 @@ def delete_user(
                 "import_records",
                 "import_effects",
                 "jobs",
+                # Owned since migration 0034 (DEC-180); without this the cascade on the
+                # deleted user would take the transferred library's files with it.
+                "attachments",
             ):
                 connection.execute(
                     text(f"UPDATE {table} SET user_id=:target WHERE user_id=:source"),

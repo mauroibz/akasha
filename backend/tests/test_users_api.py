@@ -340,6 +340,16 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
                 owned.entry_id, shelf_id
             )
             batch_id = seed_import_ledger(app, int(second["id"]), owned.entry_id, owned.item_id)
+            now = datetime.now(UTC).isoformat()
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO attachments "
+                        "(item_id,user_id,filename,byte_size,sha256,created_at,updated_at) "
+                        "VALUES (:item,:user,'notes.txt',4,:sha,:now,:now)"
+                    ),
+                    {"item": owned.item_id, "user": second["id"], "sha": "b" * 64, "now": now},
+                )
             transferred = await client.request(
                 "DELETE",
                 f"/api/users/{second['id']}",
@@ -350,6 +360,13 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
             assert (
                 connection.execute(
                     text("SELECT count(*) FROM entries WHERE user_id=1")
+                ).scalar_one()
+                == 1
+            )
+            # A transferred library keeps its files (DEC-180: attachments are owned).
+            assert (
+                connection.execute(
+                    text("SELECT count(*) FROM attachments WHERE user_id=1")
                 ).scalar_one()
                 == 1
             )
