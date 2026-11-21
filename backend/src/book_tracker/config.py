@@ -1,8 +1,24 @@
+import re
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SecretsSettingsSource,
+    SettingsConfigDict,
+)
+
+#: Docker and Compose secrets are mounted here (Sprint 128). A file is named like the
+#: environment variable it replaces, in lower case: `akasha_admin_password` for
+#: AKASHA_ADMIN_PASSWORD, `tmdb_read_token` for TMDB_READ_TOKEN. The environment wins
+#: when both are set. Read only when the directory exists, because pydantic-settings
+#: warns about a configured directory that does not.
+SECRETS_DIR = Path("/run/secrets")
+
+#: A bare DNS name: what Cloudflare calls the team domain, `<team>.cloudflareaccess.com`.
+_HOSTNAME = re.compile(r"(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}")
 
 
 class Settings(BaseSettings):
@@ -62,6 +78,47 @@ class Settings(BaseSettings):
     admin_username: str | None = None
     admin_password: SecretStr | None = None
     static_dir: Path | None = None
+    # Cloudflare Access as a second gate (DEC-180 point 4). With both set, every request
+    # must carry a valid Access JWT for this team and application, so one that bypassed
+    # Access is refused even if it reaches the container. Neither set: no check.
+    cf_access_team_domain: str | None = None
+    cf_access_aud: str | None = None
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Decided per instantiation rather than in model_config, so the directory is
+        # looked for when the settings are read, and only used when it is there.
+        if SECRETS_DIR.is_dir():
+            file_secret_settings = SecretsSettingsSource(settings_cls, secrets_dir=SECRETS_DIR)
+        return init_settings, env_settings, dotenv_settings, file_secret_settings
+
+    @field_validator("cf_access_team_domain", "cf_access_aud", mode="before")
+    @classmethod
+    def blank_is_unset(cls, value: object) -> object:
+        # The compose pass-through hands an empty `.env` line over as "".
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("cf_access_team_domain")
+    @classmethod
+    def team_domain_is_a_host(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        host = value.lower().removeprefix("https://").rstrip("/")
+        if not _HOSTNAME.fullmatch(host):
+            raise ValueError(
+                "AKASHA_CF_ACCESS_TEAM_DOMAIN must be a host name such as "
+                "myteam.cloudflareaccess.com"
+            )
+        return host
 
     @model_validator(mode="after")
     def validate_admin_bootstrap(self) -> "Settings":
@@ -75,6 +132,14 @@ class Settings(BaseSettings):
             raise ValueError(
                 "AKASHA_TRUSTED_PROXY_HEADER requires AKASHA_TRUSTED_PROXY_PEERS; "
                 "otherwise any direct caller could turn it into an authentication bypass"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_cloudflare_access(self) -> "Settings":
+        if (self.cf_access_team_domain is None) != (self.cf_access_aud is None):
+            raise ValueError(
+                "AKASHA_CF_ACCESS_TEAM_DOMAIN and AKASHA_CF_ACCESS_AUD must be set together"
             )
         return self
 

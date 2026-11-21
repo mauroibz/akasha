@@ -16,6 +16,7 @@ from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
+from book_tracker.app.cloudflare_access import install_cloudflare_access
 from book_tracker.app.errors import NOT_FOUND, install_error_handlers
 from book_tracker.app.health import install_health_routes
 from book_tracker.app.lifespan import back_up_before_migrating, make_lifespan
@@ -85,6 +86,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return FileResponse(candidate)
             return HTMLResponse(index.read_text(encoding="utf-8"))
 
+    # Last, so it is the outermost middleware (DEC-180 point 4).
+    install_cloudflare_access(app, configured)
     return app
 
 
