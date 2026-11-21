@@ -321,6 +321,8 @@ def build_calibre_export(
     book_path: str = "Brandon Sanderson/Mistborn (2)",
     corrupt_checksum: bool = False,
     omit_part_one: bool = False,
+    data_name: str = "Mistborn",
+    data_format: str = "EPUB",
 ) -> list[Path]:
     """A synthetic two-part "Export/import all calibre data" bundle.
 
@@ -346,9 +348,9 @@ def build_calibre_export(
         INSERT INTO books VALUES (2, 'Mistborn', '2006-01-01', '{book_path}', 'uuid-m1');
         INSERT INTO authors VALUES (1, 'Brandon Sanderson');
         INSERT INTO books_authors_link VALUES (2, 1);
-        INSERT INTO data VALUES (1, 2, 'EPUB', 10, 'Mistborn');
         """
     )
+    connection.execute("INSERT INTO data VALUES (1, 2, ?, 10, ?)", (data_format, data_name))
     connection.commit()
     connection.close()
     db_bytes = database.read_bytes()
@@ -372,7 +374,7 @@ def build_calibre_export(
         },
         "libraries": {library_path: 1},
         library_path: {
-            "format_data": {"2": {"EPUB": "epub", ".cover": "cover"}},
+            "format_data": {"2": {data_format.upper(): "epub", ".cover": "cover"}},
             "metadata.db": "db",
             "total": 1,
             "extra_files": {"2": {}},
@@ -494,6 +496,48 @@ async def test_a_calibre_export_naming_a_book_path_outside_the_library_is_refuse
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("data_name", "data_format"),
+    [
+        ("ABSOLUTE", "PY"),
+        ("../../../../escape", "EPUB"),
+        ("sub/dir", "EPUB"),
+        ("..", "EPUB"),
+        ("back\\slash", "EPUB"),
+        ("nul\x00byte", "EPUB"),
+        ("Mistborn", "py/../../x"),
+        ("Mistborn", "EP UB"),
+    ],
+)
+async def test_a_calibre_export_never_writes_a_file_name_outside_its_book_folder(
+    tmp_path: Path, data_name: str, data_format: str
+) -> None:
+    """Finding F1 (Sprint 128): the `data` table's `name` and `format` come from the
+    uploaded metadata.db, so they are attacker text. A name that is not one plain path
+    segment, or a format that is not a plain extension, is refused for that book — the
+    row reports a problem and nothing is written anywhere."""
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    if data_name == "ABSOLUTE":
+        data_name = str(victim / "evil")
+    parts = build_calibre_export(tmp_path / "export", data_name=data_name, data_format=data_format)
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/calibre/preview", files=_export_files(parts))
+    assert response.status_code == 201, response.text
+    record = response.json()["records"][0]
+    assert record["attachment_staged"] is False
+    assert {"field": "file", "code": "malformed_row"} in record["errors"]
+    assert list(victim.iterdir()) == []
+    assert not (tmp_path / "escape.epub").exists()
+    written = {path.name for path in (tmp_path / "data").rglob("*") if path.is_file()}
+    assert not any(name.endswith(".py") or name.startswith("escape") for name in written)
+
+
+@pytest.mark.anyio
 async def test_a_calibre_export_rejects_an_undeclared_file(tmp_path: Path) -> None:
     parts = build_calibre_export(tmp_path / "export")
     app = _no_mount_app(tmp_path)
@@ -594,3 +638,18 @@ async def test_a_calibre_export_and_a_mount_normalize_the_same_book_identically(
     assert via_mount.json()["records"][0]["attachment_staged"] is False
     assert via_export.json()["records"][0]["attachment_staged"] is True
     assert via_export.json()["fingerprint"] == via_mount.json()["fingerprint"]
+
+
+def test_an_uploaded_metadata_db_is_opened_without_a_trusted_schema(tmp_path: Path) -> None:
+    """F21 (Sprint 128): a crafted schema must not run side-effecting SQL functions
+    while it is merely read, so every untrusted metadata.db is opened with
+    `trusted_schema=OFF` and `query_only=ON`."""
+    from book_tracker.domains.book.calibre import _connect_untrusted
+
+    database = calibre_library(tmp_path)
+    connection = _connect_untrusted(database)
+    try:
+        assert connection.execute("PRAGMA trusted_schema").fetchone()[0] == 0
+        assert connection.execute("PRAGMA query_only").fetchone()[0] == 1
+    finally:
+        connection.close()
