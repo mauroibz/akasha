@@ -67,6 +67,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.0.0
         with:
           python-version: "3.12"
+          # The Makefile pins its own UV_CACHE_DIR, so the action's default cache
+          # directory is never written and its save step fails the job (see `checks`).
+          enable-cache: false
       - uses: actions/setup-node@v7
         with: { node-version: "22" }
       - run: make audit
