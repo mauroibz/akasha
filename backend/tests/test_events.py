@@ -75,26 +75,36 @@ def test_a_person_sees_their_own_jobs_and_not_anyone_elses(tmp_path: Path) -> No
 
 @pytest.mark.anyio
 async def test_the_stream_carries_each_change_to_a_job(tmp_path: Path) -> None:
+    """Each state a job holds across a poll reaches the stream, in order.
+
+    The stream reads the jobs table once a second, so a state that lasts less than
+    a poll can be skipped by design; the job here therefore holds `running` for
+    longer than one poll. Letting the live runner claim and fail it in the same
+    millisecond made this test fail about one run in five (Sprint 129).
+    """
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        app.state.event_stream_seconds = 2.5
-        # A kind nothing handles: the runner fails it at once, which is a finish.
-        job_id = JobRepository(app.state.engine).enqueue(
-            None, "nothing_handles_this", {}, user_id=1
-        )
-        response = await client.get("/api/events")
+        app.state.job_runner.stop()
+        app.state.event_stream_seconds = 4.0
+        repo = JobRepository(app.state.engine)
+        job_id = repo.enqueue(None, "nothing_handles_this", {}, user_id=1)
+        request = asyncio.create_task(client.get("/api/events"))
+        await asyncio.sleep(1.2)
+        claimed = repo.claim(datetime.now(UTC))
+        assert claimed is not None and claimed.id == job_id, repo.get_job(job_id)
+        await asyncio.sleep(1.5)
+        repo.fail(job_id, "no handler", datetime.now(UTC), code="no_handler")
+        response = await request
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     states = [event["state"] for event in _events(response.text) if event["id"] == job_id]
-    assert states, response.text
-    # Claimed, then failed and requeued with a backoff (a missing handler is retried
-    # like any failure): each change arrives as its own event, in order.
-    assert "running" in states
+    # Queued, claimed, then failed and requeued with a backoff: each change arrives
+    # as its own event, in order.
+    assert states == ["queued", "running", "queued"], response.text
     final = [event for event in _events(response.text) if event["id"] == job_id][-1]
-    assert final["state"] == "queued"
     assert final["attempts"] == 1
     assert final["error_code"] == "no_handler"
     assert final["kind"] == "nothing_handles_this"
