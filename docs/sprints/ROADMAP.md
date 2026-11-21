@@ -1885,6 +1885,16 @@ approved as recommended. All six sprints are completed, unreleased on top of 2.7
   **[126 — Five minutes](126-five-minutes.md)** (**completed**).
 - **[127 — The goal in the Diary](127-the-goal-in-the-diary.md)** (**completed**).
 
+## Public exposure — the hardening line
+
+The owner wants the auth-on install reachable on a personal domain, behind Cloudflare Tunnel
+and Access, recorded 2026-11-21 as **DEC-180**. A six-way audit found a set of ways in and
+ways out; one sprint closes them and documents the deployment.
+
+- **[128 — Public exposure hardening](128-public-exposure-hardening.md)** (**ready**): the
+  request boundary, per-user ownership of attachments and shared items, bounded untrusted
+  input, patched dependencies, and a contained container with a public compose overlay.
+
 ## Not scheduled
 
 - **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024

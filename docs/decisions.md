@@ -7118,3 +7118,37 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   this day* strip intrusive (DEC-178); a goal on the Library page.
 - Consequences: 124 needs a place to keep *I don't remember* per entry and field (migration
   0033). No network call is added to any page render.
+
+## DEC-180 — Public exposure: the hardening line (Sprint 128)
+
+- Date: 2026-11-21
+- Status: accepted
+- Context: the owner wants to publish the auth-on install on a personal domain
+  (`akasha.ibz.com.ar` or similar), probably behind Cloudflare Tunnel and Access, decided later
+  on the real server. Their words: prepare everything so that the login is secure and, even if
+  it is breached, the rest of the system is not at risk. A six-way audit of `12705c9`
+  (authentication, authorization, untrusted input, browser surface, container, dependencies)
+  found the findings F1–F21 listed in Sprint 128, among them an arbitrary file write through a
+  Calibre export upload, an authentication bypass through a forged `Host` header, unlimited
+  password guessing behind a shared peer address, an open first-run setup, and attachments
+  readable across users through the shared item cache.
+- Decision: `FINAL_SPRINT` 127 → 128, plan revision 52. One sprint fixes every finding and
+  documents the deployment:
+  1. The exposure rule stands and gains a fourth condition for the internet: setup is completed
+     (or bootstrapped from the environment) before the hostname is published, and the setup
+     screen asks for a one-time code printed in the server log.
+  2. **Shared items stay shared; their edits do not.** A non-admin edits an item's metadata or
+     cover only while no other user holds an entry on it; otherwise `403 item_shared`. Admins
+     keep the edit. Attachments are owned per user. Manual items are per user, so a hand-typed
+     title is never claimable by another account.
+  3. **The server-side Calibre mount is the operator's**: browsing and importing it is
+     admin-only; the per-user upload variant stays open.
+  4. **Cloudflare Access is a second gate, not the only one.** The application keeps its own
+     login; optionally it verifies the `Cf-Access-Jwt-Assertion` on every request so a request
+     that bypassed Access is refused even if it reaches the container.
+  5. The container is contained by default: root-owned code, read-only root filesystem, no
+     capabilities, resource limits, temp files on the data volume. The public overlay publishes
+     no port; only the tunnel sidecar reaches the application.
+- Consequences: migration for attachment ownership; the session cookie is renamed to
+  `__Host-akasha_session` when Secure (one sign-in again per device); new passwords need 12
+  characters; existing ones keep working.
