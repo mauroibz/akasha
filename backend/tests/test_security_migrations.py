@@ -15,6 +15,7 @@ weeks on the old image) gets a fresh rollback point.
 import json
 import shutil
 import sqlite3
+import time
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -176,6 +177,22 @@ def test_a_multi_revision_upgrade_is_one_transaction(
 
     assert _revision(database) == TWO_BEFORE_OWNERS
     assert _schema(database) == before
+
+
+def test_a_start_with_nothing_pending_does_not_need_the_write_lock(tmp_path: Path) -> None:
+    """Every start runs the upgrade; at head it only reads, so a writer elsewhere
+    (a backup, the CLI) must not stall it."""
+    configured = _settings(tmp_path)
+    upgrade(_url(configured))
+    holder = sqlite3.connect(configured.data_dir / "books.db", isolation_level=None)
+    holder.execute("BEGIN IMMEDIATE")
+    try:
+        started = time.monotonic()
+        upgrade(_url(configured))
+        assert time.monotonic() - started < 2.0
+    finally:
+        holder.execute("ROLLBACK")
+        holder.close()
 
 
 def test_migrations_still_run_with_foreign_keys_off(tmp_path: Path) -> None:

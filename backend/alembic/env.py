@@ -40,9 +40,10 @@ def _one_sqlite_transaction(engine: Engine) -> None:
 
     @event.listens_for(engine, "begin")
     def _on_begin(connection: Connection) -> None:
-        # IMMEDIATE takes the write lock up front: an upgrade that cannot get it
-        # fails before it has done anything, not halfway through.
-        connection.exec_driver_sql("BEGIN IMMEDIATE")
+        # Deferred, not IMMEDIATE: every start runs this, and a start with nothing
+        # pending only reads `alembic_version`. It must not need the write lock,
+        # or a writer elsewhere (a backup, the CLI) would stall or fail the start.
+        connection.exec_driver_sql("BEGIN")
 
 
 def run_migrations_online() -> None:
