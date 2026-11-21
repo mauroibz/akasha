@@ -11,6 +11,7 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -499,13 +500,27 @@ class JobRunner:
         every request in the process for as long as it waited (Sprint 087).
         """
         self._running = True
+        if self.data_dir is not None:
+            # A commit installs its staged covers and ebooks after the database
+            # commit; a process killed in between left them behind. The first thing a
+            # new process does is finish that (Sprint 129).
+            try:
+                await off_loop(self._resume_interrupted_installs, self.data_dir)
+            except Exception:
+                logger.exception("interrupted import installs could not be resumed")
         while self._running:
             try:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
                     await off_loop(self.repo.reclaim_expired, now, max_retries=self.max_retries)
                     if self.data_dir is not None:
-                        await off_loop(reclaim_import_batches, self.engine, self.data_dir, now=now)
+                        await off_loop(
+                            reclaim_import_batches,
+                            self.engine,
+                            self.data_dir,
+                            now=now,
+                            resume=partial(self._resume_install, self.data_dir),
+                        )
                     await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
                 raise
@@ -515,6 +530,19 @@ class JobRunner:
 
     def stop(self) -> None:
         self._running = False
+
+    # The install is the import pipeline's (application layer), imported where it
+    # is called: `application.imports` imports this module, so a top-level import
+    # here would be a cycle.
+    def _resume_interrupted_installs(self, data_dir: Path) -> None:
+        from book_tracker.application.imports import resume_interrupted_installs
+
+        resume_interrupted_installs(self.engine, data_dir)
+
+    def _resume_install(self, data_dir: Path, batch_id: str) -> None:
+        from book_tracker.application.imports import resume_staged_install
+
+        resume_staged_install(self.engine, data_dir, batch_id)
 
     async def tick(self, now: datetime) -> bool:
         """Process at most one job. Returns True if a job was processed."""

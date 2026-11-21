@@ -1,28 +1,37 @@
 """Robustness follow-ups (Sprint 129): failures that are not the provider's, kept off it."""
 
+import asyncio
 import hashlib
 import os
 import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
+import httpx
 import pytest
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
+from book_tracker.application.imports import (
+    ImportService,
+    resume_interrupted_installs,
+    resume_staged_install,
+)
 from book_tracker.application.providers import search_providers
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import SearchCandidate, SourceRef
 from book_tracker.infrastructure.attachments import blob_path, store_blob
 from book_tracker.infrastructure.covers import install_cover
-from book_tracker.infrastructure.jobs import JobRepository
+from book_tracker.infrastructure.jobs import JobRepository, JobRunner
 from book_tracker.infrastructure.observed import (
     ObservedProvider,
     ProviderObservations,
     ResponseCache,
 )
 from book_tracker.migrations import upgrade
+from book_tracker.reclaim import reclaim_import_batches, unconsumed_stage_files
 
 
 @pytest.fixture
@@ -195,3 +204,132 @@ def test_a_job_whose_lease_keeps_expiring_is_dead_lettered(engine: Engine) -> No
     assert job["error_code"] == "lease_expired"
     assert job["finished_at"] is not None
     assert repo.claim(now) is None
+
+
+def _expire_undo_window(engine: Engine, batch_id: str) -> None:
+    past = (datetime.now(UTC) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE import_batches SET undo_expires_at = :past WHERE id = :id"),
+            {"past": past, "id": batch_id},
+        )
+
+
+async def _commit_killed_before_install(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: httpx.AsyncClient
+) -> str:
+    """A Calibre export (a cover and an ebook) committed by a process that died
+    the moment the database work landed: no staged file was installed."""
+    from test_calibre_import import _export_files, build_calibre_export
+
+    parts = build_calibre_export(tmp_path / "export")
+    preview = await client.post("/api/import/calibre/preview", files=_export_files(parts))
+    assert preview.status_code == 201, preview.text
+    batch_id = str(preview.json()["batch_id"])
+    with monkeypatch.context() as killed:
+        killed.setattr(ImportService, "install_staged", lambda *_args, **_kwargs: None)
+        committed = await client.post("/api/import/calibre/commit", json={"batch_id": batch_id})
+    assert committed.status_code == 200, committed.text
+    return batch_id
+
+
+def _files_of(engine: Engine) -> tuple[str | None, list[str]]:
+    with engine.connect() as connection:
+        cover = connection.scalar(text("SELECT cover_path FROM items"))
+        names = list(connection.scalars(text("SELECT filename FROM attachments")))
+    return cover, names
+
+
+@pytest.mark.anyio
+async def test_a_commit_killed_before_its_files_were_installed_resumes_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_calibre_import import _no_mount_app
+
+    app: Any = _no_mount_app(tmp_path)
+    data_dir = tmp_path / "data"
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.job_runner.stop()
+        engine = app.state.engine
+        batch_id = await _commit_killed_before_install(tmp_path, monkeypatch, client)
+        assert _files_of(engine) == (None, [])
+        assert unconsumed_stage_files(engine, data_dir, batch_id)
+
+        # What the next start does: the committed batch's staged files are installed.
+        assert resume_interrupted_installs(engine, data_dir) == (batch_id,)
+        cover, names = _files_of(engine)
+        assert cover is not None and (data_dir / cover).is_file()
+        assert names == ["Mistborn.epub"]
+        assert unconsumed_stage_files(engine, data_dir, batch_id) == []
+        # Idempotent: nothing left to resume, nothing installed twice.
+        assert resume_interrupted_installs(engine, data_dir) == ()
+        assert _files_of(engine)[1] == ["Mistborn.epub"]
+
+        _expire_undo_window(engine, batch_id)
+        assert reclaim_import_batches(engine, data_dir).reclaimed == (batch_id,)
+
+
+@pytest.mark.anyio
+async def test_the_job_runner_resumes_an_interrupted_install_when_it_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_calibre_import import _no_mount_app
+
+    app: Any = _no_mount_app(tmp_path)
+    data_dir = tmp_path / "data"
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.job_runner.stop()
+        engine = app.state.engine
+        await _commit_killed_before_install(tmp_path, monkeypatch, client)
+
+        # The next process's runner: the first thing it does is finish the install.
+        runner = JobRunner(engine, {}, poll_interval=0.01, data_dir=data_dir)
+        worker = asyncio.create_task(runner.run_forever())
+        for _ in range(500):
+            if _files_of(engine)[1]:
+                break
+            await asyncio.sleep(0.01)
+        runner.stop()
+        await worker
+        assert _files_of(engine)[1] == ["Mistborn.epub"]
+
+
+@pytest.mark.anyio
+async def test_a_batch_folder_holding_uninstalled_files_is_never_reclaimed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_calibre_import import _no_mount_app
+
+    app: Any = _no_mount_app(tmp_path)
+    data_dir = tmp_path / "data"
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.job_runner.stop()
+        engine = app.state.engine
+        batch_id = await _commit_killed_before_install(tmp_path, monkeypatch, client)
+        _expire_undo_window(engine, batch_id)
+        staging = data_dir / "imports" / batch_id
+
+        def broken(_batch_id: str) -> None:
+            raise OSError("disk unavailable")
+
+        report = reclaim_import_batches(engine, data_dir, resume=broken)
+        assert report.reclaimed == ()
+        assert report.kept == (batch_id,)
+        assert staging.is_dir()
+
+        # With an install that works, the sweep finishes the commit, then collects.
+        report = reclaim_import_batches(
+            engine, data_dir, resume=lambda batch: resume_staged_install(engine, data_dir, batch)
+        )
+        assert report.reclaimed == (batch_id,)
+        assert _files_of(engine)[1] == ["Mistborn.epub"]
+        assert not staging.exists()
