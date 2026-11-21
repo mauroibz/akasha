@@ -2,6 +2,24 @@
 
 ## Where the project stands
 
+**2026-11-21:** Sprint 128, *Public exposure hardening* (DEC-180), is completed on branch
+`ccr-61c66a6d-g1wptf` for a pull request to `main`; unreleased on top of 2.8.0. It fixes the
+21 findings of a six-way security audit (see the sprint file's table) and adds the public
+deployment: `compose.public.yaml` (Cloudflare Tunnel sidecar, no published port),
+`scripts/akasha-egress-firewall.sh`, optional Cloudflare Access JWT verification, Docker
+secret files, and the runbook's *Publishing on the internet* section. Migration 0034 assigns
+attachment owners. The project state is `complete` again.
+
+Upgrade notes for the owner: every device signs in once more (cookie rename when Secure);
+new passwords need 12 characters; the first-run setup asks for the code in
+`docker compose logs akasha`; compose now runs the container read-only with no capabilities
+and resource limits (`AKASHA_MEM_LIMIT`, `AKASHA_CPUS`, `AKASHA_PIDS_LIMIT`).
+
+Waiting on the owner (Sprint 128): a Cloudflare account, tunnel token, Access application and
+policy on the real server; running the egress firewall script there; an off-host backup copy.
+
+## Earlier state (2026-10-24)
+
 **2026-10-24:** Sprints 109–127 are completed and **released as v2.8.0** (tag
 `v2.8.0`, GitHub release from `docs/operations/release-notes-v2.8.md`). The project state is `complete`; no sprint is planned. 109–121 are the house and the
 history (DEC-176, DEC-178); 122–127 are the owner's first look at them in the running app

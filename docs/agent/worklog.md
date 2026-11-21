@@ -6799,3 +6799,25 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Verified: `make test` (1792 + 549) and full Playwright (214, 2 skipped) on the 122–127 code;
   after the version move, `make check` and `make smoke-container` (passed).
 - Next: the owner upgrades the board.
+
+## 2026-11-21 — Sprint 128 (complete)
+- Done: owner asked for a vulnerability hunt before publishing the auth-on install on a personal
+  domain (Cloudflare Tunnel/Access later). Planned Sprint 128 and DEC-180 (`f1fa581`); six
+  read-only audits (auth, authorization, input, browser surface, container, dependencies) found
+  F1–F21; five parallel fix streams in worktrees, merged; merge repairs: setup code in the body
+  limit test, duplicate compose env names, lifespan scrub list + `tmp` dir, relock with PyJWT,
+  attachments carried on user transfer (`4e5ecd3`), OpenAPI/types regenerated (`c45cad5`).
+  Migration `0034_attachment_owners`.
+- Verified: full backend pytest 1934 passed / 1 failed (`test_prune_items` cover-removal test,
+  root ignores chmod; fails on base too); Vitest 553; Playwright auth + import 27 passed;
+  `make check` green. Live walkthrough on uvicorn :8799 (auth on, built dist): setup screen
+  with code field, short password refused in place, setup with logged code, five pages with
+  zero console/CSP errors; curl probes — forged Host 401, /metrics 401, /docs 401, second
+  setup 409, `Sec-Fetch-Site: same-site` POST 403, 3 MB login 413, five wrong logins then 429,
+  shell `no-cache`, API `no-store`. Image built and run read-only by the containment stream.
+- Deviations: FastAPI 0.136.3 (not newest) to keep route walking; `__Host-` cookie only on
+  Secure requests; `source: "manual"` → 422 on `POST /api/entries`; `/metrics` admin-only with
+  auth on. Recorded in the sprint Outcome.
+- Blocked/open: egress firewall script only dry-run; `_EDITION_NOTE` regex quadratic on
+  unclosed brackets (bounded by title caps); uvicorn access log keeps query strings.
+- Next: owner reviews the PR; on the server, follow runbook *Publishing on the internet*.

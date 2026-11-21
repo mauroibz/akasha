@@ -740,8 +740,8 @@ jobs waiting or running, jobs by kind and state, provider calls by outcome with 
 API request latency by route template. Provider counters reset when the process restarts.
 
 With `AKASHA_AUTH=off` the route is open to whoever reaches the port, and it names providers and
-routes: scrape it from the LAN and do not proxy it to the internet. With auth on it sits behind the
-login like every other route (Sprint 128). A public install keeps it off; `compose.public.yaml`
+routes: scrape it from the LAN and do not proxy it to the internet. With auth on it answers only an
+admin's session (Sprint 128), so a Prometheus scraper cannot read it there. A public install keeps it off; `compose.public.yaml`
 forces `AKASHA_METRICS=off`.
 
 *Search is running on fewer providers* on the Add page now also names a configured provider that

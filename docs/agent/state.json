@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 52,
-  "project_status": "in_progress",
-  "active_sprint": "128",
-  "active_sprint_file": "docs/sprints/128-public-exposure-hardening.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "127",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "128",
   "completed_sprints": [
     "001",
     "002",
@@ -133,8 +133,9 @@
     "124",
     "125",
     "126",
-    "127"
+    "127",
+    "128"
   ],
-  "started_at": "2026-11-21T12:40:14+00:00",
-  "updated_at": "2026-11-21T12:40:14+00:00"
+  "started_at": "",
+  "updated_at": "2026-11-21T13:35:41+00:00"
 }

@@ -61,7 +61,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
 | List rendering | TanStack Virtual + keyset pagination on `/` and the triage surface | Calibre libraries reach thousands of rows |
-| Auth | Optional, off by default (2.0). With auth on: accounts, per-user libraries, 400-day sessions. Exposure rule unchanged until all three hold: auth on, TLS in front, cookie `Secure` | Delivered as DEC-146; see §9 |
+| Auth | Optional, off by default (2.0). With auth on: accounts, per-user libraries, 400-day sessions. Exposure rule unchanged until all four hold: auth on, TLS in front, cookie `Secure`, setup completed before publishing (DEC-180) | Delivered as DEC-146; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
 ---
@@ -1114,8 +1114,8 @@ optional trusted-header login behind `tailscale serve`, and a login/setup
 surface that works on a phone. `AKASHA_AUTH` defaults to `off`, so a
 single-user install upgrades with no action and no visible change. The
 exposure rule narrows rather than deletes: no internet-reachable proxy, DNS or
-port forward unless auth is on, TLS terminates in front, and the cookie is
-`Secure`. The operator path is the runbook's
+port forward unless auth is on, TLS terminates in front, the cookie is
+`Secure`, and setup is completed before the hostname is published (DEC-180). The operator path is the runbook's
 [Turning authentication on](../operations/runbook.md#turning-authentication-on).
 
 **v2 — sharing.** Public read-only list URLs. Cheap *if* the list view is
@@ -1184,7 +1184,7 @@ Resolved during spec review; recorded so they aren't reopened.
 | 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
 | 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
 | 6 | Export | Deferred through v1; nightly DB backup mandatory in the meantime (§9). **Delivered in Sprint 024** — entity-shaped JSON plus a Goodreads CSV, attachments by reference (DEC-054) |
-| 7 | Auth | **Delivered in 2.0 (DEC-146, Sprints 075–081)** — accounts, per-user libraries, 400-day sliding sessions, device revocation, optional trusted-header login; off by default. The exposure rule holds until all three conditions are met: auth on, TLS in front, cookie `Secure` (§9) |
+| 7 | Auth | **Delivered in 2.0 (DEC-146, Sprints 075–081)** — accounts, per-user libraries, 400-day sliding sessions, device revocation, optional trusted-header login; off by default. The exposure rule holds until all four conditions are met: auth on, TLS in front, cookie `Secure`, setup completed before publishing (§9, DEC-180) |
 
 ---
 
