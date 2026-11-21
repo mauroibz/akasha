@@ -23,7 +23,6 @@ import {
 import { AUTH_REQUIRED_EVENT } from "@/api/request";
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
-import { DetailPage } from "@/pages/DetailPage";
 import { HomePage } from "@/pages/HomePage";
 import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
@@ -37,6 +36,11 @@ const AddPage = lazy(async () => ({
   default: (await import("@/pages/AddPage")).AddPage,
 }));
 
+// The detail page carries the edit dialogs and with them the form stack
+// (react-hook-form and zod), which DEC-037 kept out of the first load.
+const DetailPage = lazy(async () => ({
+  default: (await import("@/pages/DetailPage")).DetailPage,
+}));
 const ImportPage = lazy(async () => ({
   default: (await import("@/pages/ImportPage")).ImportPage,
 }));

@@ -1092,8 +1092,9 @@ test("choosing a web result opens the confirm form over the library", async () =
 
   const dialog = await screen.findByRole("dialog");
   // The confirm form entire, in a dialog, over a library that is still there.
+  // The form arrives as its own chunk when a result is chosen (Sprint 129).
   expect(
-    within(dialog).getByRole("combobox", { name: /status/i }),
+    await within(dialog).findByRole("combobox", { name: /status/i }),
   ).toBeVisible();
   expect(
     within(dialog).getByRole("button", { name: /add to library/i }),

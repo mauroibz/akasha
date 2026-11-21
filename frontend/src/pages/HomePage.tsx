@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { AnimatePresence, m } from "motion/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -48,7 +48,6 @@ import {
   sortLabels,
   statusLabelFor,
 } from "@/features/library/labels";
-import { AddForm } from "@/features/add/AddForm";
 import { ResultsGrid } from "@/features/add/ResultsGrid";
 import { useWebSearch } from "@/features/add/useWebSearch";
 import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
@@ -91,6 +90,13 @@ import { NowStrip } from "@/features/library/NowStrip";
 import { SaveView } from "@/features/library/SaveView";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
+// The confirm dialog is the only place `/` needs the form stack (react-hook-form
+// and zod); loading it when a result is chosen keeps it out of the first load
+// (DEC-037).
+const AddForm = lazy(async () => ({
+  default: (await import("@/features/add/AddForm")).AddForm,
+}));
+
 const allShelves = "__all__";
 const allFormats = "__all_formats__";
 const allPlaces = "__anywhere__";
@@ -1207,49 +1213,51 @@ export function HomePage() {
             <DialogTitle>Add to your library</DialogTitle>
           </DialogHeader>
           {selectedCandidate && (
-            <AddForm
-              itemType={selectedDomain}
-              itemTypes={domains}
-              candidate={selectedCandidate}
-              manual={false}
-              onAdded={(entryId, alreadyExists) => {
-                setSelectedCandidate(null);
-                if (alreadyExists) {
-                  toast("Already in your library", {
-                    description: "Opened the entry you already have.",
+            <Suspense fallback={<Loading label="Loading the form…" />}>
+              <AddForm
+                itemType={selectedDomain}
+                itemTypes={domains}
+                candidate={selectedCandidate}
+                manual={false}
+                onAdded={(entryId, alreadyExists) => {
+                  setSelectedCandidate(null);
+                  if (alreadyExists) {
+                    toast("Already in your library", {
+                      description: "Opened the entry you already have.",
+                    });
+                    void navigate(`/books/${entryId}`);
+                    return;
+                  }
+                  toast.success(`${domainLabel} added`);
+                  /**
+                   * Clearing the query is what makes the highlight mean anything.
+                   *
+                   * The web search only ran because the library had nothing for this
+                   * string, so the library behind the dialog is showing an empty
+                   * filtered view. Closing the dialog onto it and highlighting a row
+                   * that the filter excludes shows the reader nothing at all — which
+                   * is what the walkthrough found. The old flow got this for free by
+                   * navigating to an unfiltered `/`; here it has to be done.
+                   *
+                   * The domain filter stays: that is a choice the reader made, and the
+                   * thing just added is in it.
+                   */
+                  clearSearch({ refocus: false });
+                  // On `/` the handoff is a dialog closing rather than a
+                  // navigation, so the highlight is set directly instead of
+                  // travelling as router state.
+                  setHighlightId(entryId);
+                  setFocusedId(entryId);
+                  void queryClient.invalidateQueries({
+                    queryKey: queryKeys.library.all,
                   });
+                }}
+                onOpenExisting={(entryId) => {
+                  setSelectedCandidate(null);
                   void navigate(`/books/${entryId}`);
-                  return;
-                }
-                toast.success(`${domainLabel} added`);
-                /**
-                 * Clearing the query is what makes the highlight mean anything.
-                 *
-                 * The web search only ran because the library had nothing for this
-                 * string, so the library behind the dialog is showing an empty
-                 * filtered view. Closing the dialog onto it and highlighting a row
-                 * that the filter excludes shows the reader nothing at all — which
-                 * is what the walkthrough found. The old flow got this for free by
-                 * navigating to an unfiltered `/`; here it has to be done.
-                 *
-                 * The domain filter stays: that is a choice the reader made, and the
-                 * thing just added is in it.
-                 */
-                clearSearch({ refocus: false });
-                // On `/` the handoff is a dialog closing rather than a
-                // navigation, so the highlight is set directly instead of
-                // travelling as router state.
-                setHighlightId(entryId);
-                setFocusedId(entryId);
-                void queryClient.invalidateQueries({
-                  queryKey: queryKeys.library.all,
-                });
-              }}
-              onOpenExisting={(entryId) => {
-                setSelectedCandidate(null);
-                void navigate(`/books/${entryId}`);
-              }}
-            />
+                }}
+              />
+            </Suspense>
           )}
         </DialogContent>
       </Dialog>
