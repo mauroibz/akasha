@@ -13,7 +13,10 @@ RUN npm run build
 
 FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc AS backend-build
 WORKDIR /build/backend
-ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+# Bytecode is compiled here, into the venv the runtime copies root-owned: the runtime
+# never writes .pyc files (its code is read-only to it, and so is its filesystem).
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_COMPILE_BYTECODE=1
 RUN pip install --no-cache-dir uv
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
@@ -26,14 +29,23 @@ ENV PATH=/opt/venv/bin:$PATH \
     AKASHA_BACKUP_DIR=/backups \
     AKASHA_STATIC_DIR=/app/static \
     AKASHA_ENVIRONMENT=production \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TMPDIR=/data/tmp
+# TMPDIR: request bodies, import bundles and SQLite's temporary files spool to the data
+# volume, not to /tmp — a small RAM tmpfs under compose's read-only root filesystem
+# (Sprint 128). The lifespan creates the folder on volumes that predate it.
 RUN groupadd --system --gid 10001 akasha && useradd --system --uid 10001 --gid akasha --home /app akasha
 WORKDIR /app
 COPY --from=backend-build /opt/venv /opt/venv
 COPY --from=backend-build /build/backend/alembic.ini /app/alembic.ini
 COPY --from=backend-build /build/backend/alembic /app/alembic
 COPY --from=frontend-build /build/frontend/dist /app/static
-RUN mkdir -p /data /backups && chown -R akasha:akasha /app /data /backups
+# The application user owns its data and nothing else (Sprint 128, F20). /app, its
+# static files, its migrations and /opt/venv stay root's: a process that can write its
+# own code turns any file-write bug into code execution on the next start, and into
+# script injection into the page every user loads.
+RUN mkdir -p /data/tmp /backups && chown akasha:akasha /data /data/tmp /backups
 USER 10001:10001
 EXPOSE 8000
 # uvicorn is PID 1 under the exec-form CMD below, so SIGTERM reaches it directly
@@ -47,4 +59,8 @@ STOPSIGNAL SIGTERM
 # told to. Interval and retries stay tight so a genuinely dead container is
 # still flagged within about half a minute after the start period lapses.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=2)"]
-CMD ["uvicorn", "book_tracker.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# No --proxy-headers / FORWARDED_ALLOW_IPS: uvicorn keeps its default of trusting
+# forwarded headers from 127.0.0.1 only. Never set FORWARDED_ALLOW_IPS=*: every client
+# could then name its own address. The application reads a client address header only
+# from AKASHA_TRUSTED_PROXY_PEERS. --no-server-header drops the version banner.
+CMD ["uvicorn", "book_tracker.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-server-header"]

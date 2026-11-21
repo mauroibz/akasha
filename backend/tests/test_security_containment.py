@@ -124,3 +124,71 @@ def test_blank_cloudflare_access_settings_mean_unset(
 
     assert configured.cf_access_team_domain is None
     assert configured.cf_access_aud is None
+
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_the_image_does_not_hand_its_code_to_the_application_user() -> None:
+    """F20: a process that can write /app turns a file-write bug into code execution."""
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "chown -R" not in dockerfile
+    assert "chown akasha:akasha /data /data/tmp /backups" in dockerfile
+    assert "TMPDIR=/data/tmp" in dockerfile
+    assert "PYTHONDONTWRITEBYTECODE=1" in dockerfile
+    assert '"--no-server-header"' in dockerfile
+    command = [line for line in dockerfile.splitlines() if line.startswith("CMD ")][-1]
+    assert "proxy-headers" not in command
+    assert "forwarded-allow-ips" not in command
+
+
+def test_compose_contains_the_container() -> None:
+    compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+
+    for line in (
+        "read_only: true",
+        "- /tmp:size=64m,mode=1777,noexec,nosuid,nodev",
+        "cap_drop: [ALL]",
+        '- "no-new-privileges:true"',
+        "mem_limit: ${AKASHA_MEM_LIMIT:-",
+        "cpus: ${AKASHA_CPUS:-",
+        "pids_limit: ${AKASHA_PIDS_LIMIT:-",
+    ):
+        assert line in compose, line
+
+
+def test_the_public_overlay_publishes_nothing_and_forces_the_exposure_conditions() -> None:
+    overlay = (ROOT / "compose.public.yaml").read_text(encoding="utf-8")
+
+    assert "ports: !reset []" in overlay
+    for line in (
+        "- AKASHA_AUTH=on",
+        "- AKASHA_COOKIE_SECURE=true",
+        "- AKASHA_METRICS=off",
+        "- AKASHA_CLIENT_IP_HEADER=CF-Connecting-IP",
+        '- AKASHA_TRUSTED_PROXY_PEERS=["172.30.10.2"]',
+        "ipv4_address: 172.30.10.2",
+        "internal: true",
+        "com.docker.network.bridge.name: br-akasha-eg",
+    ):
+        assert line in overlay, line
+    assert overlay.count("enable_ipv6: false") == 3
+    # The sidecar is pinned by digest, never a floating tag.
+    assert "image: cloudflare/cloudflared:" in overlay
+    assert "@sha256:" in overlay.split("image: cloudflare/cloudflared:", 1)[1].splitlines()[0]
+
+
+def test_startup_creates_the_temporary_directory_on_the_data_volume(tmp_path: Path) -> None:
+    """The image sets TMPDIR=/data/tmp; a volume from before Sprint 128 has no such folder.
+
+    Without it, tempfile silently falls back to /tmp — a small RAM tmpfs in the read-only
+    container — and a large import fails there instead of spooling to disk.
+    """
+    from fastapi.testclient import TestClient
+
+    from book_tracker.main import create_app
+
+    data = tmp_path / "data"
+    with TestClient(create_app(Settings(data_dir=data))):
+        assert (data / "tmp").is_dir()

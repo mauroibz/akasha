@@ -113,7 +113,9 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(configured.log_level, scrub=(configured.google_books_api_key,))
-        for directory in ("", "covers", "imports", "attachments"):
+        # "tmp" is the image's TMPDIR (Sprint 128): uploads spool on the data volume, not in
+        # the read-only container's small /tmp, and volumes from before it lack the folder.
+        for directory in ("", "covers", "imports", "attachments", "tmp"):
             (configured.data_dir / directory).mkdir(parents=True, exist_ok=True)
         if not getattr(app.state, "skip_migrations", False):
             assert configured.database_url is not None
