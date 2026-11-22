@@ -6840,3 +6840,17 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Deviations: cursor pages carry `null` total/facets; no refetch on focus (DEC-182).
 - Next: owner reviews the PR; release as 2.9.0 so compose and image move together (Sprint 128's
   read-only compose with the 2.8.0 image caps uploads at the 64 MB /tmp).
+
+## 2026-11-22 — Release v2.9.0
+
+- Done: version surfaces 2.8.0 → 2.9.0 (pyproject, uv.lock, main.py, package and lock,
+  openapi, compose, runbook example, docs index); release notes `docs/operations/release-notes-v2.9.md`.
+- Verified: CI on PR #40 (`make check`, `make test`, full Playwright, `make audit`,
+  `make smoke-container`) green on the release code. The PR image ran against a copy of the
+  board's library (2.8.0, revision 0033) under the new compose restrictions (read-only root,
+  no capabilities, limits): pre-migration backup written, 0034–0035 applied, integrity and
+  foreign-key checks clean, counts unchanged (359 items, 345 entries, 22 attachments,
+  11 shelves), a restart ran no migration and wrote no backup. An independent review of the
+  migration transaction, digest guard, library batching, durability and shutdown found nothing
+  blocking; two import-resume edge cases are recorded in the handoff.
+- Next: the board upgrades to 2.9.0.

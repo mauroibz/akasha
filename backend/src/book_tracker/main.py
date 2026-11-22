@@ -91,7 +91,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     docs_on = configured.auth == "off"
     app = FastAPI(
         title="Akasha",
-        version="2.8.0",
+        version="2.9.0",
         lifespan=make_lifespan(configured),
         responses={422: {"model": ErrorResponse}},
         docs_url="/docs" if docs_on else None,

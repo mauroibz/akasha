@@ -2,26 +2,24 @@
 
 ## Where the project stands
 
-**2026-11-21 (later):** Sprint 128 is merged to `main` (#38). Sprint 129, *Security
-follow-ups* (DEC-181) widened to robustness and performance (DEC-182), is completed on branch
-`ccr-61c66a6d-g1wptf` for a pull request. Migrations 0034–0035 are unreleased; the next release
-should be 2.9.0 so `compose.yaml`'s hardening and the image that expects it ship together.
+**2026-11-22:** Sprints 128–129 are merged to `main` (#38, #40) and **released as v2.9.0**
+(tag `v2.9.0`, notes in `docs/operations/release-notes-v2.9.md`). Migrations 0034–0035 are
+new. The project state is `complete`; no sprint is planned.
 
-**2026-11-21:** Sprint 128, *Public exposure hardening* (DEC-180), is completed on branch
-`ccr-61c66a6d-g1wptf` for a pull request to `main`; unreleased on top of 2.8.0. It fixes the
-21 findings of a six-way security audit (see the sprint file's table) and adds the public
-deployment: `compose.public.yaml` (Cloudflare Tunnel sidecar, no published port),
-`scripts/akasha-egress-firewall.sh`, optional Cloudflare Access JWT verification, Docker
-secret files, and the runbook's *Publishing on the internet* section. Migration 0034 assigns
-attachment owners. The project state is `complete` again.
-
-Upgrade notes for the owner: every device signs in once more (cookie rename when Secure);
-new passwords need 12 characters; the first-run setup asks for the code in
-`docker compose logs akasha`; compose now runs the container read-only with no capabilities
-and resource limits (`AKASHA_MEM_LIMIT`, `AKASHA_CPUS`, `AKASHA_PIDS_LIMIT`).
+Upgrade notes for the owner: new passwords need 12 characters; the first-run setup asks for
+the code in `docker compose logs akasha`; compose runs the container read-only with no
+capabilities and resource limits (`AKASHA_MEM_LIMIT`, `AKASHA_CPUS`, `AKASHA_PIDS_LIMIT`).
+Take the 2.9.0 `compose.yaml` and image together.
 
 Waiting on the owner (Sprint 128): a Cloudflare account, tunnel token, Access application and
 policy on the real server; running the egress firewall script there; an off-host backup copy.
+
+Known from the 2.9.0 review, not fixed: resuming an import install whose item was deleted
+meanwhile writes an orphan cover and keeps the batch's staging, retried hourly
+(`install_staged` catches only `CoverError`, `set_cover_path` raises `LookupError`); and
+`resume_interrupted_installs` has no per-batch guard. Batches committed by 2.8.0 inside their
+24 h undo window look interrupted on the first 2.9.0 start, which re-fills a cover removed
+after that import.
 
 ## Earlier state (2026-10-24)
 
