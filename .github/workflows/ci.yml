@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
       # Pinned to the exact tag: setup-uv publishes a floating major only for
       # older lines (v6, v6.8), and no `v10` alias exists yet.
-      - uses: astral-sh/setup-uv@v10.0.0
+      - uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
           python-version: "3.12"
@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.0.0
+      - uses: astral-sh/setup-uv@v10.4.0
         with:
           python-version: "3.12"
           # The Makefile pins its own UV_CACHE_DIR, so the action's default cache
