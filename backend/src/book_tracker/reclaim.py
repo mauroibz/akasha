@@ -34,6 +34,8 @@ link count rather than reaching the bytes.
 """
 
 import argparse
+import json
+import logging
 import re
 import sqlite3
 import sys
@@ -48,7 +50,9 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.attachments import ATTACHMENTS_DIR
-from book_tracker.infrastructure.models import ImportBatchRow
+from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
+
+logger = logging.getLogger(__name__)
 
 DATABASE_NAME = "books.db"
 GRACE_SECONDS = 3600
@@ -197,13 +201,52 @@ class ReclaimError(RuntimeError):
 
 @dataclass(frozen=True)
 class ImportBatchReclaimReport:
-    """Which committed batches' staging directories were removed."""
+    """Which committed batches' staging directories were removed, and which were
+    kept because they still hold files the commit never installed."""
 
     reclaimed: tuple[str, ...] = ()
+    kept: tuple[str, ...] = ()
+
+
+def unconsumed_stage_files(engine: Engine, data_dir: Path, batch_id: str) -> list[Path]:
+    """The staged covers and ebooks of a batch's matched rows still on disk.
+
+    `ImportService.install_staged` consumes every one it reaches — installs it, or
+    drops it deliberately — so after a commit that finished this is empty. Anything
+    listed is a file the commit promised and a dead process never installed
+    (Sprint 129).
+    """
+    with Session(engine) as session:
+        payloads = list(
+            session.scalars(
+                select(ImportRecordRow.normalized_payload).where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.matched_item_id.is_not(None),
+                )
+            )
+        )
+    left: list[Path] = []
+    for raw in payloads:
+        payload = json.loads(raw)
+        for key in ("cover_stage", "attachment_stage"):
+            relative = payload.get(key)
+            if relative and (data_dir / relative).is_file():
+                left.append(data_dir / relative)
+    return left
+
+
+#: How long a batch kept for uninstalled files waits before the runner retries it.
+KEPT_BATCH_RETRY_SECONDS = 3600.0
 
 
 def reclaim_import_batches(
-    engine: Engine, data_dir: Path, *, now: datetime | None = None
+    engine: Engine,
+    data_dir: Path,
+    *,
+    now: datetime | None = None,
+    resume: Callable[[str], None] | None = None,
+    retries: dict[str, float] | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> ImportBatchReclaimReport:
     """Remove a committed batch's staging directory once its undo window has passed.
 
@@ -219,23 +262,58 @@ def reclaim_import_batches(
     An uncommitted (still-`previewed`) batch that is simply abandoned is not covered: its
     `undo_expires_at` is never set, so it never becomes a candidate here. That is a
     narrower, separate leak from the one this sprint's acceptance criteria describe.
+
+    One exception to "nothing depends on it" (Sprint 129): a commit installs its
+    staged covers and ebooks *after* the database commit, so a process killed
+    mid-install leaves some behind. A directory still holding one is never removed:
+    `resume` (the install, run as the batch's owner) gets one more go at it first,
+    and whatever it could not finish keeps the directory and is logged.
+    The runner passes `retries`, its own memory of when each kept batch was last
+    tried, so a batch that keeps failing is retried and logged once an hour, not
+    on every idle second.
     """
     now_iso = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
     reclaimed: list[str] = []
+    kept: list[str] = []
     with Session(engine) as session:
-        expired = session.scalars(
-            select(ImportBatchRow).where(
-                ImportBatchRow.state == "committed",
-                ImportBatchRow.undo_expires_at.is_not(None),
-                ImportBatchRow.undo_expires_at <= now_iso,
+        expired = [
+            batch.id
+            for batch in session.scalars(
+                select(ImportBatchRow).where(
+                    ImportBatchRow.state == "committed",
+                    ImportBatchRow.undo_expires_at.is_not(None),
+                    ImportBatchRow.undo_expires_at <= now_iso,
+                )
             )
-        ).all()
-        for batch in expired:
-            staging = data_dir / "imports" / batch.id
-            if staging.is_dir():
-                rmtree(staging)
-                reclaimed.append(batch.id)
-    return ImportBatchReclaimReport(reclaimed=tuple(reclaimed))
+        ]
+    for batch_id in expired:
+        staging = data_dir / "imports" / batch_id
+        if not staging.is_dir():
+            continue
+        last_tried = retries.get(batch_id) if retries is not None else None
+        if last_tried is not None and clock() - last_tried < KEPT_BATCH_RETRY_SECONDS:
+            kept.append(batch_id)
+            continue
+        if unconsumed_stage_files(engine, data_dir, batch_id) and resume is not None:
+            try:
+                resume(batch_id)
+            except Exception:  # noqa: BLE001 - the directory is kept below, and logged
+                logger.exception("import install could not be resumed", extra={"batch": batch_id})
+        left = unconsumed_stage_files(engine, data_dir, batch_id)
+        if left:
+            logger.warning(
+                "import staging kept: it holds files the commit never installed",
+                extra={"batch": batch_id, "files": len(left)},
+            )
+            kept.append(batch_id)
+            if retries is not None:
+                retries[batch_id] = clock()
+            continue
+        if retries is not None:
+            retries.pop(batch_id, None)
+        rmtree(staging)
+        reclaimed.append(batch_id)
+    return ImportBatchReclaimReport(reclaimed=tuple(reclaimed), kept=tuple(kept))
 
 
 def main(argv: list[str] | None = None) -> int:

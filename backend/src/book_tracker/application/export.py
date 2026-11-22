@@ -26,7 +26,7 @@ without an N+1.
 """
 
 import json
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -343,6 +343,27 @@ def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
                 # What the owner said they do not remember (Sprint 124).
                 "unknown_fields": json.loads(entry.unknown_fields) if entry.unknown_fields else [],
             }
+
+
+#: What one streamed chunk holds at least (Sprint 129). A string per row made a
+#: 10k-entry export 20,000 chunks, and the response cost of each one, not the
+#: query, was the seven seconds; 64 KB keeps memory flat and the chunks few.
+EXPORT_CHUNK_BYTES = 64 * 1024
+
+
+def coalesce(chunks: Iterable[str], size: int = EXPORT_CHUNK_BYTES) -> Iterator[str]:
+    """The same text as `chunks`, joined into pieces of at least `size` characters."""
+    pending: list[str] = []
+    held = 0
+    for chunk in chunks:
+        pending.append(chunk)
+        held += len(chunk)
+        if held >= size:
+            yield "".join(pending)
+            pending = []
+            held = 0
+    if pending:
+        yield "".join(pending)
 
 
 def export_json(engine: Engine, *, user_id: int, now: datetime | None = None) -> Iterator[str]:

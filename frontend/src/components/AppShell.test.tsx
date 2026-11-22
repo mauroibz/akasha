@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -173,5 +173,72 @@ describe("AppShell", () => {
       method: "DELETE",
     });
     expect(onActingAsChanged).toHaveBeenCalledWith(null);
+  });
+
+  it("recounts the Inbox when a background job finishes, not on a timer", async () => {
+    const sources: { emit: (state: string) => void }[] = [];
+    vi.stubGlobal(
+      "EventSource",
+      class {
+        listener: ((message: MessageEvent<string>) => void) | null = null;
+        constructor() {
+          sources.push({
+            emit: (state) =>
+              this.listener?.({
+                data: JSON.stringify({
+                  id: "j1",
+                  batch_id: null,
+                  kind: "search_import_rows",
+                  state,
+                  progress: {},
+                  error: null,
+                  error_code: null,
+                  attempts: 0,
+                  updated_at: new Date().toISOString(),
+                }),
+              } as MessageEvent<string>),
+          });
+        }
+        addEventListener(
+          _type: string,
+          listener: (message: MessageEvent<string>) => void,
+        ) {
+          this.listener = listener;
+        }
+        removeEventListener() {}
+        close() {}
+      },
+    );
+    let total = 1;
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(
+        async () => new Response(JSON.stringify({ items: [], total })),
+      );
+    renderShell(
+      <Routes>
+        <Route path="/" element={<div>Library page</div>} />
+      </Routes>,
+    );
+    const inboxCalls = () =>
+      fetchMock.mock.calls.filter(([url]) =>
+        String(url).includes("status=unsorted"),
+      ).length;
+    expect(
+      (await screen.findAllByLabelText("1 waiting in the Inbox")).length,
+    ).toBeGreaterThan(0);
+    expect(inboxCalls()).toBe(1);
+
+    // A job still running changes nothing in the Inbox yet.
+    act(() => sources[0]?.emit("running"));
+    expect(inboxCalls()).toBe(1);
+
+    total = 3;
+    act(() => sources[0]?.emit("succeeded"));
+    expect(
+      (await screen.findAllByLabelText("3 waiting in the Inbox")).length,
+    ).toBeGreaterThan(0);
+    expect(inboxCalls()).toBe(2);
+    vi.unstubAllGlobals();
   });
 });

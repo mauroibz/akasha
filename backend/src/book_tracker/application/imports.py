@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
@@ -23,7 +24,7 @@ from book_tracker.domain.importers import (
     SearchingImporter,
 )
 from book_tracker.domain.matching import MatchKind
-from book_tracker.domain.registry import DOMAINS
+from book_tracker.domain.registry import DOMAINS, IMPORTERS
 from book_tracker.domain.spec import (
     Domain,
     InvalidEntryField,
@@ -43,6 +44,9 @@ from book_tracker.infrastructure.models import (
     ImportRecordRow,
 )
 from book_tracker.infrastructure.repositories import DomainRepository, ImportRepository
+from book_tracker.reclaim import unconsumed_stage_files
+
+logger = logging.getLogger(__name__)
 
 
 def batch_item_ids(engine: Engine, batch_id: str) -> list[int]:
@@ -1081,6 +1085,32 @@ class ImportService:
             domains=self.domains,
             identity_kinds=self.importer.identity_kinds,
         )
+        self.install_staged(batch_id)
+        # Any domain this connector can produce, rather than the one it happened to
+        # declare first: a mixed batch has no single domain to ask, and asking the
+        # wrong one would silently skip half the library's backfill.
+        if any(domain.enriches for domain in self.domains.values()):
+            enqueue_enrichment_backfill(
+                self.engine,
+                batch_id=batch_id,
+                item_ids=batch_item_ids(self.engine, batch_id),
+            )
+        return result
+
+    def install_staged(self, batch_id: str, *, resuming: bool = False) -> None:
+        """Move a committed batch's staged covers and ebooks onto their items.
+
+        Runs after the database commit, so a process killed part-way leaves some
+        stage files behind under `imports/<batch>/` (Sprint 129). Every stage file
+        is *consumed* — installed, or deliberately dropped — so one still on disk
+        means "not done yet", and running this again finishes the job: an installed
+        cover was moved away, and an attachment already recorded is found again
+        rather than duplicated (`record_attachment` and `record_file` both dedupe).
+
+        `resuming` is the late run (`resume_interrupted_installs`): by then the
+        owner may have chosen a cover of their own, so a staged cover only fills a
+        missing one there.
+        """
         with Session(self.engine) as session:
             rows = list(
                 session.scalars(select(ImportRecordRow).where(ImportRecordRow.batch_id == batch_id))
@@ -1098,12 +1128,20 @@ class ImportService:
         for item_id, cover_relative, attachment_relative, attachment_name in installs:
             if cover_relative:
                 staged = self.data_dir / cover_relative
-                if staged.is_file() and self._may_replace_cover(item_id):
-                    try:
-                        install_cover(staged, self.data_dir, item_id)
-                        self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
-                    except CoverError:
-                        pass
+                if staged.is_file():
+                    if resuming and self._has_cover(item_id):
+                        wanted = False
+                    else:
+                        wanted = self._may_replace_cover(item_id)
+                    if wanted:
+                        try:
+                            install_cover(staged, self.data_dir, item_id)
+                            self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
+                        except CoverError:
+                            pass
+                    # Consumed either way: a cover the rules refused is not one
+                    # still waiting to be installed.
+                    staged.unlink(missing_ok=True)
             if attachment_relative and attachment_name:
                 staged = self.data_dir / attachment_relative
                 if staged.is_file():
@@ -1124,13 +1162,56 @@ class ImportService:
                             byte_size=stored.byte_size,
                         )
                     staged.unlink(missing_ok=True)
-        # Any domain this connector can produce, rather than the one it happened to
-        # declare first: a mixed batch has no single domain to ask, and asking the
-        # wrong one would silently skip half the library's backfill.
-        if any(domain.enriches for domain in self.domains.values()):
-            enqueue_enrichment_backfill(
-                self.engine,
-                batch_id=batch_id,
-                item_ids=batch_item_ids(self.engine, batch_id),
+
+    def _has_cover(self, item_id: int) -> bool:
+        with Session(self.engine) as session:
+            return bool(
+                session.execute(
+                    text("SELECT cover_path FROM items WHERE id = :item"), {"item": item_id}
+                ).scalar()
             )
-        return result
+
+
+def resume_staged_install(engine: Engine, data_dir: Path, batch_id: str) -> None:
+    """Finish installing one committed batch's staged files, as its owner."""
+    with Session(engine) as session:
+        batch = session.get(ImportBatchRow, batch_id)
+        if batch is None or batch.state != "committed" or batch.user_id is None:
+            return
+        importer = IMPORTERS.get(batch.kind)
+        owner = batch.user_id
+    if importer is None:
+        return
+    service = ImportService(engine, data_dir, data_dir / "imports", importer, user_id=owner)
+    service.install_staged(batch_id, resuming=True)
+
+
+def resume_interrupted_installs(engine: Engine, data_dir: Path) -> tuple[str, ...]:
+    """At start, finish every committed batch whose install a dead process cut short.
+
+    Only batches that still have a staging directory can have anything left, so the
+    walk is bounded by `imports/`, not by the batch table. Returns the batches it
+    resumed.
+    """
+    root = data_dir / "imports"
+    if not root.is_dir():
+        return ()
+    staged = {path.name for path in root.iterdir() if path.is_dir()}
+    if not staged:
+        return ()
+    with Session(engine) as session:
+        committed = list(
+            session.scalars(
+                select(ImportBatchRow.id).where(
+                    ImportBatchRow.id.in_(staged), ImportBatchRow.state == "committed"
+                )
+            )
+        )
+    resumed: list[str] = []
+    for batch_id in sorted(committed):
+        if not unconsumed_stage_files(engine, data_dir, batch_id):
+            continue
+        logger.warning("resuming an interrupted import install", extra={"batch": batch_id})
+        resume_staged_install(engine, data_dir, batch_id)
+        resumed.append(batch_id)
+    return tuple(resumed)

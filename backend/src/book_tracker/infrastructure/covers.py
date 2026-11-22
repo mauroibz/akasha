@@ -6,6 +6,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 import httpx
 from PIL import Image, UnidentifiedImageError
 
+from book_tracker.infrastructure.durable import fsync_directory, fsync_file
 from book_tracker.infrastructure.offload import off_loop
 
 MAX_COVER_BYTES = 10 * 1024 * 1024
@@ -220,7 +221,11 @@ def install_cover(prepared: Path, data_dir: Path, item_id: int) -> Path:
     target = data_dir / "covers" / f"{item_id}.jpg"
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
+        # Synced before the row that names it commits (Sprint 129): a power loss
+        # must not leave a durable row over a zero-length cover.
+        fsync_file(prepared)
         os.replace(prepared, target)
+        fsync_directory(target.parent)
     except OSError as error:
         prepared.unlink(missing_ok=True)
         raise CoverError("cover could not be installed") from error

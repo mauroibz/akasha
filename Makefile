@@ -1,4 +1,4 @@
-.PHONY: bootstrap dev format lint typecheck test check migrate build openapi openapi-check smoke-container
+.PHONY: bootstrap dev format lint typecheck test check migrate build openapi openapi-check smoke-container audit
 
 UV_ENV = UV_CACHE_DIR=/tmp/akasha-uv-cache
 
@@ -61,3 +61,11 @@ build:
 
 smoke-container:
 	bash scripts/smoke_container.sh
+
+# Known vulnerabilities in what the image ships (Sprint 129): the production
+# Python requirements through pip-audit, the frontend's runtime packages
+# through npm. Dev-only tooling is out of scope; it never reaches the image.
+audit:
+	cd backend && $(UV_ENV) uv export --frozen --no-dev --no-hashes --no-emit-project > /tmp/akasha-audit-requirements.txt
+	$(UV_ENV) uvx pip-audit --strict --no-deps -r /tmp/akasha-audit-requirements.txt
+	cd frontend && npm audit --omit=dev --audit-level=moderate

@@ -888,3 +888,17 @@ async def test_undo_not_found(tmp_path: Path) -> None:
     ):
         response = await client.delete("/api/import/batches/nonexistent")
         assert response.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_a_runner_stopped_before_its_task_starts_never_claims(engine: Engine) -> None:
+    """`stop()` called between `create_task(run_forever())` and the task's first step
+    (the lifespan starts the runner this way) used to be undone by `run_forever`
+    setting itself running again, so the runner claimed work after being told not to."""
+    repo = JobRepository(engine)
+    job_id = repo.enqueue(None, "nothing_handles_this", {})
+    runner = JobRunner(engine, {}, poll_interval=0.01)
+    worker = asyncio.create_task(runner.run_forever())
+    runner.stop()
+    await asyncio.wait_for(worker, 1)
+    assert (repo.get_job(job_id) or {})["state"] == "queued"

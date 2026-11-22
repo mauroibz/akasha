@@ -101,6 +101,7 @@ def create_backup(
             "label": label,
             "created_at": stamp.isoformat(),
             "alembic_revision": _revision(path / DATABASE_NAME),
+            "database_digest": database_digest(path / DATABASE_NAME),
             "counts": counts,
             "files": archived,
             "attachments": attachments,
@@ -443,6 +444,39 @@ def _existing_backups(dest: Path, *, exclude: Path) -> list[Path]:
         if manifest is not None:
             found.append((str(manifest.get("created_at", "")), candidate))
     return [path for _, path in sorted(found, reverse=True)]
+
+
+def database_digest(database_path: Path) -> str:
+    """What a database holds, independent of how its pages lie on disk (Sprint 129).
+
+    Every schema object and every row, read through SQLite, so a backup made with
+    the online backup API, the restored copy of it and the live file it came from
+    agree exactly while their contents do, whatever WAL, page order or a rolled-back
+    transaction did to the files' bytes and modification times. The pre-migration
+    guard compares this to decide whether an earlier rollback point still holds the
+    library; it is never a security boundary.
+    """
+    digest = hashlib.sha256()
+    connection = sqlite3.connect(database_path)
+    try:
+        objects = connection.execute(
+            "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name"
+        ).fetchall()
+        for row in objects:
+            digest.update(repr(row).encode())
+        for kind, name, _table, _sql in objects:
+            if kind != "table":
+                continue
+            quoted = '"' + str(name).replace('"', '""') + '"'
+            digest.update(f"\0table {quoted}\0".encode())
+            for record in connection.execute(f"SELECT * FROM {quoted}"):  # noqa: S608
+                digest.update(repr(record).encode())
+                digest.update(b"\n")
+    except sqlite3.DatabaseError as error:
+        raise BackupError(f"Could not read {database_path}: {error}") from error
+    finally:
+        connection.close()
+    return f"sha256:{digest.hexdigest()}"
 
 
 def _revision(database_path: Path) -> str | None:

@@ -12,6 +12,7 @@ answer from yesterday would be a refresh that refreshed nothing.
 
 import asyncio
 import json
+import logging
 import time
 from collections import deque
 from collections.abc import Callable
@@ -21,11 +22,14 @@ from typing import Any, Literal
 
 import httpx
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import OperationalError
 
 from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.providers import SearchCandidate, SourceRef
 from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import ProviderPayloadError
+
+logger = logging.getLogger(__name__)
 
 HealthState = Literal["working", "degraded", "down"]
 
@@ -204,9 +208,23 @@ class ObservedProvider:
         if self._cache is None:
             return await self._observe(self._inner.search, query, limit)  # type: ignore[no-any-return]
         key = f"{normalize_text(query)}|{limit}"
-        cached = await off_loop(self._cache.get, self._inner.name, key)
+        cached = await self._cached(self._cache.get, self._inner.name, key)
         if cached is not None:
-            return cached
+            return cached  # type: ignore[no-any-return]
         answer = await self._observe(self._inner.search, query, limit)
-        await off_loop(self._cache.put, self._inner.name, key, list(answer))
+        # Outside the timed call: the provider answered, and a database too busy to
+        # keep the answer (a long import commit holding SQLite's write lock past
+        # busy_timeout) neither fails the search nor counts against the provider.
+        await self._cached(self._cache.put, self._inner.name, key, list(answer))
         return answer  # type: ignore[no-any-return]
+
+    async def _cached(self, call: Callable[..., Any], *args: Any) -> Any:
+        """A cache read or write, best effort: a locked database is a miss."""
+        try:
+            return await off_loop(call, *args)
+        except OperationalError as error:
+            logger.warning(
+                "provider response cache unavailable",
+                extra={"provider": self._inner.name, "error": str(error)},
+            )
+            return None

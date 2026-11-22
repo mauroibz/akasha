@@ -7,7 +7,10 @@ EventSource reconnects by itself, which bounds every connection without a timer
 anywhere else.
 """
 
+import asyncio
 import json
+import signal
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -72,26 +75,36 @@ def test_a_person_sees_their_own_jobs_and_not_anyone_elses(tmp_path: Path) -> No
 
 @pytest.mark.anyio
 async def test_the_stream_carries_each_change_to_a_job(tmp_path: Path) -> None:
+    """Each state a job holds across a poll reaches the stream, in order.
+
+    The stream reads the jobs table once a second, so a state that lasts less than
+    a poll can be skipped by design; the job here therefore holds `running` for
+    longer than one poll. Letting the live runner claim and fail it in the same
+    millisecond made this test fail about one run in five (Sprint 129).
+    """
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with (
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        app.state.event_stream_seconds = 2.5
-        # A kind nothing handles: the runner fails it at once, which is a finish.
-        job_id = JobRepository(app.state.engine).enqueue(
-            None, "nothing_handles_this", {}, user_id=1
-        )
-        response = await client.get("/api/events")
+        app.state.job_runner.stop()
+        app.state.event_stream_seconds = 4.0
+        repo = JobRepository(app.state.engine)
+        job_id = repo.enqueue(None, "nothing_handles_this", {}, user_id=1)
+        request = asyncio.create_task(client.get("/api/events"))
+        await asyncio.sleep(1.2)
+        claimed = repo.claim(datetime.now(UTC))
+        assert claimed is not None and claimed.id == job_id, repo.get_job(job_id)
+        await asyncio.sleep(1.5)
+        repo.fail(job_id, "no handler", datetime.now(UTC), code="no_handler")
+        response = await request
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")
     states = [event["state"] for event in _events(response.text) if event["id"] == job_id]
-    assert states, response.text
-    # Claimed, then failed and requeued with a backoff (a missing handler is retried
-    # like any failure): each change arrives as its own event, in order.
-    assert "running" in states
+    # Queued, claimed, then failed and requeued with a backoff: each change arrives
+    # as its own event, in order.
+    assert states == ["queued", "running", "queued"], response.text
     final = [event for event in _events(response.text) if event["id"] == job_id][-1]
-    assert final["state"] == "queued"
     assert final["attempts"] == 1
     assert final["error_code"] == "no_handler"
     assert final["kind"] == "nothing_handles_this"
@@ -121,3 +134,47 @@ async def test_a_failed_job_can_be_retried_by_its_owner_only(tmp_path: Path) -> 
     assert retried.json()["state"] == "queued"
     assert retried.json()["attempts"] == 0
     assert refused.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_the_stream_ends_promptly_when_the_server_shuts_down(tmp_path: Path) -> None:
+    """Sprint 129: uvicorn waits for open responses before it shuts the application
+    down, and a stream lives for minutes, so every restart with a tab open ran into
+    the container's grace period and ended in SIGKILL mid-job."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.event_stream_seconds = 20.0
+        asyncio.get_running_loop().call_later(0.5, app.state.shutting_down.set)
+        started = time.monotonic()
+        response = await client.get("/api/events")
+        elapsed = time.monotonic() - started
+    assert response.status_code == 200
+    assert elapsed < 3.0
+
+
+@pytest.mark.anyio
+async def test_the_servers_termination_signal_marks_the_application_as_shutting_down(
+    tmp_path: Path,
+) -> None:
+    """The application cannot see uvicorn's `should_exit`, so it chains onto the
+    handler the server installed and hands the signal on unchanged."""
+    received: list[int] = []
+
+    def server_handler(signum: int, _frame: object) -> None:
+        received.append(signum)
+
+    previous = signal.signal(signal.SIGTERM, server_handler)
+    try:
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with app.router.lifespan_context(app):
+            assert not app.state.shutting_down.is_set()
+            signal.raise_signal(signal.SIGTERM)
+            await asyncio.wait_for(app.state.shutting_down.wait(), timeout=2)
+            assert received == [signal.SIGTERM]
+        # The server's own handler is back once the application has shut down.
+        assert signal.getsignal(signal.SIGTERM) is server_handler
+    finally:
+        signal.signal(signal.SIGTERM, previous)

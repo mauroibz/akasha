@@ -215,14 +215,16 @@ export interface LibraryEntry {
 export interface LibraryPage {
   items: LibraryEntry[];
   next_cursor: string | null;
-  total: number;
+  /** The whole filtered library; `null` on a page fetched with a cursor (Sprint 129). */
+  total: number | null;
+  /** Likewise first-page only: a cursor page carries `null`. */
   facets: {
     /** Whole-library totals: what the inbox badge counts. */
     status_counts: Partial<Record<EntryStatus, number>>;
     /** The same counts per item type, for a screen that lists domains separately. */
     status_counts_by_type: Record<string, Partial<Record<EntryStatus, number>>>;
     format_counts: Partial<Record<EntryFormat, number>>;
-  };
+  } | null;
 }
 
 export interface LibraryFilters {
