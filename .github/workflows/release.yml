@@ -38,7 +38,7 @@ jobs:
             type=raw,value=latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
       # The same Dockerfile the `container` job in ci.yml already smoke-tests —
       # there is no second image definition.
       - uses: docker/build-push-action@v6
