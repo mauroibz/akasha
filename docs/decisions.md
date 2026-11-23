@@ -7629,3 +7629,32 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   OpenAI-compatible key with `AKASHA_RECS_EMBEDDINGS_PROVIDER=openai`) and run
   `scripts/record_embedding_fixtures.py`, then open *From your library* in the app. The first
   start with a key embeds the whole library over the following minutes (32 items a request).
+
+## DEC-192 — The owner's first review of 3.0: six changes (Sprints 137–138)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-179 (the finish sheet), DEC-183 (Home), DEC-185 (the stored
+  layout), DEC-186 (the ranked pile).
+- **Context:** the owner used 3.0.0 on the board and asked: when something is set to read, set
+  the finished date to today or ask whether it was today; the *Finished* button under what is
+  being read reads like the status, not an action; *Up next* is too samey (several Stephen
+  King books float to the top); *N on the pile* opens the card deck where a plain list of what
+  is pending was wanted, and both should exist; the Diary goal's grid of what was finished
+  should be on Home for every library that has the data, with or without a goal, toggleable;
+  shelves should be placeable on Home — "this home screen is your library, and you can arrange
+  it however you like".
+- **Decision:**
+  1. A single entry moved to a finished status asks when: a library card opens the finish sheet
+     (*Today* chosen); the opinion dialog fills an empty finished date with today, visibly.
+     Bulk and triage status changes do not, because they classify imports finished long ago.
+  2. The buttons say *Mark as* the domain's finished status ("Mark as read", "Mark as watched").
+  3. The ranked pile is ordered in rounds by creator: every creator's best before any creator's
+     second. Scores and reasons are unchanged; variety is an order, not a penalty weight.
+  4. *N on the pile* opens the library filtered to the waiting statuses, as a list; *Sort*
+     beside it opens the deck.
+  5. Home's layout gains module families, `year:<item type>` and `shelf:<shelf id>`, listed by
+     the server from the registry and the person's shelves; a library's year is shown by
+     default and drawn only when it has data, a shelf is hidden until turned on.
+- **Consequences:** Sprints 137 and 138, then 3.1.0. The layout's write contract changes: a key
+  is a static module or an existing family member.

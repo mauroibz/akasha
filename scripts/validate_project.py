@@ -57,7 +57,7 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # and chapter marks reopen it at 106 as 107-108; DEC-176's house-and-history line reopens it
 # at 108 as 109-119; DEC-178's resurfacing sprints extend it to 121; DEC-179's second look reopens it
 # at 121 as 122-127; DEC-180 and DEC-181 extend it to 129; DEC-183 reopens it at 129 as 130-136).
-FINAL_SPRINT = 136
+FINAL_SPRINT = 138
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
