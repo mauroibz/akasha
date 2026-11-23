@@ -439,6 +439,14 @@ test("the add dialog over the library has no serious accessibility violations", 
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: /Web result/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  // The dialog and its overlay fade in over 200 ms, and axe computes contrast
+  // from the colours on screen: sampled mid-fade, text the settled dialog shows
+  // at full contrast reads as too faint (a different element each time, 1-2
+  // runs in 3 under parallel load). Wait until nothing moves, as the goal
+  // dialog's check does.
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().length))
+    .toBe(0);
   await expectNoSeriousViolations(page, "library (add dialog)");
 });
 
