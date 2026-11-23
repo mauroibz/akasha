@@ -371,6 +371,12 @@ test("Edit home reorders by dragging a handle", async ({ page }) => {
 test("Start moves a pile entry under way", async ({ page }) => {
   const patches = await stubHome(page);
   await page.goto("/");
+  // Sprint 132: each pick carries the ranking's strongest reason under it.
+  await expect(
+    page
+      .getByRole("region", { name: "Up next" })
+      .getByText("You rate Brandon Sanderson 8.5 across 4"),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Start Mistborn" }).click();
   await expect
     .poll(() => patches)
