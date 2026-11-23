@@ -177,7 +177,12 @@ const home = {
       count: 1,
     },
   ],
-  tidy: { duplicates: 12, without_cover: 32, unscored: 3 },
+  tidy: {
+    duplicates: 12,
+    without_cover: 32,
+    unscored: 3,
+    unscored_by_type: { book: 3 },
+  },
   question: {
     kind: "revisit",
     entry: entry(23, "Pet Sematary", "book", { status: "read", score: 9 }),
@@ -299,7 +304,7 @@ test("Tidy up's counts open what resolves them", async ({ page }) => {
   const tidy = page.getByRole("region", { name: "Tidy up" });
   await tidy.getByRole("link", { name: /finished, not scored/ }).click();
   await expect(page).toHaveURL(
-    /\/library\?status=read&status=completed&unscored=true/,
+    /\/library\?type=book&status=read&unscored=true/,
   );
   await expect(
     page.getByRole("button", { name: /No score yet/ }),

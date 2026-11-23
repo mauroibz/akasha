@@ -2505,6 +2505,13 @@
             "title": "Unscored",
             "type": "integer"
           },
+          "unscored_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Unscored By Type",
+            "type": "object"
+          },
           "without_cover": {
             "title": "Without Cover",
             "type": "integer"
@@ -2513,7 +2520,8 @@
         "required": [
           "duplicates",
           "without_cover",
-          "unscored"
+          "unscored",
+          "unscored_by_type"
         ],
         "title": "HomeTidy",
         "type": "object"

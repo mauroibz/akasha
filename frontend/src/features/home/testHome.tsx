@@ -151,7 +151,12 @@ export function emptyHome(): Home {
     },
     domains: [],
     lately: [],
-    tidy: { duplicates: 0, without_cover: 0, unscored: 0 },
+    tidy: {
+      duplicates: 0,
+      without_cover: 0,
+      unscored: 0,
+      unscored_by_type: {},
+    },
     question: null,
     shelves: [],
     lent: { total: 0, loans: [] },
@@ -299,7 +304,12 @@ export function fullHome(): Home {
       count: 3,
     },
   ];
-  home.tidy = { duplicates: 12, without_cover: 32, unscored: 3 };
+  home.tidy = {
+    duplicates: 12,
+    without_cover: 32,
+    unscored: 3,
+    unscored_by_type: { book: 3 },
+  };
   home.question = {
     kind: "revisit",
     entry: entry(43, "Pet Sematary", "book", { status: "read", score: 9 }),

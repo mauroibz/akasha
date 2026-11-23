@@ -29,8 +29,8 @@ NEXT_LIMIT = 5
 MONTH_COVERS = 24
 #: Covers on a library tile.
 TILE_COVERS = 3
-#: Rows in *Lately*.
-LATELY_LIMIT = 8
+#: Rows in *Lately* at its largest; eight at its default size.
+LATELY_LIMIT = 10
 #: Shelves in the *Shelves* module.
 SHELF_LIMIT = 8
 #: Loans listed in *Lent out*; `total` still counts them all.
@@ -184,11 +184,12 @@ class HomeService:
         rows.sort(key=lambda row: str(row["at"]), reverse=True)
         return rows[:LATELY_LIMIT]
 
-    def _tidy(self) -> dict[str, int]:
+    def _tidy(self) -> dict[str, Any]:
         """What *Tidy up* counts: pairs, entries without a cover, finished but unscored.
 
-        The cover count is the covers deck's own filter (the Inbox aside); the unscored
-        count is each domain's declared finished status with no score.
+        The cover count is the covers deck's own filter (the Inbox aside). The unscored
+        count is each domain's declared finished status with no score, per domain as
+        well, because the library it links to opens one domain at a time.
         """
         finished = [
             (domain.item_type, status.value)
@@ -204,18 +205,22 @@ class HomeService:
             clauses.append(f"(i.type = :type{index} AND e.status = :status{index})")
         unscored = f"sum(e.score IS NULL AND ({' OR '.join(clauses)}))" if clauses else "0"
         with self.engine.connect() as connection:
-            without_cover, unscored_count = connection.execute(
+            rows = connection.execute(
                 text(
-                    "SELECT sum(i.cover_path IS NULL OR i.cover_path = ''),"
+                    "SELECT i.type, sum(i.cover_path IS NULL OR i.cover_path = ''),"
                     f" {unscored} FROM entries e JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted"
+                    " WHERE e.user_id = :user AND e.status != :unsorted GROUP BY i.type"
                 ),
                 params,
-            ).one()
+            ).all()
+        by_type = {item_type: count or 0 for item_type, _covers, count in rows}
         return {
             "duplicates": self.library.duplicate_count(),
-            "without_cover": without_cover or 0,
-            "unscored": unscored_count or 0,
+            "without_cover": sum(covers or 0 for _type, covers, _count in rows),
+            "unscored": sum(by_type.values()),
+            "unscored_by_type": {
+                item_type: by_type[item_type] for item_type in DOMAINS if by_type.get(item_type)
+            },
         }
 
     def _question(self) -> dict[str, Any] | None:

@@ -2477,6 +2477,10 @@ export interface components {
       duplicates: number;
       /** Unscored */
       unscored: number;
+      /** Unscored By Type */
+      unscored_by_type: {
+        [key: string]: number;
+      };
       /** Without Cover */
       without_cover: number;
     };

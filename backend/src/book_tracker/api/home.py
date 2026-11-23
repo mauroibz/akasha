@@ -131,6 +131,9 @@ class HomeTidy(BaseModel):
     without_cover: int
     #: Entries in a status their domain declares finished, with no score.
     unscored: int
+    #: The same per library, in registry order, only those with some: the library
+    #: Tidy up links to opens one domain at a time.
+    unscored_by_type: dict[str, int]
 
 
 class HomeQuestion(BaseModel):

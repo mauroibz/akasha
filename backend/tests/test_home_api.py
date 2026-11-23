@@ -145,7 +145,12 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
     assert body["domains"] == []
     # Nothing to show is an empty section, which the screen hides.
     assert body["lately"] == []
-    assert body["tidy"] == {"duplicates": 0, "without_cover": 0, "unscored": 0}
+    assert body["tidy"] == {
+        "duplicates": 0,
+        "without_cover": 0,
+        "unscored": 0,
+        "unscored_by_type": {},
+    }
     assert body["question"] is None
     assert body["shelves"] == []
     assert body["lent"] == {"total": 0, "loans": []}
@@ -324,12 +329,18 @@ async def test_the_remaining_modules_read_the_library(tmp_path: Path) -> None:
     assert lately[0]["count"] == 2
     assert added not in [row["entry"]["id"] for row in lately]
     assert lately[1]["score"] == 7 and lately[1]["previous"] == 9
-    assert len(lately) <= 8
+    assert len(lately) <= 10
     assert all(row["entry"]["status"] != "unsorted" for row in lately)
 
     # The pair, every entry without a cover but the one in the Inbox, and finished
     # entries with no score (Ficciones, Up and the second Hobbit).
-    assert body["tidy"] == {"duplicates": 1, "without_cover": 5, "unscored": 3}
+    assert body["tidy"] == {
+        "duplicates": 1,
+        "without_cover": 5,
+        "unscored": 3,
+        # Per library, in registry order: the library opens one domain at a time.
+        "unscored_by_type": {"book": 2, "movie": 1},
+    }
     assert watched
 
     question = body["question"]
@@ -349,7 +360,7 @@ async def test_the_remaining_modules_read_the_library(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 async def test_tidy_ups_unscored_count_is_what_its_library_link_lists(tmp_path: Path) -> None:
-    """Tidy up links its unscored count to `/library?status=<finished>&unscored=true`."""
+    """Tidy up links each library's unscored count to `/library?type=…&unscored=true`."""
     finished = [
         status.value for domain in DOMAINS.values() for status in domain.statuses if status.finished
     ]
@@ -363,6 +374,7 @@ async def test_tidy_ups_unscored_count_is_what_its_library_link_lists(tmp_path: 
             await client.get("/api/entries", params={"status": finished, "unscored": "true"})
         ).json()
     assert tidy["unscored"] == 2
+    assert tidy["unscored_by_type"] == {"book": 1, "movie": 1}
     assert {row["item"]["title"] for row in listed["items"]} == {"Unscored book", "Unscored film"}
 
 

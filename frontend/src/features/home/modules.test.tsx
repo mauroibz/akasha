@@ -50,7 +50,12 @@ describe("TidyUp", () => {
   it("links each count to what resolves it", () => {
     renderWithRouter(
       <TidyUp
-        tidy={{ duplicates: 12, without_cover: 32, unscored: 3 }}
+        tidy={{
+          duplicates: 12,
+          without_cover: 32,
+          unscored: 3,
+          unscored_by_type: { book: 3 },
+        }}
         types={types}
       />,
     );
@@ -63,16 +68,43 @@ describe("TidyUp", () => {
     ).toHaveAttribute("href", "/deck/covers");
     expect(
       within(module).getByRole("link", { name: /3 finished, not scored/ }),
+    ).toHaveAttribute("href", "/library?type=book&status=read&unscored=true");
+  });
+
+  it("opens each library's unscored entries on their own, as the library shows one", () => {
+    renderWithRouter(
+      <TidyUp
+        tidy={{
+          duplicates: 0,
+          without_cover: 0,
+          unscored: 8,
+          unscored_by_type: { book: 3, anime: 5 },
+        }}
+        types={types}
+      />,
+    );
+    const module = screen.getByRole("region", { name: "Tidy up" });
+    expect(module).toHaveTextContent(/8\s*finished, not scored/);
+    expect(
+      within(module).getByRole("link", { name: "3 books" }),
+    ).toHaveAttribute("href", "/library?type=book&status=read&unscored=true");
+    expect(
+      within(module).getByRole("link", { name: "5 anime" }),
     ).toHaveAttribute(
       "href",
-      "/library?status=read&status=completed&status=watched&unscored=true",
+      "/library?type=anime&status=completed&unscored=true",
     );
   });
 
   it("leaves out a count of nothing", () => {
     renderWithRouter(
       <TidyUp
-        tidy={{ duplicates: 0, without_cover: 4, unscored: 0 }}
+        tidy={{
+          duplicates: 0,
+          without_cover: 4,
+          unscored: 0,
+          unscored_by_type: {},
+        }}
         types={types}
       />,
     );

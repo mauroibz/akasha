@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { HomeModule } from "./HomeModule";
 import { localDate } from "./year";
 
-const ROWS: Record<ModuleSize, number> = { S: 4, M: 6, L: 8 };
+const ROWS: Record<ModuleSize, number> = { S: 4, M: 8, L: 10 };
 
 const DAY = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",

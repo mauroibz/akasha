@@ -83,7 +83,12 @@ export const test = base.extend<{
             },
             domains: [],
             lately: [],
-            tidy: { duplicates: 0, without_cover: 0, unscored: 0 },
+            tidy: {
+              duplicates: 0,
+              without_cover: 0,
+              unscored: 0,
+              unscored_by_type: {},
+            },
             question: null,
             shelves: [],
             lent: { total: 0, loans: [] },
