@@ -5,6 +5,7 @@ import type { HomeNext, ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { finishAction, finishActionFor } from "@/features/finish/label";
 import { statusWith } from "@/features/rescore/rescore";
 import { cn } from "@/lib/utils";
 
@@ -133,11 +134,15 @@ export function UpNext({
                 ) : (
                   <button
                     type="button"
-                    aria-label={`Finished ${pick.entry.item.title}`}
+                    aria-label={finishActionFor(
+                      pick.entry.item.title,
+                      pick.entry.item.type,
+                      types,
+                    )}
                     onClick={() => setFinishing(pick.entry)}
                     className="mt-auto min-h-11 rounded-full border border-border text-sm font-medium transition-colors hover:bg-accent focus-ring"
                   >
-                    Finished
+                    {finishAction(pick.entry.item.type, types)}
                   </button>
                 )}
               </li>

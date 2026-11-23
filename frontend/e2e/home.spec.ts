@@ -383,14 +383,14 @@ test("Start moves a pile entry under way", async ({ page }) => {
     .toEqual([{ id: "10", body: { status: "reading" } }]);
 });
 
-test("Finished opens the finish sheet and finishes the entry", async ({
+test("Mark as read opens the finish sheet and finishes the entry", async ({
   page,
 }) => {
   const patches = await stubHome(page);
   await page.goto("/");
   await page
     .getByRole("button", {
-      name: "Finished Designing Data-Intensive Applications",
+      name: "Mark Designing Data-Intensive Applications as read",
     })
     .click();
   const sheet = page.getByRole("dialog");

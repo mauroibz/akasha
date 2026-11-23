@@ -1177,7 +1177,9 @@ for (const scheme of ["light", "dark"] as const) {
       .getByRole("alertdialog")
       .getByRole("button", { name: "Start again" })
       .click();
-    await page.getByRole("button", { name: "Finished", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Mark as read", exact: true })
+      .click();
     await page
       .getByRole("dialog", { name: "You finished Rayuela" })
       .getByRole("button", { name: "Another day" })

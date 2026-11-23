@@ -1668,7 +1668,7 @@ describe("DetailPage", () => {
       renderPage();
       const user = userEvent.setup();
       await screen.findByRole("heading", { name: "Rayuela" });
-      await user.click(screen.getByRole("button", { name: "Finished" }));
+      await user.click(screen.getByRole("button", { name: "Mark as read" }));
       const sheet = await screen.findByRole("dialog", {
         name: "You finished Rayuela",
       });

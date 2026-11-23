@@ -56,6 +56,7 @@ import { isAbandoned, localDay } from "@/features/progress/outline";
 import { askStill, isFinished, statusWith } from "@/features/rescore/rescore";
 import { ScoreHistoryRow } from "@/features/rescore/ScoreHistoryRow";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { finishAction } from "@/features/finish/label";
 import { OneQuestion } from "@/features/questions/OneQuestion";
 import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
@@ -705,7 +706,7 @@ export function DetailPage() {
                   className="rounded-full px-5"
                   onClick={() => setFinishing(true)}
                 >
-                  Finished
+                  {finishAction(item.type, itemTypes.data)}
                 </Button>
               )}
               <Button

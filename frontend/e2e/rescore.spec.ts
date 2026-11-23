@@ -49,7 +49,7 @@ test("a reread starts, finishes on the last light, and its new score joins the h
 });
 
 /**
- * Finishing (Sprint 123, DEC-179): after *Start again* the page offers *Finished*,
+ * Finishing (Sprint 123, DEC-179): after *Start again* the page offers *Mark as read* (DEC-192),
  * which asks when, the score and the format in one sheet.
  */
 test("a reread is finished with one button and one sheet", async ({ page }) => {
@@ -57,7 +57,7 @@ test("a reread is finished with one button and one sheet", async ({ page }) => {
   await stubRescore(page, patches);
   await page.goto("/books/7");
   await expect(
-    page.getByRole("button", { name: "Finished", exact: true }),
+    page.getByRole("button", { name: "Mark as read", exact: true }),
   ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Start again" }).click();
@@ -65,7 +65,7 @@ test("a reread is finished with one button and one sheet", async ({ page }) => {
     .getByRole("alertdialog")
     .getByRole("button", { name: "Start again" })
     .click();
-  await page.getByRole("button", { name: "Finished", exact: true }).click();
+  await page.getByRole("button", { name: "Mark as read", exact: true }).click();
 
   const sheet = page.getByRole("dialog", { name: "You finished Rayuela" });
   await expect(sheet).toContainText("Still an 8?");
@@ -87,7 +87,7 @@ test("a reread is finished with one button and one sheet", async ({ page }) => {
   });
   await expect(page.locator("[data-fact='status'] dd")).toContainText("Read");
   await expect(
-    page.getByRole("button", { name: "Finished", exact: true }),
+    page.getByRole("button", { name: "Mark as read", exact: true }),
   ).toHaveCount(0);
   await expect(page.locator("[data-fact='score-history']")).toContainText(
     "9 in",
@@ -105,7 +105,9 @@ test.describe("on a phone", () => {
       .getByRole("alertdialog")
       .getByRole("button", { name: "Start again" })
       .click();
-    await page.getByRole("button", { name: "Finished", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Mark as read", exact: true })
+      .click();
     const sheet = page.getByRole("dialog", { name: "You finished Rayuela" });
     await expect(
       sheet.getByRole("button", { name: "Finish" }),

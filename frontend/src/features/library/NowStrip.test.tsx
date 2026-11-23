@@ -112,7 +112,7 @@ describe("NowStrip", () => {
     });
     mount();
     await userEvent.click(
-      await screen.findByRole("button", { name: "Finished Frieren" }),
+      await screen.findByRole("button", { name: "Mark Frieren as completed" }),
     );
     await userEvent.click(
       await screen.findByRole("button", { name: "Finish" }),

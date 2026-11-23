@@ -68,7 +68,7 @@ describe("UpNext", () => {
       screen.queryByRole("button", { name: "Start Paris, Texas" }),
     ).toBeNull();
     await userEvent.click(
-      screen.getByRole("button", { name: "Finished Paris, Texas" }),
+      screen.getByRole("button", { name: "Mark Paris, Texas as watched" }),
     );
     expect(await screen.findByRole("dialog")).toHaveTextContent(
       "You finished Paris, Texas",
