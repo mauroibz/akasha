@@ -4,7 +4,9 @@ import { useState } from "react";
 import { getGoals, type Goal } from "@/api/goals";
 import { queryKeys } from "@/api/keys";
 import { getDiary } from "@/api/library";
+import { DomainStrip } from "@/components/DomainStrip";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 import { GoalBand } from "./GoalBand";
 import { GoalDialog } from "./GoalDialog";
@@ -42,6 +44,23 @@ export function GoalWidget() {
     (a, b) => finishedOf(b.id).length - finishedOf(a.id).length,
   )[0];
   const mine = Array.isArray(goals.data) ? goals.data : [];
+  // The medium the invitation is for is the person's to choose (DEC-195): among the
+  // media a goal can count, in their order, the one finished most to begin with.
+  const shown = useShownItemTypes();
+  // Their media first, then the rest: a goal can be set for a medium not begun yet,
+  // and a medium nobody chose to turn off is not one to withhold.
+  const first = (shown.data ?? []).filter((type) =>
+    able.some((domain) => domain.id === type.id),
+  );
+  const offered = [
+    ...first,
+    ...able.filter((domain) => !first.some((type) => type.id === domain.id)),
+  ];
+  const [picked, setPicked] = useState<string | null>(null);
+  const domain =
+    offered.find((type) => type.id === picked) ??
+    offered.find((type) => type.id === invited?.id) ??
+    invited;
 
   if (goals.isPending) return null;
   return (
@@ -56,15 +75,28 @@ export function GoalWidget() {
           onChange={() => setEditing({ open: true, goal })}
         />
       ))}
-      {mine.length === 0 && invited && (
+      {mine.length === 0 && domain && offered.length > 1 && (
+        <DomainStrip
+          label="A goal for"
+          domains={offered.map((type) => ({
+            id: type.id,
+            label: type.plural_label ?? type.label,
+          }))}
+          value={domain.id}
+          onChange={setPicked}
+        />
+      )}
+      {mine.length === 0 && domain && (
         <GoalInvite
-          domain={invited}
-          done={finishedOf(invited.id).length}
+          // A fresh invitation per medium: its paces follow that medium's count.
+          key={domain.id}
+          domain={domain}
+          done={finishedOf(domain.id).length}
           year={year}
           onOther={() => setEditing({ open: true })}
         />
       )}
-      {mine.length === 0 && !invited && (
+      {mine.length === 0 && !domain && (
         <p className="text-sm text-muted-foreground">
           A goal counts what you finish in a year. Nothing you keep records
           finishing yet.

@@ -1,7 +1,7 @@
 # Sprint 149 — The Journal's two gaps
 
 **Sprint:** 149
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 57
 **Depends on:** 148
 **Owner:** Mauro
@@ -53,4 +53,27 @@ One per deliverable, then `[DOCS]` close.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-195). Commit: `HASH`.
+
+- **The goal's medium.** Above the invitation the one chooser, "A goal for", lists every
+  medium that records a finish: the person's own in their order, then the rest. The invitation
+  and its paces are for the one chosen.
+- **Something else.** `features/journal/DaySearch.tsx`: a field that lists library matches as
+  it is typed (250 ms after the last key, two characters or more); *Search the web*, with the
+  medium chooser beside it, asks a provider once per press; a result's *Add* creates the entry
+  and chooses it. What is found stands among the day's choices.
+
+Acceptance: 1 by `GoalWidget.test.tsx`; 2, 3 and 4 by `EveryDay.test.tsx` (the provider
+requests are counted).
+
+Verification: Vitest 764 passed; Playwright `every-day`, `diary-goal`, `play`, `accessibility`
+58 passed; `make check`. In the running app on a copy of the development library: the goal
+chooser read Books, Anime, Movies, Series; with nothing under way a day's question found
+*Tokio blues* by typing "tokio". The web half could not be looked at live: providers are
+unreachable from the agent's sandbox.
+
+Deviations: the goal chooser lists media the person has turned off or never used as well as
+their own. On the test library only books could carry a goal among the media held, so a
+chooser of the person's media alone would not have appeared at all. A web result that looks
+like something already held is refused with a line pointing at the library results, rather
+than asking to confirm.

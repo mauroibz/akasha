@@ -10,6 +10,7 @@ import { Cover } from "@/components/Cover";
 import { cn } from "@/lib/utils";
 
 import { daysOf, iso, longDay, type Span } from "./days";
+import { DaySearch } from "./DaySearch";
 
 export const spanKey = "akasha.journal.everyday";
 const weekdays = ["M", "T", "W", "T", "F", "S", "S"];
@@ -42,6 +43,9 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
   const [open, setOpen] = useState<string | null>(null);
   const [changing, setChanging] = useState(false);
   const [chosen, setChosen] = useState<number[]>([]);
+  // What *Something else* found: offered beside what is under way once chosen.
+  const [extra, setExtra] = useState<LibraryEntry[]>([]);
+  const [searching, setSearching] = useState(false);
   const { days, lead } = daysOf(span, today);
   const from = iso(days[0]);
   const to = iso(days[days.length - 1]);
@@ -68,6 +72,8 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
     setOpen(null);
     setChanging(false);
     setChosen([]);
+    setExtra([]);
+    setSearching(false);
     void queryClient.invalidateQueries({ queryKey: queryKeys.litDays });
   };
   const light = useMutation({
@@ -108,7 +114,17 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
   const opened = open ? days.find((day) => iso(day) === open) : undefined;
   const openedLit = open ? byDay.get(open) : undefined;
   const asking = opened && (!openedLit || changing);
-  const under = Array.isArray(now.data) ? now.data : [];
+  const underWay = Array.isArray(now.data) ? now.data : [];
+  const under = [
+    ...underWay,
+    ...extra.filter((entry) => !underWay.some((row) => row.id === entry.id)),
+  ];
+  const find = (entry: LibraryEntry) => {
+    setExtra((rows) =>
+      rows.some((row) => row.id === entry.id) ? rows : [...rows, entry],
+    );
+    setChosen((ids) => (ids.includes(entry.id) ? ids : [...ids, entry.id]));
+  };
   const toggle = (entry: LibraryEntry) =>
     setChosen((ids) =>
       ids.includes(entry.id)
@@ -180,6 +196,8 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
                   onClick={() => {
                     setOpen(open === key ? null : key);
                     setChanging(false);
+                    setSearching(false);
+                    setExtra(row?.entries ?? []);
                     setChosen(row?.entries.map((entry) => entry.id) ?? []);
                   }}
                   className={cn(
@@ -292,9 +310,10 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
               <p className="mt-1 text-sm text-muted-foreground">
                 {now.isPending
                   ? "Looking at what is under way…"
-                  : "Nothing is under way to choose from; it can still be lit."}
+                  : "Nothing is under way. Find what it was for, or just light it."}
               </p>
             )}
+            {searching && <DaySearch chosen={chosen} onChoose={find} />}
             <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
               <button
                 type="button"
@@ -304,6 +323,15 @@ export function EveryDay({ today = new Date() }: { today?: Date }) {
               >
                 {chosen.length ? "Light it" : "Just light it"}
               </button>
+              {!searching && (
+                <button
+                  type="button"
+                  className={plain}
+                  onClick={() => setSearching(true)}
+                >
+                  Something else
+                </button>
+              )}
               <button
                 type="button"
                 className={plain}

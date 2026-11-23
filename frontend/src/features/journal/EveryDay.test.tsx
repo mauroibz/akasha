@@ -20,7 +20,10 @@ const entry = (id: number, title: string) => ({
   item: { id, type: "book", title, cover_url: null, year: 1963 },
 });
 
-function serve(lit: Array<{ day: string; entries: unknown[] }> = []) {
+function serve(
+  lit: Array<{ day: string; entries: unknown[] }> = [],
+  underWay: unknown[] = [entry(1, "Rayuela"), entry(2, "Frieren")],
+) {
   const calls: Array<{ method: string; url: string; body?: unknown }> = [];
   vi.stubGlobal(
     "fetch",
@@ -39,8 +42,37 @@ function serve(lit: Array<{ day: string; entries: unknown[] }> = []) {
       if (url.startsWith("/api/lit-days"))
         return new Response(JSON.stringify({ days: lit }));
       if (url.startsWith("/api/now"))
+        return new Response(JSON.stringify(underWay));
+      if (url.startsWith("/api/item-types"))
         return new Response(
-          JSON.stringify([entry(1, "Rayuela"), entry(2, "Frieren")]),
+          JSON.stringify([
+            { id: "book", label: "Book", plural_label: "Books" },
+          ]),
+        );
+      if (url.startsWith("/api/media")) return new Response("{}");
+      if (url.startsWith("/api/search/library"))
+        return new Response(JSON.stringify([entry(9, "Piranesi")]));
+      if (url.startsWith("/api/search?"))
+        return new Response(
+          JSON.stringify([
+            {
+              source: "openlibrary",
+              source_id: "OL9M",
+              source_refs: [],
+              title: "Solaris",
+              creators: ["Stanisław Lem"],
+              year: 1961,
+            },
+          ]),
+        );
+      if (url === "/api/entries" && method === "POST")
+        return new Response(
+          JSON.stringify({
+            entry: entry(12, "Solaris"),
+            already_exists: false,
+            near_matches: [],
+          }),
+          { status: 201 },
         );
       return new Response("[]");
     }),
@@ -232,5 +264,96 @@ describe("EveryDay (Sprint 147, DEC-193)", () => {
       screen.queryByRole("group", { name: "What was it for?" }),
     ).toBeNull();
     expect(calls.some((call) => call.method === "PUT")).toBe(false);
+  });
+
+  describe("something else (Sprint 149, DEC-195)", () => {
+    async function ask(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(
+        await screen.findByRole("button", {
+          name: "Monday 23 November, not lit",
+        }),
+      );
+      const question = await screen.findByRole("group", {
+        name: "What was it for?",
+      });
+      await user.click(
+        within(question).getByRole("button", { name: "Something else" }),
+      );
+      return question;
+    }
+
+    it("lights a day for something found in the library when nothing is under way", async () => {
+      const calls = serve([], []);
+      renderWidget();
+      const user = userEvent.setup();
+      const question = await ask(user);
+      expect(question).toHaveTextContent("Nothing is under way");
+      await user.type(within(question).getByLabelText("Find it"), "pira");
+      await user.click(
+        await within(question).findByRole("button", { name: /Piranesi/ }),
+      );
+      await user.click(
+        within(question).getByRole("button", { name: "Light it" }),
+      );
+      await waitFor(() =>
+        expect(calls.find((call) => call.method === "PUT")).toMatchObject({
+          body: { entry_ids: [9] },
+        }),
+      );
+    });
+
+    it("asks no provider while typing, and one per press of Search the web", async () => {
+      const calls = serve([], []);
+      renderWidget();
+      const user = userEvent.setup();
+      const question = await ask(user);
+      await user.type(within(question).getByLabelText("Find it"), "solaris");
+      await within(question).findByRole("button", { name: /Piranesi/ });
+      const web = () =>
+        calls.filter((call) => call.url.startsWith("/api/search?")).length;
+      expect(web()).toBe(0);
+      await user.click(
+        within(question).getByRole("button", { name: "Search the web" }),
+      );
+      await within(question).findByRole("button", {
+        name: "Add Solaris and choose it",
+      });
+      expect(web()).toBe(1);
+    });
+
+    it("adds a web result to the library and lights the day for it", async () => {
+      const calls = serve([], []);
+      renderWidget();
+      const user = userEvent.setup();
+      const question = await ask(user);
+      await user.type(within(question).getByLabelText("Find it"), "solaris");
+      await user.click(
+        await within(question).findByRole("button", { name: "Search the web" }),
+      );
+      await user.click(
+        await within(question).findByRole("button", {
+          name: "Add Solaris and choose it",
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          calls.find(
+            (call) => call.method === "POST" && call.url === "/api/entries",
+          ),
+        ).toMatchObject({ body: { source: "openlibrary", source_id: "OL9M" } }),
+      );
+      // The new entry stands among the choices, chosen.
+      expect(
+        await within(question).findByRole("button", { name: "Solaris" }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await user.click(
+        within(question).getByRole("button", { name: "Light it" }),
+      );
+      await waitFor(() =>
+        expect(calls.find((call) => call.method === "PUT")).toMatchObject({
+          body: { entry_ids: [12] },
+        }),
+      );
+    });
   });
 });

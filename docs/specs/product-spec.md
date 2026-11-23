@@ -1114,13 +1114,17 @@ a light on each day something was read, watched or finished; never the year. A d
 when progress is logged on something of a medium kept in front, on the day something is
 finished, and by hand. Tapping an unlit day asks one question in place, "What was Monday 23
 November for?", offering what is under way as covers to choose, any number or none, then
-*Light it* or *Just light it*; *Not now* leaves it. Nothing else is asked: no amount, no note.
+*Light it* or *Just light it*; *Not now* leaves it. *Something else* (Sprint 149) opens a
+search for what is not under way: the library as it is typed, and the web only on *Search the
+web*, where adding a result makes the entry and chooses it. Nothing else is asked: no amount,
+no note.
 Tapping a lit day says what it was for and offers *Change what it was for* and *Unlight*. A
 day to come cannot be lit. The count is said in words, "14 days lit in November"; nothing
 counts streaks and an unlit day is only unlit), *Play* (the
 games described next, asked of the medium the person keeps first, with links to *Tidy up*, the
 rank list and tiers) and *Goal* (this year's goals with their slots and picks, or the
-invitation to set one). Then **Timeline**, the Diary described below without its goal; then
+invitation to set one, for a medium chosen among those that record a finish, the person's
+own first; Sprint 149). Then **Timeline**, the Diary described below without its goal; then
 **Patterns**, the Insights sections per medium. The owner chose widgets over a page to write
 on. The descriptions of Play, the Diary and Insights that follow are of those parts.
 
