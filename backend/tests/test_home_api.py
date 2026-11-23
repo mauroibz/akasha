@@ -188,10 +188,8 @@ async def test_the_five_sections_read_the_library(tmp_path: Path) -> None:
     # Every entry but the one still in the Inbox; the pile is every planned entry.
     assert greeting["entries"] == 15
     assert greeting["pile"] == 8
-    assert greeting["goals"] == [
-        {"item_type": "book", "target": 24, "count": 2},
-        {"item_type": "movie", "target": 6, "count": 1},
-    ]
+    # One library: the book under way, beside the book goal (Sprint 131).
+    assert greeting["goals"] == [{"item_type": "book", "target": 24, "count": 2}]
 
     assert [row["id"] for row in body["now"]] == [reading, watching]
 
@@ -386,6 +384,40 @@ async def test_one_question_asks_an_old_score_again_before_a_gap(tmp_path: Path)
     assert body["question"]["kind"] == "revisit"
     assert body["question"]["entry"]["id"] == old
     assert body["question"]["scored_at"].startswith("2019-01-02")
+
+
+@pytest.mark.anyio
+async def test_the_greeting_names_what_is_under_way_in_the_goals_library(tmp_path: Path) -> None:
+    """Day N of a book beside the book goal, even when an anime was touched later."""
+    today = date.today()
+    async with _client(tmp_path) as (app, client):
+        book = _entry(
+            app,
+            "A book",
+            "book",
+            "reading",
+            date_started=(today - timedelta(days=4)).isoformat(),
+            updated_at="2026-01-01T00:00:00Z",
+        )
+        _entry(app, "An anime", "anime", "watching", updated_at="2026-11-01T00:00:00Z")
+        _goal(app, "book", 2, "month")
+        body = (await client.get("/api/home")).json()
+    greeting = body["greeting"]
+    assert greeting["active"]["entry"]["id"] == book
+    assert greeting["active"]["day"] == 5
+    assert [goal["item_type"] for goal in greeting["goals"]] == ["book"]
+
+
+@pytest.mark.anyio
+async def test_the_greeting_shows_the_goal_of_the_library_it_names(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        anime = _entry(app, "An anime", "anime", "watching")
+        _goal(app, "book", 2, "month")
+        _goal(app, "anime", 20, "year")
+        body = (await client.get("/api/home")).json()
+    greeting = body["greeting"]
+    assert greeting["active"]["entry"]["id"] == anime
+    assert greeting["goals"] == [{"item_type": "anime", "target": 20, "count": 0}]
 
 
 @pytest.mark.anyio

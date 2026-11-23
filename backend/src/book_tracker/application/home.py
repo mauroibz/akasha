@@ -285,9 +285,11 @@ class HomeService:
             if status.planned
         }
         done = _done_by_type(finished)
+        mine = self._goals(goals)
+        active, goal = _greeting_pair(now, mine)
         return {
             "today": today.isoformat(),
-            "active": {"entry": now[0], "day": _day_of(now[0], today)} if now else None,
+            "active": {"entry": active, "day": _day_of(active, today)} if active else None,
             "entries": sum(row[2] for row in by_status if row[0] in DOMAINS),
             "pile": sum(row[2] for row in by_status if (row[0], row[1]) in planned),
             "goals": [
@@ -296,8 +298,9 @@ class HomeService:
                     "target": _target(goal),
                     "count": done.get(goal["item_type"], 0),
                 }
-                for goal in self._goals(goals)
-            ],
+            ]
+            if goal
+            else [],
         }
 
     def _goals(self, goals: GoalService) -> list[dict[str, Any]]:
@@ -405,6 +408,27 @@ class HomeService:
                 }
             )
         return tiles
+
+
+def _greeting_pair(
+    now: list[dict[str, Any]], goals: list[dict[str, Any]]
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    """What the greeting names and the goal beside it, always of one library.
+
+    The first goal (registry order) whose library has something under way names that
+    library's most recently touched entry. Without one, the most recently touched entry
+    overall, beside its own library's goal if it has one. With nothing under way, the
+    lead goal alone.
+    """
+    for goal in goals:
+        for entry in now:
+            if entry["item"]["type"] == goal["item_type"]:
+                return entry, goal
+    if now:
+        lead = now[0]
+        own = next((goal for goal in goals if goal["item_type"] == lead["item"]["type"]), None)
+        return lead, own
+    return None, goals[0] if goals else None
 
 
 def _done_by_type(finished: Sequence[Any]) -> dict[str, int]:
