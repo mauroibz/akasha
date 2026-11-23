@@ -43,6 +43,8 @@ from book_tracker.domain.spec import Domain
 #: The next in a series, at a mean score of `SERIES_FULL_AT` (more lifts up to 1.25x).
 SERIES_WEIGHT = 3.0
 SERIES_FULL_AT = 8.0
+#: The next after one still under way waits a little behind one ready to start.
+SERIES_UNDER_WAY = 0.75
 #: A series whose scores average below this is not pushed.
 SERIES_MIN_MEAN = 6.0
 #: Points per score point a creator stands above the person's mean, before shrinking.
@@ -63,6 +65,8 @@ AFFINITY_FLOOR = 0.25
 #: Below this many points a subject is not a reason.
 AFFINITY_MIN_LIFT = 0.1
 AFFINITY_CAP = 2.0
+#: A subject on more than this share of a library's scored entries is not a taste.
+AFFINITY_MAX_SHARE = 0.5
 #: Points per year on the pile, up to the cap: small on purpose.
 WAITING_PER_YEAR = 0.15
 WAITING_CAP_YEARS = 5.0
@@ -109,12 +113,13 @@ class _SeriesMember:
 
 @dataclass
 class _Taste:
-    """One subject's scores: how many, their sum, and the recency-weighted lift."""
+    """One subject's scores: how many, their sum, and their recency-weighted sums."""
 
     name: str
     rated: int = 0
     total: float = 0.0
-    deviation: float = 0.0
+    #: Recency-weighted: the sum of weight times score, and of the weights.
+    weighted: float = 0.0
     weight: float = 0.0
 
 
@@ -144,9 +149,9 @@ def rank_pile(
         candidates = _candidates(connection, user_id, domains)
         if not candidates:
             return []
-        means = _creator_signal(connection, user_id, domains, candidates)
+        _creator_signal(connection, user_id, domains, candidates)
         _series_signal(connection, user_id, domains, candidates)
-        _affinity_signal(connection, user_id, domains, candidates, means, today)
+        _affinity_signal(connection, user_id, domains, candidates, today)
         if item_type is None:
             _goal_signal(connection, user_id, domains, candidates, today)
     for candidate in candidates:
@@ -204,8 +209,8 @@ def _candidates(connection: Connection, user_id: int, domains: list[Domain]) -> 
 
 def _creator_signal(
     connection: Connection, user_id: int, domains: list[Domain], candidates: list[_Candidate]
-) -> dict[str, float]:
-    """Lift a creator the person rates above their own average; return those averages.
+) -> None:
+    """Lift a creator the person rates above their own average in that library.
 
     One pass over the scored entries gives both: per creator, and summed per library,
     the mean "above your average" is measured from.
@@ -241,7 +246,6 @@ def _creator_signal(
         candidate.signals.append(
             ("creator", points, f"You rate {candidate.creator} {mean:.1f} across {count}")
         )
-    return means
 
 
 def _series_of(domain: Domain, title: str, value: Any) -> tuple[str, str, float | None] | None:
@@ -346,6 +350,8 @@ def _series_signal(
                 continue
         nxt = min(waiting, key=lambda m: (m.position is None, m.position or 0.0, m.entry_id))
         factor = 1.0 if mean is None else min(1.25, mean / SERIES_FULL_AT)
+        if flags[last.status].in_progress:
+            factor *= SERIES_UNDER_WAY
         by_id[nxt.entry_id].signals.append(
             (
                 "series",
@@ -373,8 +379,13 @@ def _series_reason(domain: Domain, name: str, last: _SeriesMember, flags: dict[s
     if flags[last.status].in_progress:
         return f"Next in {name}; you're on {which} now"
     if last.score is not None:
-        return f"Next in {name}; you gave {which} a {last.score}"
+        return f"Next in {name}; you gave {which} {_article(last.score)} {last.score}"
     return f"Next in {name} after {which}"
+
+
+def _article(score: int) -> str:
+    """ "an 8", "an 11", "an 18"; "a" before every other score."""
+    return "an" if score in (8, 11, 18) else "a"
 
 
 def _recency(day: str | None, today: date) -> float:
@@ -391,7 +402,6 @@ def _affinity_signal(
     user_id: int,
     domains: list[Domain],
     candidates: list[_Candidate],
-    means: dict[str, float],
     today: date,
 ) -> None:
     """Lift waiting entries carrying a subject the person has lately scored high."""
@@ -426,11 +436,25 @@ def _affinity_signal(
             carried[entry_id].add(normalize_text(value))
     if not carried:
         return
+    # The baseline is the person's own recent taste in that library, weighted alike:
+    # when every score lately is higher, a subject is not lifted for sharing in it.
+    baseline: dict[str, _Taste] = {}
+    types = _in("t", sorted({item_type for item_type, _path in paths}), params)
+    for item_type, score, month, count in connection.execute(
+        text(
+            "SELECT i.type, e.score, substr(coalesce(e.date_finished, e.date_added), 1, 7),"
+            " count(*) FROM entries e JOIN items i ON i.id = e.item_id"
+            f" WHERE e.user_id = :user AND e.score IS NOT NULL AND i.type IN ({types})"
+            " GROUP BY 1, 2, 3"
+        ),
+        params,
+    ).all():
+        _tally(baseline.setdefault(item_type, _Taste(item_type)), score, month, count, today)
     stats: dict[tuple[str, str], _Taste] = {}
     for item_type, value, score, month, count in connection.execute(
         text(
             f"WITH fields AS ({fields}) SELECT i.type, j.value, e.score,"
-            " substr(coalesce(e.date_finished, e.date_added), 1, 7), count(*)"
+            " substr(coalesce(e.date_finished, e.date_added), 1, 7), count(DISTINCT e.id)"
             " FROM entries e JOIN items i ON i.id = e.item_id JOIN fields f ON f.type = i.type,"
             " json_each(i.metadata, f.path) j"
             " WHERE e.user_id = :user AND e.score IS NOT NULL AND j.type = 'text'"
@@ -439,24 +463,32 @@ def _affinity_signal(
         params,
     ).all():
         key = normalize_text(value)
-        if not key or item_type not in means:
-            continue
-        weight = _recency(f"{month}-01" if month else None, today) * count
-        seen = stats.setdefault((item_type, key), _Taste(value.strip()))
-        seen.rated += count
-        seen.total += score * count
-        seen.deviation += weight * (score - means[item_type])
-        seen.weight += weight
+        if key and item_type in baseline:
+            _tally(
+                stats.setdefault((item_type, key), _Taste(value.strip())),
+                score,
+                month,
+                count,
+                today,
+            )
     for candidate in candidates:
+        base = baseline.get(candidate.item_type)
+        if base is None or not base.weight:
+            continue
+        usual = base.weighted / base.weight
         best: tuple[float, str] | None = None
         # Sorted, so two subjects lifting alike always name the same one.
         for key in sorted(carried.get(candidate.entry_id, ())):
             taste = stats.get((candidate.item_type, key))
-            if taste is None or taste.rated < AFFINITY_MIN_RATED:
+            # A subject on most of what was scored ("Fiction") says nothing of taste.
+            if (
+                taste is None
+                or taste.rated < AFFINITY_MIN_RATED
+                or taste.rated > AFFINITY_MAX_SHARE * base.rated
+            ):
                 continue
-            points = min(
-                AFFINITY_CAP, AFFINITY_WEIGHT * taste.deviation / (taste.weight + AFFINITY_SHRINK)
-            )
+            lift = (taste.weighted - usual * taste.weight) / (taste.weight + AFFINITY_SHRINK)
+            points = min(AFFINITY_CAP, AFFINITY_WEIGHT * lift)
             if points < AFFINITY_MIN_LIFT or (best is not None and points <= best[0]):
                 continue
             plural = DOMAINS[candidate.item_type].plural_label.lower()
@@ -464,6 +496,14 @@ def _affinity_signal(
             best = (points, f"You rate {taste.name} {mean:.1f} across {taste.rated} {plural}")
         if best is not None:
             candidate.signals.append(("affinity", *best))
+
+
+def _tally(taste: _Taste, score: int, month: str | None, count: int, today: date) -> None:
+    weight = _recency(f"{month}-01" if month else None, today) * count
+    taste.rated += count
+    taste.total += score * count
+    taste.weighted += weight * score
+    taste.weight += weight
 
 
 def _goal_signal(

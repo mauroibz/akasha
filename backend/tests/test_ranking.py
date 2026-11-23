@@ -172,6 +172,62 @@ async def test_a_series_without_places_or_after_a_drop(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
+async def test_a_series_after_one_finished_leads_one_after_one_under_way(tmp_path: Path) -> None:
+    async with _app(tmp_path) as app:
+        _entry(app, "Leviathan Wakes (The Expanse, #1)", "read", score=8)
+        _entry(app, "Caliban's War (The Expanse, #2)", "reading")
+        under_way = _entry(app, "Abaddon's Gate (The Expanse, #3)", "to_read")
+        _entry(
+            app,
+            "El problema de los tres cuerpos",
+            "read",
+            score=8,
+            metadata={"series": "Tres Cuerpos #1"},
+        )
+        finished = _entry(
+            app, "El bosque oscuro", "to_read", metadata={"series": "Tres Cuerpos #2"}
+        )
+
+        ranked = _rank(app)
+
+    # Book 2 of the Expanse is not done yet; book 2 of the other is ready to start.
+    assert _ids(ranked) == [finished, under_way]
+    assert _reasons(ranked[0])["series"] == "Next in Tres Cuerpos; you gave book 1 an 8"
+
+
+@pytest.mark.anyio
+async def test_a_subject_on_almost_everything_is_no_reason(tmp_path: Path) -> None:
+    async with _app(tmp_path) as app:
+        # Lately the scores are higher across the board; "Fiction" is on all of them.
+        for index in range(6):
+            _entry(
+                app,
+                f"Long ago {index}",
+                "read",
+                score=6,
+                metadata={"subjects": ["Fiction"]},
+                date_finished=f"201{index}-05-05",
+                creators=(f"A{index}",),
+            )
+            _entry(
+                app,
+                f"Lately {index}",
+                "read",
+                score=9,
+                metadata={"subjects": ["Fiction", "Horror" if index < 3 else "Poetry"]},
+                date_finished=f"2026-0{index + 1}-05",
+                creators=(f"B{index}",),
+            )
+        plain = _entry(app, "Plain", "to_read", metadata={"subjects": ["Fiction"]})
+        horror = _entry(app, "Horror", "to_read", metadata={"subjects": ["Fiction", "Horror"]})
+
+        ranked = {pick["entry_id"]: pick for pick in _rank(app)}
+
+    assert "affinity" not in _reasons(ranked[plain])
+    assert _reasons(ranked[horror])["affinity"] == "You rate Horror 9.0 across 3 books"
+
+
+@pytest.mark.anyio
 async def test_a_favourite_creator_lifts_their_waiting_book(tmp_path: Path) -> None:
     async with _app(tmp_path) as app:
         for index, score in enumerate((9, 8, 9, 8, 8)):
