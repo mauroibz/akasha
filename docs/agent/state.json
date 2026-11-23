@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "140",
-  "active_sprint_file": "docs/sprints/140-one-bar.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "139",
+  "project_status": "ready",
+  "active_sprint": "141",
+  "active_sprint_file": "docs/sprints/141-library-at-home.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "140",
   "completed_sprints": [
     "001",
     "002",
@@ -145,8 +145,9 @@
     "136",
     "137",
     "138",
-    "139"
+    "139",
+    "140"
   ],
-  "started_at": "2026-11-23T13:10:56-03:00",
-  "updated_at": "2026-11-23T13:10:56-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T13:21:30-03:00"
 }

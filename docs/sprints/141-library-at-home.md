@@ -1,7 +1,7 @@
 # Sprint 141 — The library is the home
 
 **Sprint:** 141
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 140
 **Owner:** Mauro

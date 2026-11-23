@@ -1,7 +1,7 @@
 # Sprint 140 — One bar
 
 **Sprint:** 140
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 139
 **Owner:** Mauro
@@ -59,7 +59,8 @@ The Library moving to `/` (141). Changing the Add form or the import flow.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193).
+Completed 2026-11-23 (DEC-193). Commit: `d497c8e`. The product spec's screens section is
+rewritten once, in Sprint 141, when the Library moves.
 
 - **Navigation.** Home, Library, Shelves, Insights, Diary. *Add* and *Import* are gone from the
   desktop bar and the phone's tab bar; the routes stay.
