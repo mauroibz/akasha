@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { getGoals, type Goal } from "@/api/goals";
 import { queryKeys } from "@/api/keys";
 import { getDiary } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Timeline } from "@/features/diary/Timeline";
@@ -18,6 +18,7 @@ import { countLabel } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { cn } from "@/lib/utils";
 import { navigateWithTransition } from "@/lib/viewTransition";
+import { PageFrame } from "@/components/PageFrame";
 
 const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" });
 
@@ -68,7 +69,7 @@ export function DiaryPage() {
   )[0];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         title="Diary"
         lede="What you finished, month by month."
@@ -217,17 +218,14 @@ export function DiaryPage() {
                                 `/books/${entry.id}`,
                               )
                             }
-                            className="block w-full rounded-md text-left focus-ring"
+                            className="group block w-full rounded-md text-left focus-ring"
                             aria-label={`Open ${entry.item.title}`}
                           >
-                            <CoverImage
+                            <Cover
                               src={entry.item.cover_url}
-                              alt=""
-                              className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
+                              size="m"
+                              title={entry.item.title}
                             />
-                            <span className="mt-2 block truncate text-sm font-medium">
-                              {entry.item.title}
-                            </span>
                           </button>
                         </li>
                       ))}
@@ -239,6 +237,6 @@ export function DiaryPage() {
           )}
         </>
       )}
-    </main>
+    </PageFrame>
   );
 }

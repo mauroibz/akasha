@@ -29,6 +29,7 @@ import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
 import { createQueryClient } from "@/lib/queryClient";
+import { PageFrame } from "@/components/PageFrame";
 
 // `/` (Home) and `/library` are the screens the application opens on, so they
 // stay in the entry chunk.
@@ -138,9 +139,9 @@ function HomeRoute() {
  */
 function RouteFallback() {
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <PageFrame width="reading">
       <Loading label="Loading…" shape="page" />
-    </main>
+    </PageFrame>
   );
 }
 
@@ -162,13 +163,14 @@ function currentDestination(pathname: string, search: string, hash: string) {
 
 function AuthLoading() {
   return (
-    <main
-      className="flex min-h-screen items-center justify-center p-6"
+    <PageFrame
+      width="reading"
       role="status"
       aria-live="polite"
+      className="flex items-center justify-center"
     >
       <p className="text-sm text-muted-foreground">Opening Akasha…</p>
-    </main>
+    </PageFrame>
   );
 }
 

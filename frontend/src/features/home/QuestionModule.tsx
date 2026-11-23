@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import type { HomeQuestion } from "@/api/home";
 import { queryKeys } from "@/api/keys";
 import type { ItemType } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { OneQuestion } from "@/features/questions/OneQuestion";
 import { scoreArticle } from "@/features/rescore/rescore";
 
@@ -35,11 +35,7 @@ export function QuestionModule({
       className="w-12 shrink-0 rounded focus-ring"
       aria-label={`Open ${entry.item.title}`}
     >
-      <CoverImage
-        src={entry.item.cover_url}
-        alt=""
-        className="aspect-[2/3] w-full rounded object-cover"
-      />
+      <Cover src={entry.item.cover_url} size="s" />
     </Link>
   );
   return (

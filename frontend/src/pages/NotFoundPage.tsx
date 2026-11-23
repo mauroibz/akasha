@@ -1,9 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
+import { PageFrame } from "@/components/PageFrame";
 
 export function NotFoundPage() {
   const navigate = useNavigate();
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 text-center">
+    <PageFrame
+      width="focus"
+      className="flex min-h-[70vh] flex-col items-center justify-center text-center"
+    >
       <p className="text-6xl font-bold text-primary/30">404</p>
       <h1 className="mt-4 font-display text-3xl font-medium">Page not found</h1>
       <p className="mt-2 text-muted-foreground">
@@ -23,7 +27,7 @@ export function NotFoundPage() {
           Enter by hand
         </Link>
       </div>
-    </main>
+    </PageFrame>
   );
 }
 
@@ -35,7 +39,10 @@ export function RouteErrorPage({
   reset: () => void;
 }) {
   return (
-    <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 text-center">
+    <PageFrame
+      width="focus"
+      className="flex min-h-[70vh] flex-col items-center justify-center text-center"
+    >
       <h1 className="font-display text-3xl font-medium">
         Something went wrong
       </h1>
@@ -48,6 +55,6 @@ export function RouteErrorPage({
       >
         Try again
       </button>
-    </main>
+    </PageFrame>
   );
 }

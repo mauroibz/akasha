@@ -90,6 +90,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useCommandBar } from "@/features/command/commandBar";
 import { NowStrip } from "@/features/library/NowStrip";
 import { SaveView } from "@/features/library/SaveView";
+import { PageFrame } from "@/components/PageFrame";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 // The confirm dialog is the only place `/` needs the form stack (react-hook-form
@@ -666,7 +667,7 @@ export function LibraryPage() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-7 sm:px-8">
+    <PageFrame width="wide">
       {/* Sprint 072 (DEC-139, deliverable 5): one sticky command bar. The
           brand lockup, the domain strip, search, the density toggle, the
           inbox and the add path share one row; sort, shelf, format and
@@ -1304,7 +1305,7 @@ export function LibraryPage() {
         types={itemTypes.data}
         onClose={() => setFinishing(null)}
       />
-    </main>
+    </PageFrame>
   );
 }
 

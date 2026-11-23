@@ -40,6 +40,7 @@ import { TidyUp } from "./TidyUp";
 import { UpNext } from "./UpNext";
 import { localDate } from "./year";
 import { YearModule } from "./YearModule";
+import { PageFrame } from "@/components/PageFrame";
 
 function isEmpty(home: Home): boolean {
   return home.greeting.entries === 0 && home.now.length === 0;
@@ -290,8 +291,8 @@ export function HomePage() {
   }
 
   return (
-    <main aria-label="Home" className="mx-auto max-w-7xl px-4 py-5 sm:px-6">
+    <PageFrame width="wide" aria-label="Home">
       {body}
-    </main>
+    </PageFrame>
   );
 }

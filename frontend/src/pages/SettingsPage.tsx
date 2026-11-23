@@ -11,6 +11,7 @@ import {
   type ThemeChoice,
 } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
 
 interface Option {
   value: ThemeChoice;
@@ -59,7 +60,7 @@ export function SettingsPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+    <PageFrame width="reading">
       <PageHeader title="Settings" />
       <h2 className="mt-8 font-display text-3xl font-medium tracking-tight">
         Appearance
@@ -138,6 +139,6 @@ export function SettingsPage() {
           Tidy up
         </Link>
       </p>
-    </main>
+    </PageFrame>
   );
 }

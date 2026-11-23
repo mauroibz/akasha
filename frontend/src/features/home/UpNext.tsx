@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { HomeNext, ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { FinishDialog } from "@/features/finish/FinishDialog";
 import { finishAction, finishActionFor } from "@/features/finish/label";
 import { statusWith } from "@/features/rescore/rescore";
@@ -107,11 +107,7 @@ export function UpNext({
                   className="rounded-md focus-ring"
                   aria-label={`Open ${pick.entry.item.title}`}
                 >
-                  <CoverImage
-                    src={pick.entry.item.cover_url}
-                    alt=""
-                    className="aspect-[2/3] w-full rounded-md object-cover"
-                  />
+                  <Cover src={pick.entry.item.cover_url} size="m" />
                 </Link>
                 <p className="line-clamp-2 text-sm font-medium leading-snug">
                   {pick.entry.item.title}

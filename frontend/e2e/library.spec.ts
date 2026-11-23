@@ -1040,12 +1040,14 @@ test("the library fits a phone with five domains, and the domain strip scrolls w
   );
   expect(overflow, "horizontal page overflow").toBeLessThanOrEqual(0);
 
+  // Since Sprint 139 the strip is underlined tabs, and five of them fit 390px, so
+  // nothing has to scroll here. What still holds is how it would cope with more: it
+  // scrolls inside its own box and never grows past the screen.
   const stripBox = await strip.evaluate((node) => ({
-    scrollWidth: node.scrollWidth,
-    clientWidth: node.clientWidth,
+    overflowX: getComputedStyle(node).overflowX,
     boundingWidth: node.getBoundingClientRect().width,
   }));
-  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.overflowX).toBe("auto");
   expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
 
   // Every domain button keeps its 44px target even while the strip scrolls.

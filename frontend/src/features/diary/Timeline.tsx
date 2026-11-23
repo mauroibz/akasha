@@ -2,7 +2,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { getTimeline, type ItemType, type TimelineEvent } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/skeleton";
@@ -109,11 +109,7 @@ export function Timeline({ types }: { types: ItemType[] }) {
                           }
                           className="w-10 shrink-0 rounded focus-ring"
                         >
-                          <CoverImage
-                            src={event.entry.item.cover_url ?? null}
-                            alt=""
-                            className="aspect-[2/3] w-10 rounded object-cover"
-                          />
+                          <Cover src={event.entry.item.cover_url} size="s" />
                         </button>
                         <div className="min-w-0 flex-1 text-sm">
                           <p className="flex flex-wrap items-baseline gap-x-2">

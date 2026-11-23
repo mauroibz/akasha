@@ -54,6 +54,7 @@ import { queryKeys } from "@/api/keys";
 import { getInboxCount } from "@/api/library";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Arrivals } from "@/features/import/Arrivals";
+import { PageFrame } from "@/components/PageFrame";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -870,7 +871,7 @@ export function ImportPage() {
   return (
     <>
       <Tabs value={source} onValueChange={selectTab} asChild>
-        <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+        <PageFrame width="reading">
           <PageHeader
             back
             title="Import"
@@ -1502,7 +1503,7 @@ export function ImportPage() {
               <BackToLibrary className="mt-3" />
             </div>
           )}
-        </main>
+        </PageFrame>
       </Tabs>
     </>
   );

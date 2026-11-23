@@ -9,6 +9,7 @@ import { useItemTypes } from "@/features/library/useItemTypes";
 import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Which score to put in order (Sprint 116, DEC-176): for one library, every score
@@ -27,7 +28,7 @@ export function RankPage() {
     .reverse();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back
         title="Put your scores in order"
@@ -85,6 +86,6 @@ export function RankPage() {
           No score is shared by two yet, so there is nothing to put in order.
         </p>
       )}
-    </main>
+    </PageFrame>
   );
 }

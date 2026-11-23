@@ -44,6 +44,7 @@ import { OneQuestion } from "@/features/questions/OneQuestion";
 import { scoreArticle } from "@/features/rescore/rescore";
 import { scoreChipClass } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Five minutes (Sprint 126, DEC-179, mockup 2C): one mixed round of up to five cards
@@ -122,7 +123,7 @@ export function FivePage() {
   const card = round?.[index];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-xl px-5 pb-24 pt-8">
+    <PageFrame width="focus" className="pb-24 pt-8">
       <PageHeader
         back={{ to: "/insights", label: "Insights" }}
         eyebrow="Play"
@@ -165,7 +166,7 @@ export function FivePage() {
       ) : (
         <End changes={changes} letGo={letGo} />
       )}
-    </main>
+    </PageFrame>
   );
 }
 

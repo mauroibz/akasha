@@ -19,6 +19,7 @@ import { AddForm } from "@/features/add/AddForm";
 import { ExportPicker } from "@/features/import/ExportPicker";
 import { handFiles } from "@/features/import/handoff";
 import { domainsFrom, labelFor } from "@/features/library/labels";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Adding something without a provider search: files dropped in, or typed by hand.
@@ -77,7 +78,7 @@ export function AddPage() {
   const label = labelFor(itemType, itemTypes);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back
         title="Add"
@@ -161,6 +162,6 @@ export function AddPage() {
           />
         </div>
       )}
-    </main>
+    </PageFrame>
   );
 }

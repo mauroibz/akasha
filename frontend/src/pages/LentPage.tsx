@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 
 import { queryKeys } from "@/api/keys";
 import { getLoans, updateLoan } from "@/api/loans";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/skeleton";
 import { howLong, readableDay } from "@/features/house/house";
 import { localDay } from "@/features/progress/outline";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * What is out (Sprint 111, DEC-176): a quiet list, longest out first, each with who
@@ -33,7 +34,7 @@ export function LentPage() {
   const today = new Date();
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back={{ to: "/shelves", label: "Shelves" }}
         title="Lent out"
@@ -55,11 +56,7 @@ export function LentPage() {
                 className="w-12 shrink-0 focus-ring"
                 aria-label={`Open ${loan.entry.item.title}`}
               >
-                <CoverImage
-                  src={loan.entry.item.cover_url ?? null}
-                  alt=""
-                  className="aspect-[2/3] w-12 rounded object-cover"
-                />
+                <Cover src={loan.entry.item.cover_url} size="s" />
               </Link>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{loan.entry.item.title}</p>
@@ -81,6 +78,6 @@ export function LentPage() {
           ))}
         </ul>
       )}
-    </main>
+    </PageFrame>
   );
 }

@@ -18,6 +18,8 @@ import { howLong } from "@/features/house/house";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { OpeningCover } from "@/features/shelves/OpeningCover";
 import { cn } from "@/lib/utils";
+import { DomainStrip } from "@/components/DomainStrip";
+import { PageFrame } from "@/components/PageFrame";
 
 type ShelfSort = "size" | "recent" | "name";
 
@@ -126,7 +128,7 @@ export function ShelvesPage() {
   );
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1280px] px-5 pb-24 pt-8 md:px-8 md:pt-12">
+    <PageFrame width="wide" className="pb-24 pt-8 md:pt-12">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div>
           <h1
@@ -218,32 +220,18 @@ export function ShelvesPage() {
       {(domainsInUse.length > 1 || all.length > searchFrom) && (
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border">
           {domainsInUse.length > 1 && (
-            <div
-              role="radiogroup"
-              aria-label="Choose a domain"
-              className="-mb-px flex gap-5 overflow-x-auto"
-            >
-              {[
-                { id: allDomains, label: "All", plural_label: "All" },
-                ...domainsInUse,
-              ].map((domain) => (
-                <button
-                  key={domain.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={domain.id === domainFilter}
-                  onClick={() => setDomainFilter(domain.id)}
-                  className={cn(
-                    "min-h-11 shrink-0 border-b-2 text-sm font-medium focus-ring",
-                    domain.id === domainFilter
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {domain.plural_label ?? domain.label}
-                </button>
-              ))}
-            </div>
+            <DomainStrip
+              className="-mb-px"
+              domains={[
+                { id: allDomains, label: "All" },
+                ...domainsInUse.map((domain) => ({
+                  id: domain.id,
+                  label: domain.plural_label ?? domain.label,
+                })),
+              ]}
+              value={domainFilter}
+              onChange={setDomainFilter}
+            />
           )}
           {all.length > searchFrom && (
             <label className="ml-auto min-w-48">
@@ -293,7 +281,7 @@ export function ShelvesPage() {
           />
         ))}
       </ol>
-    </main>
+    </PageFrame>
   );
 }
 

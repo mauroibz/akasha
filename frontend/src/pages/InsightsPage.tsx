@@ -41,7 +41,8 @@ import { useInsights } from "@/features/library/useInsights";
 import { PlaySection } from "@/features/play/PlaySection";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { useScoreDistribution } from "@/features/library/useScoreDistribution";
-import { cn } from "@/lib/utils";
+import { DomainStrip } from "@/components/DomainStrip";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Ask the library a question it already has the answer to, from the fields items
@@ -240,7 +241,7 @@ export function InsightsPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 pb-24 pt-8 md:pt-12">
+    <PageFrame width="reading" className="pb-24 pt-8 md:pt-12">
       <h1
         ref={headingRef}
         tabIndex={-1}
@@ -254,29 +255,15 @@ export function InsightsPage() {
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 border-b border-border">
         {domains.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Choose a domain"
-            className="-mb-px flex min-w-0 max-w-full gap-6 overflow-x-auto"
-          >
-            {domains.map((domain) => (
-              <button
-                key={domain.id}
-                type="button"
-                role="radio"
-                aria-checked={domain.id === type}
-                onClick={() => setType(domain.id)}
-                className={cn(
-                  "min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors focus-ring",
-                  domain.id === type
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {domain.plural_label ?? domain.label}
-              </button>
-            ))}
-          </div>
+          <DomainStrip
+            className="-mb-px"
+            domains={domains.map((domain) => ({
+              id: domain.id,
+              label: domain.plural_label ?? domain.label,
+            }))}
+            value={type}
+            onChange={setType}
+          />
         )}
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
           <input
@@ -326,7 +313,7 @@ export function InsightsPage() {
           {sections.map((render, index) => render(index + 1))}
         </>
       )}
-    </main>
+    </PageFrame>
   );
 }
 

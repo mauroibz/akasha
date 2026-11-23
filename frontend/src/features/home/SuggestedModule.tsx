@@ -11,7 +11,7 @@ import {
   type Suggestion,
   type SuggestionAnswer,
 } from "@/api/suggestions";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import {
   MoreLikeThisSheet,
   type Seed,
@@ -109,11 +109,7 @@ export function SuggestedModule({
                   })
                 }
               >
-                <CoverImage
-                  src={suggestion.cover_url}
-                  alt=""
-                  className="aspect-[2/3] w-full rounded object-cover"
-                />
+                <Cover src={suggestion.cover_url} size="m" />
               </button>
               <p className="line-clamp-2 break-words text-xs font-medium leading-snug">
                 {suggestion.title}

@@ -23,9 +23,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { TypesetCover } from "@/features/shelves/OpeningCover";
-import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import {
   defaultLibraryFilters,
   mergeUniqueEntries,
@@ -40,6 +39,7 @@ import { readPinnedShelf, writePinnedShelf } from "@/features/library/library";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/api/keys";
 import { Loading } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/PageFrame";
 
 const everything = "";
 
@@ -161,15 +161,15 @@ export function ShelfPage() {
 
   if (shelvesQuery.isPending) {
     return (
-      <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
+      <PageFrame width="wide">
         <Loading label="Loading shelf…" shape="page" />
-      </main>
+      </PageFrame>
     );
   }
 
   if (!shelf) {
     return (
-      <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
+      <PageFrame width="wide">
         <PageHeader title="Shelf not found" />
         <p className="mt-4 text-muted-foreground">
           This shelf may have been deleted.{" "}
@@ -177,7 +177,7 @@ export function ShelfPage() {
             Back to shelves
           </Link>
         </p>
-      </main>
+      </PageFrame>
     );
   }
 
@@ -185,7 +185,7 @@ export function ShelfPage() {
   const formatLabelsById = formatLabels(itemTypes.data);
 
   return (
-    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
+    <PageFrame width="wide">
       <Link
         to="/shelves"
         className="focus-ring inline-flex min-h-11 items-center text-sm font-medium hover:text-primary"
@@ -262,36 +262,17 @@ export function ShelfPage() {
               aria-label={`Open ${entry.item.title}`}
               className="group block rounded-md focus-ring"
             >
-              <span className="block aspect-[2/3] overflow-hidden rounded-[3px_7px_7px_3px] shadow-[inset_5px_0_0_rgba(0,0,0,0.18),0_16px_26px_-14px_rgba(28,25,23,0.5)] transition-transform duration-300 group-hover:-translate-y-1 motion-reduce:transform-none">
-                {entry.item.cover_url ? (
-                  <CoverImage
-                    src={entry.item.cover_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    placeholderClassName="h-full w-full"
-                  />
-                ) : (
+              <Cover
+                src={entry.item.cover_url}
+                size="l"
+                title={entry.item.title}
+                creator={entry.item.creator}
+                score={entry.score}
+                fallback={
                   <TypesetCover title={entry.item.title} seed={entry.id} />
-                )}
-              </span>
-              <span className="mt-3 block font-display text-lg leading-tight">
-                {entry.item.title}
-              </span>
+                }
+              />
             </Link>
-            <span className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="truncate">{entry.item.creator}</span>
-              {entry.score !== null && (
-                <span
-                  className={cn(
-                    scoreChipShape,
-                    "ml-auto",
-                    scoreChipClass(entry.score),
-                  )}
-                >
-                  {entry.score}
-                </span>
-              )}
-            </span>
           </li>
         ))}
       </ul>
@@ -372,7 +353,7 @@ export function ShelfPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </main>
+    </PageFrame>
   );
 }
 
