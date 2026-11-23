@@ -2,11 +2,11 @@
 
 ## Where the project stands
 
-**2026-11-23, 4.0.0 is released; the board is still on 3.1.0.** Sprints 139–150 (DEC-193,
+**2026-11-23, 4.0.0 is released and running on the board.** Sprints 139–150 (DEC-193,
 DEC-194, DEC-195) merged as #43 (`21602cb`), tagged `v4.0.0`, image published. Release notes:
-`docs/operations/release-notes-v4.0.md`. **The one thing left is the board upgrade**: the owner
-asked for it, and this machine's SSH key is refused at 192.168.100.240. See the last worklog
-entry for the steps. The project state is `complete`.
+`docs/operations/release-notes-v4.0.md`. The board upgraded 3.1.0 → 4.0.0 with
+`pre-migration-20261123T195907Z`; revision 0040, counts unchanged, integrity clean. The project
+state is `complete`; the next work is the owner's.
 
 What the line changed, in one paragraph: the Library is at `/` with a front above its grid
 (the greeting, *On now*, *Lately*, showcases arranged in place); the navigation is *Library*

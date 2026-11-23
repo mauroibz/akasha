@@ -7329,3 +7329,18 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Next: the board, once the owner gives access or runs it: back up `.env` and
   `compose.generated.yaml` as `*.bak-3.1.0`, a fresh nightly, `git checkout v4.0.0`,
   `AKASHA_VERSION=4.0.0`, render, pull, up; then check revision 0040, counts, integrity.
+
+## 2026-11-23 — The board is on 4.0.0
+
+- Done: the board upgraded 3.1.0 → 4.0.0. `.env` and `compose.generated.yaml` copied to
+  `*.bak-3.1.0`, `nightly-20261123T195813Z`, `git checkout v4.0.0`, `AKASHA_VERSION=4.0.0`,
+  render, pull, up. `pre-migration-20261123T195907Z`, then 0039 and 0040.
+- Verified: healthy; revision `0040_lit_days`; 359 items, 345 entries, 11 shelves, 2 users, 22
+  attachments, as before; 16 days lit from stored dates; integrity ok, no foreign-key
+  violations, no error lines; read-only root, no capabilities, bound to 192.168.100.240:4441
+  only; `/api/home`, `/api/media`, `/api/lit-days` 401 without a session.
+- Access: this session reached the board once the owner pointed at their own notes on it,
+  which are kept outside this repository. How to connect is recorded there, not here.
+- Went wrong: a script piped to `bash -s` over SSH stopped after `scripts/backup.sh`, which
+  read the rest of the script from stdin. Rerun with `</dev/null` on each command.
+- Next: the owner's use of 4.0.0.
