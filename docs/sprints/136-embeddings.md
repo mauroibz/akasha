@@ -17,6 +17,8 @@ embedding endpoint.
 
 - DEC-183 point 7; Sprints 132–135 Outcomes; `application/ranking.py`,
   `domain/recommendations.py`, the enrichment pipeline (where an item's text becomes known).
+- DEC-186: a pile signal is one `(signal, points, text)` on the candidate in `ranking.py`, its
+  weight a constant at the top; a new signal also joins `PileReason.signal` in `api/pile.py`.
 
 ## Deliverables
 

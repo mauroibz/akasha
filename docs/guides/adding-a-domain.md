@@ -211,6 +211,7 @@ DOMAIN = Domain(
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,           # the cover chooser: see §5
     list_columns=None,              # the custom-list vocabulary: see §8's list note
+    ranking=RankingSpec(),          # what the ranked pile reads: see below
 )
 ```
 
@@ -655,6 +656,7 @@ writing any of it, stop — you are about to duplicate something:
 | Attachments | files on an item, addressed by content digest |
 | Backup and restore | nightly, verified, with a tested restore |
 | Covers | validated, resized, stored locally, never re-fetched while a page renders |
+| The ranked pile | *Up next* and a goal's picks, with reasons, for any domain with a `planned` status; declare `RankingSpec(series_field=…, series_in_title=…, affinity_fields=(…))` to add a series and a taste signal from your own fields (Sprint 132, DEC-186) |
 
 ---
 

@@ -625,6 +625,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
 | `plural_label` | The label counted, for copy that counts: "142 Books", "3 Anime". Declared because an added "s" is wrong for anime and series (Sprint 102). |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
+| `ranking` | A `RankingSpec` (Sprint 132): `series_field`, a declared `one` text field naming a work's series, its place read from "Name #2", "Name, #2" or "Name (2)"; `series_in_title`, whether a trailing "(Series, #N)" in the title names it (a Goodreads title); `affinity_fields`, declared groupable fields whose values are a taste (subjects, genres). The default declares nothing, and the pile is then ranked by creators, waiting and what was set aside. |
 | `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
 Plus, outside the record itself:
@@ -738,9 +739,8 @@ The product-spec route list is authoritative, with these refinements:
   count}` for the current year — `active` and that goal are of one library: the first goal in
   registry order whose library has something under way names that library's entry touched last;
   without one, the entry touched last beside its own library's goal; with nothing under way, the
-  lead goal); `now`, `/now`'s entries; `next`, up to five `{entry, reason, creator, mean_score,
-  since}` in each domain's goal-picks order with the domains taken in turn (a placeholder until
-  Sprint 132), for every domain declaring a `planned` status; `year`, twelve `{month, count,
+  lead goal); `now`, `/now`'s entries; `next`, the first five of `/api/pile` across every library
+  (Sprint 132), each `{entry, score, reasons}`; `year`, twelve `{month, count,
   counts, covers}` for the current year by `date_finished` (at most 24 `covers` a month, each
   `{entry_id, item_id, item_type, title, cover_url, score}`) and each goal's `{item_type, period,
   count, target, done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry,
@@ -757,8 +757,30 @@ The product-spec route list is authoritative, with these refinements:
   members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
   the five open loans out longest, each `{id, person, lent_on, entry}`. A module the person hid
   is not read: `year`, `lately`, `tidy`, `question`, `shelves` and `lent` are `null`, `next` and
-  `domains` empty (`now` is still read, for the greeting). Answers in under 150 ms on a
-  10,000-entry library (126–133 ms median in its test after Sprint 131).
+  `domains` empty (`now` is still read, for the greeting). `?tz=` (Sprint 132) is the person's
+  IANA zone, which the client sends: today and the day an addition counts under in `lately` are
+  that zone's; an absent or unknown zone falls back to the server's `TZ`, then UTC. Answers in
+  under 150 ms on a 10,000-entry library (about 119 ms median in its test after Sprint 132).
+- `GET /api/pile?type=&limit=` (Sprint 132, DEC-186; `limit` 1–100, default 20) is the pile
+  ranked locally, from stored data only: entries in a status their domain declares `planned`,
+  most likely wanted next first, each `{entry, score, reasons: [{signal, text}]}`. `score` is
+  the ranking's points, comparable within one answer. `reasons` are only the signals that fired,
+  the one moving the score most first; each `text` is a sentence citing the data it rests on.
+  Signals (`application/ranking.py`, weights as constants there): `series`, the next waiting
+  entry of a series the person has finished or is under way in, after the last one by place
+  ("Next in Mistborn; you gave book 1 a 9"), not after a series scored below 6 on average or
+  past a dropped one, at half weight after one still under way; `creator`, a creator's mean
+  above the person's own in that library over two or more rated, shrunk while the count is
+  small ("You rate Le Guin 8.4 across 5"); `affinity`, a subject or genre the person has lately
+  scored above their own recency-weighted average, over three or more, scores halving in weight
+  every two years down to a quarter, never a value on more than half the scored entries ("You
+  rate Fantasy 9.0 across 3 books"); `waiting`, 0.15 a year on the pile up to five ("Waiting
+  since Mar 2023"); `goal`, a library short of its goal's pace by one or more, only when every
+  library is ranked together ("Toward 24 books this year; 14 so far"); `set_aside`, an entry
+  with a `date_started` back on the pile, pushed down by up to two points fading over 90 days
+  from its last change ("Started 1 Nov 2026, then set aside"). Ties break on entry id. Which
+  fields carry a series or a taste is the domain's `RankingSpec`. Under 100 ms for a 2,000-entry
+  pile (about 26 ms in its test).
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
   `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
@@ -798,9 +820,9 @@ The product-spec route list is authoritative, with these refinements:
   `date_finished` is refused with 422 `goal_not_supported`. `GET /api/goals/{item_type}/progress?year=`
   returns twelve monthly counts of entries finished that year, the total, and the year's target
   (a monthly count times twelve), so months count together and no field says behind.
-  `GET /api/goals/{item_type}/picks?limit=` returns entries in a status the domain declares
-  `planned`, each with a reason: `creator` (the primary creator averages 8 or more over two or
-  more rated entries in that domain, best first) or `waiting` (oldest added first), alternating.
+  `GET /api/goals/{item_type}/picks?limit=` returns that library's ranked pile, the same
+  `{entry, score, reasons}` as `/api/pile?type=` (Sprint 132; until then a favourite creator's
+  and the longest waiting, alternating).
 - `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
   `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
   own URL query string, so the server never interprets it (Sprint 100).

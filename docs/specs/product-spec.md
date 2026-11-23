@@ -40,7 +40,8 @@ save — takes under 20 seconds and never requires leaving the keyboard.
   counts, sessions and streaks remain out
 - Ebook file management or runtime linkage to Kavita/Calibre. Read-only Calibre
   metadata import is explicitly in scope.
-- Recommendations, statistics dashboards, year-in-review
+- Statistics dashboards, year-in-review. *Recommendations* left this list in 2026-11 (DEC-183):
+  the pile is ranked locally since Sprint 132 (see *Up next* under §7 Screens)
 - Mobile app (responsive web is enough)
 
 ---
@@ -813,17 +814,22 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — Home** (Sprints 130–131, DEC-183–185). The screen Akasha opens on: a 12-column grid of
+**`/` — Home** (Sprints 130–132, DEC-183–186). The screen Akasha opens on: a 12-column grid of
 modules over one `GET /api/home` that reads stored data only. The greeting names the day, "Day
 N of" an entry under way (when it has a start date) and the library's totals; what it names and
 the goal beside it are always of one library — the first goal's library with something under
 way, else the entry touched last beside its own library's goal. *On now* holds what is under
 way with *+N* progress, *Finished* (the finish sheet) and *Set aside* (back to the domain's
-planned status); *Up next* holds picks from the pile, each with why, and *Start* (or
-*Finished* where a domain has no under-way status); *Year* draws twelve months of covers and,
+planned status); *Up next* holds the pile ranked by what the person is most likely to want next
+(Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
+under way or finished, a creator or a subject they score above their own average, how long it
+has waited, a library short of its goal, and pushed down for a while when set aside — each pick
+with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you gave book 1
+a 9"), and *Start* (or *Finished* where a domain has no under-way status); a goal's picks in the
+Diary are the same ranking within that library; *Year* draws twelve months of covers, as large as the height its row gives it allows, and,
 from this month on, an empty slot for each thing the lead goal still needs, never marking a
 past month short; *Lately* lists finishes, score changes (a score kept reads "still a 9") and
-additions (a day's additions as one row), newest first; one tile per library opens
+additions (a day's additions as one row, the day being the person's own), newest first; one tile per library opens
 `/library?type=…`; *Tidy up* counts duplicate pairs (the duplicates deck), entries without a
 cover (the covers deck) and finished entries with no score (the library filtered to them, one
 link per library); *One question* asks an old score again ("Still a 9" keeps it, *Change* opens

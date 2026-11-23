@@ -7314,3 +7314,45 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   `application/home_layout.py`'s `DEFAULT_LAYOUT`, in `features/home/layout.ts` (`MODULES`,
   `moduleLabels`, `fallbackLayout`), and a case in `HomePage`'s `hasContent`; a stored layout
   that predates it gets it appended at the end, at its default size.
+
+## DEC-186 — The ranked pile: signals, weights and what they read (Sprint 132)
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 132 replaced *Up next*'s placeholder order (each domain's goal picks, taken in
+  turn) with a local ranking of the pile, each pick with a true reason (DEC-183 point 3). The
+  sprint file named the signals; several details were not settled, and one signal has no stored
+  source.
+- Decision:
+  1. **One ranking, three readers.** `application/ranking.py` `rank_pile` serves `GET /api/pile`,
+     Home's `next` (every library together, five) and `/goals/{type}/picks` (one library). The
+     picks' `{reason, creator, mean_score, since}` became `{score, reasons: [{signal, text}]}`;
+     the reasons are server-written sentences, strongest first, only signals that fired.
+  2. **Domains declare what the pile reads.** `Domain.ranking: RankingSpec(series_field,
+     series_in_title, affinity_fields)`: books read `series` and a Goodreads title's "(Series,
+     #N)", taste from `subjects`; anime, films and series from `genres`; albums declare nothing
+     (they have no pile). A conformance check holds the names to declared fields.
+  3. **"Above your average", not a fixed 8.** Creator and subject lifts are measured from the
+     person's own mean in that library (a subject's from the recency-weighted mean, so scores
+     rising lately lift no subject for being common), shrunk while the count is small. A subject
+     on more than half the scored entries is no reason: the walkthrough showed "You rate Fiction
+     7.3 across 59 books" on nearly every pick.
+  4. **The goal lifts only across libraries.** Inside one library it would lift every entry
+     alike and fill each pick with the same sentence. Its words never say *behind* (DEC-169):
+     "Toward 24 books this year; 14 so far".
+  5. **Set aside is read from what is stored; nothing is "dismissed".** No action dismisses a
+     pile entry (the Diary's *Something else* is client-side), so the signal is an entry back on
+     the pile with a `date_started` (*Set aside* keeps it), pushed down for 90 days from its last
+     change. A stored "not now" would be a new table and action, left for a later sprint.
+  6. **A series under way waits.** The next after one still under way counts half: starting
+     Mistborn #2 put #3 first in the walkthrough. Positions come from the field or the title;
+     Calibre's `series_index` is not imported, so a Calibre series ranks without places.
+  7. **Weights are constants at the top of `ranking.py`**; ties break on entry id. The weights
+     were tuned on the walkthrough library and are a judgement, recorded there and in the
+     worklog.
+  8. **Home's day is the person's.** `/api/home?tz=` (the client's zone; else `TZ`, else UTC)
+     sets today and the day an addition counts under in *Lately*, which grouped by the UTC date
+     and split an evening import in Buenos Aires into two rows (DEC-185 point 4 superseded).
+     Additions are counted per UTC hour and placed by local day, exact on whole-hour offsets.
+- Consequences: Sprint 133's recommendation sources can cite the same reason shape; Sprint 136
+  adds embeddings as one more signal in `ranking.py`.

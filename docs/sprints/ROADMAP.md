@@ -1916,6 +1916,8 @@ whole, recorded as **DEC-183**; the design is
   on 10,000 entries; Sprint 130's three walkthrough findings fixed; see the sprint's Outcome.]
 - **[132 — The ranked pile](132-the-ranked-pile.md)**: recommendations leave the non-goals; the
   pile ranked locally with a reason each.
+  [Closed 2026-11-23 (DEC-186). Three criteria met; `GET /api/pile`; `RankingSpec` per domain;
+  Home's year fills its row and Lately groups by the person's day; see the sprint's Outcome.]
 - **[133 — Recommendation infrastructure](133-recommendation-infrastructure.md)**: sources per
   domain, suggestions storage, a budgeted `recommend` job, endpoints.
 - **[134 — TMDB, and More like this](134-tmdb-and-more-like-this.md)**: the first real source,

@@ -20,6 +20,10 @@ adapter.
   `infrastructure/quota.py` (`ProviderQuota`), `application/enrichment.py` (the resolve path and
   budgets), `application/add.py` (adding a candidate as an entry), `api/events.py` (the event
   stream), `docs/guides/adding-a-domain.md`.
+- Sprint 132 (DEC-186): `application/ranking.py` and `Domain.ranking: RankingSpec` already
+  exist; `RecommendationSpec` sits beside it, and a candidate's `reason` can follow the pile's
+  `{signal, text}` shape. Nothing stores a dismissal of a *pile* entry yet (DEC-186 point 5);
+  `TasteProfile.dismissed` starts from suggestions answered *not for me*.
 
 ## Deliverables
 
