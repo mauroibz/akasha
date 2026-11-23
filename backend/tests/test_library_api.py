@@ -714,6 +714,13 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/home/layout"),
         ("PUT", "/api/home/layout"),
         ("GET", "/api/pile"),
+        # Sprint 143: the person's media, in their order.
+        ("GET", "/api/media"),
+        ("PUT", "/api/media"),
+        # Sprint 147: the days the Journal's Every day widget lights.
+        ("GET", "/api/lit-days"),
+        ("PUT", "/api/lit-days/{day}"),
+        ("DELETE", "/api/lit-days/{day}"),
         # Sprint 133: recommendation rounds and their suggestions.
         ("POST", "/api/entries/{entry_id}/more-like-this"),
         ("GET", "/api/suggestions"),

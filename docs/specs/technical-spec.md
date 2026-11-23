@@ -985,6 +985,20 @@ The product-spec route list is authoritative, with these refinements:
     `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
     `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays. *Want* on
     an item already held (a `library` pick) records the answer and adds nothing.
+- `GET /api/lit-days?from=&to=`, `PUT /api/lit-days/{day}` and `DELETE /api/lit-days/{day}`
+  (Sprint 147, DEC-193): the Journal's *Every day*. `lit_days` (migration 0040) holds
+  `(user_id, day, entry_id, source)` with `source` `progress`, `finish` or `tap`; one row per
+  person, day and entry, and one per person and day with no entry; both foreign keys cascade.
+  The migration lights past days from stored `date_finished` and `date_started` values that are
+  whole days. `PATCH /api/entries/{id}` records a row after it stores the edit, for a medium
+  the person keeps in front: a change carrying `progress` or `progress_marks` lights today
+  (the server's `TZ`, else UTC), and one that sets `date_finished` lights that day. `GET`
+  answers `{days: [{day, entries}]}`, lit days only, oldest first, for at most 62 days
+  (`range_too_long`). `PUT` takes `{entry_ids}` and replaces what the hand said for that day:
+  the entries named, or none for a day lit for nothing in particular; a day to come is
+  `future_day` (today from `?tz=`, as `/api/home`), an entry that is not the person's is
+  `unknown_entry`. It changes no entry. `DELETE` takes everything off the day. Nothing counts
+  streaks.
 - `GET /api/media` and `PUT /api/media` (Sprint 143, DEC-193): `{media: [{item_type, presence:
   front|kept|off, label, held}], chosen}`, the person's media in their order, stored per person
   in `media_preferences` (migration 0039, one JSON row keyed by `user_id`, cascading with the

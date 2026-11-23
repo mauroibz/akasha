@@ -143,7 +143,7 @@ export function YourMedia({
                   role="radio"
                   aria-checked={row.presence === presence.value}
                   onClick={() => set(index, presence.value)}
-                  className="min-h-10 rounded-full px-3 text-xs font-medium text-muted-foreground focus-ring aria-checked:bg-surface-raised aria-checked:text-foreground"
+                  className="min-h-11 rounded-full px-3 text-xs font-medium text-muted-foreground focus-ring aria-checked:bg-surface-raised aria-checked:text-foreground"
                 >
                   {presence.label}
                 </button>

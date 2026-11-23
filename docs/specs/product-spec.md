@@ -1100,7 +1100,16 @@ shelf in the Library, one per medium it holds, where it can be sorted, filtered 
 
 **`/journal` — the Journal** (Sprint 146, DEC-193). One screen for what were the Diary,
 Insights and the games; `/diary` and `/insights` redirect to its *Timeline* and *Patterns*. It
-opens on **one widget at a time**, chosen by tabs and remembered in the browser: *Play* (the
+opens on **one widget at a time**, chosen by tabs and remembered in the browser: *Every day*
+(Sprint 147, first: this week or this month as a grid of days, Monday first, today outlined,
+a light on each day something was read, watched or finished; never the year. A day lights
+when progress is logged on something of a medium kept in front, on the day something is
+finished, and by hand. Tapping an unlit day asks one question in place, "What was Monday 23
+November for?", offering what is under way as covers to choose, any number or none, then
+*Light it* or *Just light it*; *Not now* leaves it. Nothing else is asked: no amount, no note.
+Tapping a lit day says what it was for and offers *Change what it was for* and *Unlight*. A
+day to come cannot be lit. The count is said in words, "14 days lit in November"; nothing
+counts streaks and an unlit day is only unlit), *Play* (the
 games described next, asked of the medium the person keeps first, with links to *Tidy up*, the
 rank list and tiers) and *Goal* (this year's goals with their slots and picks, or the
 invitation to set one). Then **Timeline**, the Diary described below without its goal; then

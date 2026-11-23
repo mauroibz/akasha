@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { PageFrame } from "@/components/PageFrame";
 import { PageHeader } from "@/components/PageHeader";
 import { GoalWidget } from "@/features/goals/GoalWidget";
+import { EveryDay } from "@/features/journal/EveryDay";
 import {
   JournalWidgets,
   type JournalWidget,
@@ -13,6 +14,7 @@ import { DiaryPage } from "@/pages/DiaryPage";
 import { InsightsPage } from "@/pages/InsightsPage";
 
 const widgets: JournalWidget[] = [
+  { id: "day", label: "Every day", render: () => <EveryDay /> },
   { id: "play", label: "Play", render: () => <PlayWidget /> },
   { id: "goal", label: "Goal", render: () => <GoalWidget /> },
 ];

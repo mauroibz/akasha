@@ -1094,6 +1094,8 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await stubPlay(page);
     await page.goto("/insights");
+    // The games are the Journal's Play widget (Sprint 146); Every day leads (147).
+    await page.getByRole("tab", { name: "Play" }).click();
     await expect(
       page.getByRole("region", { name: "Play with your library" }),
     ).toBeVisible();

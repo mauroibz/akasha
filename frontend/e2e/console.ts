@@ -89,6 +89,10 @@ export const test = base.extend<{
       await page.route("**/api/pile?**", (route) =>
         route.fulfill({ json: [] }),
       );
+      // Every day (Sprint 147): nothing lit, unless a spec says so.
+      await page.route("**/api/lit-days?**", (route) =>
+        route.fulfill({ json: { days: [] } }),
+      );
       // Your media (Sprint 143): no preference, so the registry as each spec declares it.
       await page.route("**/api/media", (route) =>
         route.fulfill({ json: { media: [], chosen: true } }),

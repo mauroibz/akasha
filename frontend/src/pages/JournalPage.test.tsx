@@ -38,6 +38,8 @@ function serve() {
           JSON.stringify({ year: 2026, years: [2026], months: [] }),
         );
       if (url.startsWith("/api/goals")) return new Response("[]");
+      if (url.startsWith("/api/lit-days"))
+        return new Response(JSON.stringify({ days: [] }));
       if (url.startsWith("/api/insights/summary"))
         return new Response(JSON.stringify({ held: 0 }));
       if (url.startsWith("/api/insights/scores"))
@@ -103,10 +105,10 @@ describe("JournalPage (Sprint 146, DEC-193)", () => {
     serve();
     const { unmount } = renderJournal();
     const tabs = await screen.findByRole("tablist", { name: "Journal widget" });
-    expect(within(tabs).getByRole("tab", { name: "Play" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    // Every day leads (Sprint 147).
+    expect(
+      within(tabs).getByRole("tab", { name: "Every day" }),
+    ).toHaveAttribute("aria-selected", "true");
     await userEvent.click(within(tabs).getByRole("tab", { name: "Goal" }));
     expect(within(tabs).getByRole("tab", { name: "Goal" })).toHaveAttribute(
       "aria-selected",
@@ -132,7 +134,7 @@ describe("JournalPage (Sprint 146, DEC-193)", () => {
     serve();
     renderJournal();
     const play = await screen.findByRole("tab", { name: "Play" });
-    play.focus();
+    await userEvent.click(play);
     await userEvent.keyboard("{ArrowRight}");
     expect(screen.getByRole("tab", { name: "Goal" })).toHaveFocus();
     expect(screen.getByRole("tab", { name: "Goal" })).toHaveAttribute(
@@ -144,6 +146,7 @@ describe("JournalPage (Sprint 146, DEC-193)", () => {
   it("offers the decks from the Play widget, which had no door but Settings", async () => {
     serve();
     renderJournal();
+    await userEvent.click(await screen.findByRole("tab", { name: "Play" }));
     const panel = await screen.findByRole("tabpanel");
     expect(
       within(panel).getByRole("link", { name: "Tidy up" }),

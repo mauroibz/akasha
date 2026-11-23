@@ -57,4 +57,46 @@ A year view, streaks, reminders. Logging progress from the question (a later exp
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commits: `BACK` (the record, its API, the hook on progress
+and finishing), `FRONTH` (the widget).
+
+- **The record.** Migration 0040, `lit_days`; past days lit from stored finish and start
+  dates. `PATCH /api/entries/{id}` lights today when progress is logged and the finished day
+  when a finish date is set, for a medium kept in front.
+- **The API.** `GET /api/lit-days?from=&to=` (62 days at most), `PUT` and `DELETE
+  /api/lit-days/{day}`.
+- **The widget** (`features/journal/EveryDay.tsx`), first in the Journal: *This week* or *This
+  month*, remembered; a button per day named by its date and what it was lit for; the count in
+  words.
+- **What was it for?** One step, in place: what is under way as covers to choose, *Light it*
+  or *Just light it*, *Not now*. A lit day shows what it was for, *Change what it was for* and
+  *Unlight*.
+
+Acceptance: 1, 3 and 5 by `test_lit_days.py`; 2 by `EveryDay.test.tsx` (30 days at most, a day
+to come disabled) and the API's range limit; 4 by `e2e/every-day.spec.ts` (keyboard, axe at
+390 and 1440 px, at rest and asking).
+
+Verification: backend `test_lit_days` 8 with `test_isolation`, `test_app_shape`, `test_media`,
+`test_library_api`, `test_home_api` 103 passed; Vitest 661 passed; Playwright chromium and
+heavy-library, full run 235 passed with 7 needing the Play tab or a 44 px target, then those
+files 58 passed; `make check`. A copy of the development library migrated 0039 to 0040: 22
+items and 19 entries before and after, integrity ok, three days lit from stored dates. In the
+running app at 1440 and 390 px: Sunday tapped, the question with the one book under way,
+lit, the count going from one day to two. No overflow, no console errors.
+
+Deviations:
+
+- **Which media count is the media in front**, not a separate setting. One list already says
+  what the person follows day to day.
+- **No *Something else*.** The question offers what is under way and *Just light it*. Choosing
+  any entry of the library from the question would put a search inside it; the owner asked
+  for simple and calm, and named a fuller flow as a later expansion.
+- Progress lights the server's today (its `TZ`, else UTC); a tap uses the person's own zone.
+  The edit request carries no zone.
+- A light is not taken back when a progress mark is removed; *Unlight* does it.
+- The calendar's buttons are 44 px tall and narrower than tall on a phone: a seventh of the
+  row is under 44 px wide.
+- An earlier miss corrected here: `test_library_api.py` lists every served route, and Sprint
+  143 closed without `/api/media` in it. Added with this sprint's routes.
+
+Impact on later sprints: none on 148.
