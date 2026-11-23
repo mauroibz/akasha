@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 54
+**Plan revision:** 56
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** 139, the first of the owner's 2026-11-23 line (DEC-193); see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -1961,6 +1961,32 @@ Diary's goal grid, with or without a goal; shelves on Home. "This home screen is
   *Edit home*.
   [Closed 2026-11-23 (DEC-192). Four criteria met; `library_years` and `shelf_modules` on
   `/api/home`; the Diary band's `Slots` and `Bar` shared; see the sprint's Outcome.]
+
+## The library is the home again — the 4.0 line
+
+The owner's 2026-11-23 request after 3.1.0, accepted as **DEC-193**; the design is
+[`../library-first-proposal.md`](../library-first-proposal.md). The Library returns to `/` in
+three bands, one bar finds and adds, the Journal replaces Diary, Insights and the games, media
+follow the owner's order, and there are theme presets.
+
+- **[139 — One frame](139-one-frame.md)**: two page widths, the one header, one cover, one
+  medium chooser, on every screen that survives unchanged.
+- **[140 — One bar](140-one-bar.md)**: the top field as an input that answers from the library
+  and the web; *Add* and *Import* leave the navigation.
+- **[141 — The library is the home](141-library-at-home.md)**: Now, Lately and the showcases
+  above the grid at `/`; Home removed.
+- **[142 — Arrange](142-arrange.md)**: showcases edited in place, the tray, a number from the
+  Journal as a showcase.
+- **[143 — Your media](143-your-media.md)**: an ordered list, each medium *Front*, *Kept* or
+  *Off*. One migration.
+- **[144 — Shelves are a view](144-shelves-as-a-view.md)**: the Shelves view, a shelf as the
+  filtered library, the pile and *Lent out* as built-in shelves.
+- **[145 — Shelves with a rule](145-shelves-with-a-rule.md)**: a saved view becomes a shelf
+  with a rule. One migration.
+- **[146 — Journal](146-journal.md)**: Diary, Insights and the games as one screen that opens
+  on a widget; the navigation is *Library* and *Journal*.
+- **[147 — Every day](147-every-day.md)**: this week or this month as lit days. One migration.
+- **[148 — Themes](148-themes.md)**: four presets and the picker. Closes the line; 4.0.0.
 
 ## Not scheduled
 

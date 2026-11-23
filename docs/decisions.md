@@ -7658,3 +7658,55 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      default and drawn only when it has data, a shelf is hidden until turned on.
 - **Consequences:** Sprints 137 and 138, then 3.1.0. The layout's write contract changes: a key
   is a static module or an existing family member.
+
+## DEC-193 — The library is the home again: one bar, a Journal, media in the owner's order (Sprints 139–148)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 (Home at `/`, superseded in part), DEC-185 (the stored layout,
+  kept), DEC-192 (module families, kept), DEC-165 (the command bar; *Ink* and *Paper*), DEC-136
+  (one surface), DEC-132 (Insights), DEC-169 and DEC-171 (the lights: nothing says behind),
+  DEC-026 (the score ramp means score). The design is
+  [`library-first-proposal.md`](library-first-proposal.md) and its mockup.
+- **Context:** the owner, after 3.1.0: the library was meant to be the home and its search bar
+  the way to find and add; Home moved the focus away; adding is in three places and *Add*, the
+  last resort, is the door people try; shelves compete with the library, Insights with the
+  Diary; the screens feel slightly different; a home that can be made one's own, media in a
+  chosen order, preset themes. Measured on 3.1.0: six doors for adding; the same content under
+  different names on Home and the Library; a shelf, a saved view and a filter as three
+  mechanisms for one idea; seven page widths and five cover cards.
+- **Decision:** the proposal's alternative A, as the owner revised it over three readings.
+  1. The Library is at `/` in three bands, *Now*, *Lately*, *Everything*, with the person's
+     showcases between the second and third. Home as a screen is removed; `/library`
+     redirects. This supersedes DEC-183's "`/` becomes Home; the library moves to `/library`".
+     `GET /api/home`, the stored layout and the module families are kept and feed the bands and
+     showcases.
+  2. One bar: the top bar's field is an input on every screen, answering from the library and
+     then the web, with *Enter it by hand* and *Bring a whole list* in its footer. *Add* and
+     *Import* leave the navigation; the Library's own search field goes.
+  3. *Arrange* edits the Library in place and replaces the *Edit home* dialog. A showcase can
+     be a shelf, a year, *Up next*, *More like this*, *One question* or a number from the
+     Journal.
+  4. Media are an ordered per-person list, each *Front*, *Kept* or *Off*, read by every
+     chooser, the bands and the bar.
+  5. Shelves are a view of *Everything*; a shelf opens as the library filtered to it; the pile
+     and *Lent out* are built-in shelves; a saved view becomes a shelf with a rule.
+  6. The Journal replaces Diary and Insights. It opens on one widget at a time, *Every day*,
+     *Play* or *Goal*, then the timeline, then the patterns. The owner rejected a page of notes
+     ("not something I do often"). Play has no screen or navigation slot of its own. The
+     navigation is *Library* and *Journal*.
+  7. *Every day* shows this week or this month, never the year, with a light per day: lit by
+     logged progress, a finish or a tap. Lighting a day by hand asks what it was for, offering
+     what is under way, in one calm step that can be skipped. It needs a dated record the application does not
+     keep. Nothing counts streaks.
+  8. Theme presets beside *Ink* and *Paper*, each held to AA; the score ramp and the mark's dot
+     do not follow the theme.
+  9. One frame: two page widths, one header, one cover, one medium chooser.
+- **Rejected:** the stronger style drawn at the owner's request (covers on boards in *Now* and
+  *Lately*, a bookplate, a lamp, *On the table*, actions as underlined words): "not a fan of the
+  home redesign, go back to the previous one". Alternatives B (keep Home), C (frame only) and D
+  (a room per medium) are costed in the proposal.
+- **Consequences:** Sprints 139–148, then 4.0.0: addresses move, each old one redirects. Three
+  migrations (media preferences, shelf rules, lit days). The product spec's screens section is
+  rewritten as each sprint lands. The presets' final list and names are the owner's to change;
+  the mockup's four (*Moss*, *Claret*, *Dusk*, *Sakura*) are the default.
