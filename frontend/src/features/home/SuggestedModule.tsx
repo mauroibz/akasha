@@ -24,7 +24,7 @@ import { HomeModule } from "./HomeModule";
 const SHOWN: Record<ModuleSize, number> = { S: 2, M: 4, L: 8 };
 
 const iconButton =
-  "inline-flex h-9 w-9 items-center justify-center rounded-full border border-border transition-colors hover:bg-accent focus-ring disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4";
+  "inline-flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors hover:bg-accent focus-ring disabled:opacity-50 [&_svg]:h-4 [&_svg]:w-4";
 
 /**
  * Home's *More like this* (Sprint 134): the newest suggestions found in a provider
@@ -76,7 +76,11 @@ export function SuggestedModule({
           : undefined
       }
     >
-      <ul className="grid grid-cols-2 gap-3 min-[480px]:grid-cols-4">
+      <ul
+        className={
+          size === "S" ? "grid grid-cols-2 gap-2.5" : "grid grid-cols-4 gap-2.5"
+        }
+      >
         {shown.map((suggestion) => {
           const name = suggestion.year
             ? `${suggestion.title} (${suggestion.year})`
@@ -110,7 +114,7 @@ export function SuggestedModule({
                   className="aspect-[2/3] w-full rounded object-cover"
                 />
               </button>
-              <p className="line-clamp-2 text-xs font-medium leading-snug">
+              <p className="line-clamp-2 break-words text-xs font-medium leading-snug">
                 {suggestion.title}
               </p>
               {suggestion.seed ? (
@@ -118,7 +122,7 @@ export function SuggestedModule({
                   Like {suggestion.seed.title}
                 </p>
               ) : null}
-              <div className="flex gap-1.5">
+              <div className="mt-auto flex gap-1">
                 <button
                   type="button"
                   className={iconButton}

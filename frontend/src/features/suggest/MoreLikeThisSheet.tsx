@@ -71,11 +71,13 @@ function Art({ suggestion }: { suggestion: Suggestion }) {
   return (
     <div
       aria-hidden="true"
-      className="flex aspect-[2/3] w-full flex-col justify-end overflow-hidden rounded bg-surface-raised p-1.5 font-display text-[11px] leading-tight text-foreground"
+      className="flex aspect-[2/3] w-full flex-col justify-end overflow-hidden rounded bg-surface-raised p-1 font-display text-[10px] leading-tight text-foreground"
     >
-      <span className="line-clamp-3 break-words">{suggestion.title}</span>
+      <span className="line-clamp-4 hyphens-auto break-words">
+        {suggestion.title}
+      </span>
       {suggestion.year ? (
-        <span className="text-[10px] text-muted-foreground">
+        <span className="text-[9px] text-muted-foreground">
           {suggestion.year}
         </span>
       ) : null}
@@ -297,7 +299,7 @@ export function MoreLikeThisSheet({
           <DialogTitle className="font-display text-xl font-medium">
             More like {seed?.title ?? "this"}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="sr-only">
             {info && info.sources.length > 1
               ? `Suggestions from ${info.sources.map((row) => row.label).join(" or ")}.`
               : `Suggestions from ${label}, looked up in your own providers.`}
@@ -369,7 +371,7 @@ function Row({
     ? `${suggestion.title} (${suggestion.year})`
     : suggestion.title;
   return (
-    <li className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-3">
+    <li className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-2.5">
       <div className="row-span-2 w-12">
         <Art suggestion={suggestion} />
       </div>
@@ -420,7 +422,7 @@ function Row({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-9 rounded-full px-2.5"
+                className="h-8 rounded-full px-2.5"
                 disabled={busy}
                 aria-label={`Undo your answer on ${name}`}
                 onClick={() => onAnswer(null)}
@@ -434,7 +436,7 @@ function Row({
             {enriched ? (
               <Button
                 size="sm"
-                className="h-9 rounded-full px-3"
+                className="h-8 rounded-full px-3"
                 disabled={busy}
                 aria-label={`Want ${name}`}
                 onClick={() => onAnswer("want")}
@@ -443,19 +445,20 @@ function Row({
               </Button>
             ) : (
               <Button
+                variant="outline"
                 size="sm"
-                className="h-9 rounded-full px-3"
+                className="h-8 rounded-full px-3"
                 disabled={looking}
                 aria-label={`Look up ${name}`}
                 onClick={onLookUp}
               >
-                {looking ? "Looking…" : "Open"}
+                {looking ? "Looking…" : "Look up"}
               </Button>
             )}
             <Button
               variant="outline"
               size="sm"
-              className="h-9 rounded-full px-3"
+              className="h-8 rounded-full px-3"
               disabled={busy}
               aria-label={`Not for me: ${name}`}
               onClick={() => onAnswer("not_for_me")}
@@ -465,7 +468,7 @@ function Row({
             <Button
               variant="outline"
               size="sm"
-              className="h-9 rounded-full px-3"
+              className="h-8 rounded-full px-3"
               disabled={busy}
               aria-label={`Seen ${name}`}
               onClick={() => onAnswer("seen")}
