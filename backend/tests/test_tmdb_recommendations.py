@@ -790,6 +790,11 @@ async def test_home_shows_the_newest_found_suggestions_without_asking_anyone(
         yojimbo = round_body["suggestions"][1]["id"]
         await client.patch(f"/api/suggestions/{yojimbo}", json={"answer": "not_for_me"})
         asked = (len(requests), len(tmdb.requests))
+        # *More like this* is a showcase the person places (Sprint 141): hidden until then.
+        await client.put(
+            "/api/home/layout",
+            json={"modules": [{"module": "suggested", "size": "M", "hidden": False}]},
+        )
         body = (await client.get("/api/home")).json()
         after = (len(requests), len(tmdb.requests))
     assert asked == after

@@ -11,6 +11,7 @@ from each domain's `StatusSpec` flags; whether a domain can hold a goal comes fr
 `entry_fields`; which domains exist comes from the registry.
 """
 
+import json
 from collections import defaultdict
 from collections.abc import Sequence, Set
 from datetime import UTC, date, datetime, tzinfo
@@ -27,16 +28,8 @@ from book_tracker.domain.registry import DOMAINS
 
 #: How deep *Up next* goes.
 NEXT_LIMIT = 5
-#: Covers returned per month of the year; `count` still counts them all.
-MONTH_COVERS = 24
-#: Covers on a library tile.
-TILE_COVERS = 3
 #: Rows in *Lately* at its largest; eight at its default size.
 LATELY_LIMIT = 10
-#: Shelves in the *Shelves* module.
-SHELF_LIMIT = 8
-#: Loans listed in *Lent out*; `total` still counts them all.
-LENT_LIMIT = 5
 #: Suggestions on Home's *More like this*: the most its L size shows.
 SUGGESTED = 8
 #: Covers in a library's year (Sprint 138): a goal of 24 or fewer fills its slots, and
@@ -44,6 +37,9 @@ SUGGESTED = 8
 YEAR_COVERS = 48
 #: Covers on a shelf's module, its members changed last first.
 SHELF_COVERS = 24
+#: How much deeper the timeline and the pile are read when some media are out of the
+#: front, so the band and Up next still fill from what is left.
+FRONT_DEPTH = 8
 #: The status every domain has for what an import left unsorted (technical spec 6.6).
 #: The library hides it by default, so Home's counts do too.
 UNSORTED = "unsorted"
@@ -103,10 +99,13 @@ class HomeService:
         *,
         years: Sequence[str] = (),
         shelves: Sequence[str] = (),
+        front: Set[str] | None = None,
     ) -> dict[str, Any]:
         """Every shown module's payload. `years` and `shelves` are the members of the two
         module families (Sprint 138) the person shows, in their order: item types, and
-        shelf ids as the layout keys carry them."""
+        shelf ids as the layout keys carry them. `front` is the media the person keeps in
+        front (Sprint 143): what is under way, what happened lately, what is next and what
+        the greeting names are theirs alone; `None` is every medium."""
         params = {"user": self.user_id, "unsorted": UNSORTED}
         with self.engine.connect() as connection:
             by_status = connection.execute(
@@ -117,29 +116,6 @@ class HomeService:
                     " WHERE e.user_id = :user AND e.status != :unsorted GROUP BY 1, 2"
                 ),
                 params,
-            ).all()
-            histogram = connection.execute(
-                text(
-                    "SELECT i.type, e.score, count(*) FROM entries e"
-                    " JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted"
-                    " AND e.score IS NOT NULL GROUP BY 1, 2"
-                ),
-                params,
-            ).all()
-            best = connection.execute(
-                text(
-                    "SELECT entry_id, item_id, type, title, cover_path, updated_at, score FROM ("
-                    " SELECT e.id AS entry_id, i.id AS item_id, i.type, i.title, i.cover_path,"
-                    " i.updated_at, e.score, row_number() OVER (PARTITION BY i.type"
-                    "  ORDER BY e.score IS NULL, e.score DESC, e.date_finished IS NULL,"
-                    "  e.date_finished DESC, e.id DESC) AS rank"
-                    " FROM entries e JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted"
-                    " AND i.cover_path IS NOT NULL"
-                    ") WHERE rank <= :covers ORDER BY type, rank"
-                ),
-                {**params, "covers": TILE_COVERS},
             ).all()
             finished = connection.execute(
                 text(
@@ -154,22 +130,19 @@ class HomeService:
 
         goals = GoalService(self.engine, self.user_id)
         # The greeting names what is under way, so this is read even when On now is hidden.
-        now = self.library.now()
+        now = [entry for entry in self.library.now() if _in(front, entry)]
 
         def shown(module: str) -> bool:
             return module not in hidden
 
         return {
-            "greeting": self._greeting(today, now, by_status, finished, goals),
+            "greeting": self._greeting(today, now, by_status, finished, goals, front),
+            # The Library's two bands: layout items since Sprint 150, so a removed one
+            # is not drawn. What is under way is read either way, for the greeting.
             "now": now if shown("now") else [],
-            "next": self._next(today) if shown("next") else [],
-            "year": self._year(today, finished, goals) if shown("year") else None,
-            "domains": self._domains(by_status, histogram, best) if shown("libraries") else [],
-            "lately": self._lately(zone) if shown("lately") else None,
-            "tidy": self._tidy() if shown("tidy") else None,
+            "next": self._next(today, front) if shown("next") else [],
+            "lately": self._lately(zone, front) if shown("lately") else [],
             "question": self._question() if shown("question") else None,
-            "shelves": self._shelves() if shown("shelves") else None,
-            "lent": self._lent() if shown("lent") else None,
             "suggested": self._suggested() if shown("suggested") else None,
             "library_years": self._library_years(today, years, finished, goals),
             "shelf_modules": self._shelf_modules(shelves),
@@ -267,7 +240,7 @@ class HomeService:
             seed_entry_id=None, item_type=None, limit=SUGGESTED, enriched_only=True
         )
 
-    def _lately(self, zone: tzinfo = UTC) -> list[dict[str, Any]]:
+    def _lately(self, zone: tzinfo = UTC, front: Set[str] | None = None) -> list[dict[str, Any]]:
         """Finishes, score changes and additions, newest first (Sprint 131).
 
         Finishes and changes are the Diary's own timeline. Additions are counted per
@@ -275,8 +248,15 @@ class HomeService:
         the Inbox's unsorted entries are left to the Inbox. The day is the person's
         own (`zone`, Sprint 132): an evening import west of Greenwich is one day.
         """
-        timeline = self.library.timeline(limit=LATELY_LIMIT)["events"]
-        days = self._days_added(zone)
+        # With some media out of the front, read deeper so that what is left still fills
+        # the band: the timeline is across every medium.
+        depth = LATELY_LIMIT if front is None else LATELY_LIMIT * FRONT_DEPTH
+        timeline = [
+            event
+            for event in self.library.timeline(limit=depth)["events"]
+            if _in(front, event["entry"])
+        ][:LATELY_LIMIT]
+        days = self._days_added(zone, front)
         added = self.library.get_entries([entry_id for _n, entry_id, _at in days])
         rows: list[dict[str, Any]] = [
             {
@@ -297,7 +277,9 @@ class HomeService:
         rows.sort(key=lambda row: str(row["at"]), reverse=True)
         return rows[:LATELY_LIMIT]
 
-    def _days_added(self, zone: tzinfo) -> list[tuple[int, int, str]]:
+    def _days_added(
+        self, zone: tzinfo, front: Set[str] | None = None
+    ) -> list[tuple[int, int, str]]:
         """`(count, newest entry id, newest date_added)` per local day, newest first.
 
         SQL counts per UTC hour, which a local day is made of whole in any zone on a
@@ -313,12 +295,16 @@ class HomeService:
                     "  count(*) OVER (PARTITION BY substr(e.date_added, 1, 13)) AS n,"
                     "  row_number() OVER (PARTITION BY substr(e.date_added, 1, 13)"
                     "  ORDER BY e.date_added DESC, e.id DESC) AS place"
-                    " FROM entries e WHERE e.user_id = :user AND e.status != :unsorted"
+                    " FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user AND e.status != :unsorted"
+                    " AND (:every OR i.type IN (SELECT value FROM json_each(:types)))"
                     ") WHERE place = 1 ORDER BY at DESC, entry_id DESC LIMIT :hours"
                 ),
                 {
                     "user": self.user_id,
                     "unsorted": UNSORTED,
+                    "every": front is None,
+                    "types": json.dumps(sorted(front or ())),
                     # A local day is at most 25 UTC hours; one day more than shown.
                     "hours": 25 * (LATELY_LIMIT + 1),
                 },
@@ -332,45 +318,6 @@ class HomeService:
                 (newest[0] + count, newest[1], newest[2]) if newest else (count, entry_id, at)
             )
         return list(days.values())[:LATELY_LIMIT]
-
-    def _tidy(self) -> dict[str, Any]:
-        """What *Tidy up* counts: pairs, entries without a cover, finished but unscored.
-
-        The cover count is the covers deck's own filter (the Inbox aside). The unscored
-        count is each domain's declared finished status with no score, per domain as
-        well, because the library it links to opens one domain at a time.
-        """
-        finished = [
-            (domain.item_type, status.value)
-            for domain in DOMAINS.values()
-            for status in domain.statuses
-            if status.finished
-        ]
-        params: dict[str, Any] = {"user": self.user_id, "unsorted": UNSORTED}
-        clauses = []
-        for index, (item_type, status) in enumerate(finished):
-            params[f"type{index}"] = item_type
-            params[f"status{index}"] = status
-            clauses.append(f"(i.type = :type{index} AND e.status = :status{index})")
-        unscored = f"sum(e.score IS NULL AND ({' OR '.join(clauses)}))" if clauses else "0"
-        with self.engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "SELECT i.type, sum(i.cover_path IS NULL OR i.cover_path = ''),"
-                    f" {unscored} FROM entries e JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted GROUP BY i.type"
-                ),
-                params,
-            ).all()
-        by_type = {item_type: count or 0 for item_type, _covers, count in rows}
-        return {
-            "duplicates": self.library.duplicate_count(),
-            "without_cover": sum(covers or 0 for _type, covers, _count in rows),
-            "unscored": sum(by_type.values()),
-            "unscored_by_type": {
-                item_type: by_type[item_type] for item_type in DOMAINS if by_type.get(item_type)
-            },
-        }
 
     def _question(self) -> dict[str, Any] | None:
         """One question from Play: an old score to look at again, else a gap to fill."""
@@ -386,44 +333,6 @@ class HomeService:
             return {"kind": "gap", "entry": gaps[0], "scored_at": None}
         return None
 
-    def _shelves(self) -> list[dict[str, Any]]:
-        """Shelves holding something, the one whose members were touched last first.
-
-        A membership has no timestamp of its own, so a member's own last change is the
-        nearest signal of a shelf in use.
-        """
-        with self.engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "SELECT s.id, s.name, s.slug, count(*), max(e.updated_at)"
-                    " FROM shelves s JOIN entry_shelves es ON es.shelf_id = s.id"
-                    " JOIN entries e ON e.id = es.entry_id"
-                    " WHERE s.user_id = :user GROUP BY s.id"
-                    " ORDER BY max(e.updated_at) DESC, count(*) DESC, s.id LIMIT :limit"
-                ),
-                {"user": self.user_id, "limit": SHELF_LIMIT},
-            ).all()
-        return [
-            {"id": shelf_id, "name": name, "slug": slug, "entry_count": count}
-            for shelf_id, name, slug, count, _used in rows
-        ]
-
-    def _lent(self) -> dict[str, Any]:
-        """What is out now, longest out first."""
-        loans = self.library.loans(open_only=True)
-        return {
-            "total": len(loans),
-            "loans": [
-                {
-                    "id": loan["id"],
-                    "person": loan["person"],
-                    "lent_on": loan["lent_on"],
-                    "entry": loan["entry"],
-                }
-                for loan in loans[:LENT_LIMIT]
-            ],
-        }
-
     def _greeting(
         self,
         today: date,
@@ -431,6 +340,7 @@ class HomeService:
         by_status: Sequence[Any],
         finished: Sequence[Any],
         goals: GoalService,
+        front: Set[str] | None = None,
     ) -> dict[str, Any]:
         planned = {
             (domain.item_type, status.value)
@@ -439,7 +349,7 @@ class HomeService:
             if status.planned
         }
         done = _done_by_type(finished)
-        mine = self._goals(goals)
+        mine = [goal for goal in self._goals(goals) if front is None or goal["item_type"] in front]
         active, goal = _greeting_pair(now, mine)
         return {
             "today": today.isoformat(),
@@ -462,13 +372,14 @@ class HomeService:
         mine = {goal["item_type"]: goal for goal in goals.list_goals()}
         return [mine[item_type] for item_type in DOMAINS if item_type in mine]
 
-    def _next(self, today: date) -> list[dict[str, Any]]:
-        """Five from the pile, every library's ranked together (Sprint 132)."""
+    def _next(self, today: date, front: Set[str] | None = None) -> list[dict[str, Any]]:
+        """Five from the pile, every library's ranked together (Sprint 132); of the media
+        in front only (Sprint 143), read deeper so the five are still five."""
         ranked = rank_pile(
             self.engine,
             self.user_id,
             None,
-            NEXT_LIMIT,
+            NEXT_LIMIT if front is None else NEXT_LIMIT * FRONT_DEPTH,
             today=today,
             embedding_model=self.embedding_model,
         )
@@ -476,81 +387,13 @@ class HomeService:
         return [
             {"entry": entry, "score": pick["score"], "reasons": pick["reasons"]}
             for pick, entry in zip(ranked, entries, strict=True)
-        ]
+            if _in(front, entry)
+        ][:NEXT_LIMIT]
 
-    def _year(self, today: date, finished: Sequence[Any], goals: GoalService) -> dict[str, Any]:
-        months: list[dict[str, Any]] = [
-            {"month": month, "count": 0, "counts": {}, "covers": []} for month in range(1, 13)
-        ]
-        for row in finished:
-            month = row[7]
-            if not month or not 1 <= month <= 12:
-                continue
-            bucket = months[month - 1]
-            bucket["count"] += 1
-            bucket["counts"][row[2]] = bucket["counts"].get(row[2], 0) + 1
-            if len(bucket["covers"]) < MONTH_COVERS:
-                bucket["covers"].append(_cover(row))
-        done = _done_by_type(finished)
-        return {
-            "year": today.year,
-            "months": months,
-            "goals": [
-                {
-                    "item_type": goal["item_type"],
-                    "period": goal["period"],
-                    "count": goal["count"],
-                    "target": _target(goal),
-                    "done": done.get(goal["item_type"], 0),
-                }
-                for goal in self._goals(goals)
-            ],
-        }
 
-    @staticmethod
-    def _domains(
-        by_status: Sequence[Any], histogram: Sequence[Any], best: Sequence[Any]
-    ) -> list[dict[str, Any]]:
-        statuses: dict[str, dict[str, int]] = defaultdict(dict)
-        rated: dict[str, int] = defaultdict(int)
-        total: dict[str, int] = defaultdict(int)
-        coverless: dict[str, int] = defaultdict(int)
-        for item_type, status, count, scored, score_sum, without in by_status:
-            statuses[item_type][status] = count
-            rated[item_type] += scored
-            total[item_type] += score_sum or 0
-            coverless[item_type] += without or 0
-        scores: dict[str, list[int]] = defaultdict(lambda: [0] * 10)
-        for item_type, score, count in histogram:
-            if 1 <= score <= 10:
-                scores[item_type][score - 1] = count
-        covers: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for row in best:
-            covers[row[2]].append(_cover(row))
-        tiles = []
-        for item_type, domain in DOMAINS.items():
-            counts = statuses.get(item_type)
-            if not counts:
-                continue
-            ordered = {
-                status.value: counts[status.value]
-                for status in domain.statuses
-                if status.value in counts
-            }
-            tiles.append(
-                {
-                    "item_type": item_type,
-                    "count": sum(counts.values()),
-                    "status_counts": ordered,
-                    "scores": scores[item_type],
-                    "mean_score": round(total[item_type] / rated[item_type], 2)
-                    if rated[item_type]
-                    else None,
-                    "covers": covers[item_type],
-                    "without_cover": coverless[item_type],
-                }
-            )
-        return tiles
+def _in(front: Set[str] | None, entry: dict[str, Any]) -> bool:
+    """Whether an entry's medium is in front; every medium is when none are named."""
+    return front is None or entry["item"]["type"] in front
 
 
 def _greeting_pair(

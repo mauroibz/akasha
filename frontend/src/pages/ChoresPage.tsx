@@ -7,6 +7,7 @@ import { getInboxCount, getLibraryPage } from "@/api/library";
 import { queryKeys } from "@/api/keys";
 import { PageHeader } from "@/components/PageHeader";
 import { coverlessFilters } from "@/features/chores/chores";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Tidy up: the upkeep the deck does one card at a time (Sprint 112, DEC-176; named
@@ -58,7 +59,7 @@ export function ChoresPage() {
   ];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back={{ to: "/settings", label: "Settings" }}
         title="Tidy up"
@@ -96,12 +97,12 @@ export function ChoresPage() {
       <p className="mt-8 text-sm text-muted-foreground">
         Looking for the games, like which of your 8s is best?{" "}
         <Link
-          to="/insights"
+          to="/journal"
           className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
         >
-          They're at the top of Insights
+          They're in the Journal, under Play
         </Link>
       </p>
-    </main>
+    </PageFrame>
   );
 }

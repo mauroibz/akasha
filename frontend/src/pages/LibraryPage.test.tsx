@@ -95,9 +95,14 @@ test("announces loading and then renders the populated library and inbox facet",
       if (String(request).startsWith("/api/shelves")) {
         return Promise.resolve(new Response("[]", { status: 200 }));
       }
-      // The Now strip's own request (Sprint 098): nothing under way.
-      if (String(request).startsWith("/api/now")) {
-        return Promise.resolve(new Response("[]", { status: 200 }));
+      // The front of the Library (Sprint 141) asks for itself and its layout;
+      // unanswered here, it draws nothing.
+      if (String(request).startsWith("/api/home")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
+      // The person's media (Sprint 143): no preference, so the registry as declared.
+      if (String(request).startsWith("/api/media")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
       }
       // The places for the location filter (Sprint 111): none written yet.
       if (String(request).startsWith("/api/locations")) {
@@ -116,7 +121,6 @@ test("announces loading and then renders the populated library and inbox facet",
   await waitFor(() => expect(resolveResponse).toBeDefined());
   resolveResponse?.(new Response(JSON.stringify(populated), { status: 200 }));
   expect(await screen.findByText("Rayuela")).toBeVisible();
-  expect(screen.getAllByText(/Inbox 12/)[0]).toBeVisible();
   expect(fetch).toHaveBeenCalledWith(
     expect.stringContaining("/api/entries"),
     expect.anything(),
@@ -149,7 +153,6 @@ test("renders a useful empty state", async () => {
   expect(
     screen.getByRole("button", { name: "Sort them into your library" }),
   ).toBeVisible();
-  expect(screen.getAllByText(/Inbox 3/)[0]).toBeVisible();
 });
 
 test("announces a library error and offers retry", async () => {
@@ -362,27 +365,6 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
       expect.anything(),
     ),
   );
-});
-
-test("Inbox count applies the unsorted filter", async () => {
-  const fetchMock = vi.fn(
-    async (request: string | URL | Request, init?: RequestInit) => {
-      if (init?.method === "PATCH") {
-        return new Response(JSON.stringify(populated.items[0]), {
-          status: 200,
-        });
-      }
-      return new Response(JSON.stringify(populated), { status: 200 });
-    },
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  renderPage();
-  const user = userEvent.setup();
-  await screen.findByText("Rayuela");
-  const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
-  await user.click(inboxButtons[0]);
-  // The Inbox is its own page again since Sprint 096 (proposal I3).
-  await screen.findByText("Inbox page");
 });
 
 test("the shelf filter lists every shelf, not only those on loaded pages", async () => {
@@ -2003,5 +1985,60 @@ test("finishing a scored entry from its card asks whether the score holds (Sprin
     expect(bodies).toEqual([
       { status: "read", score: 8, score_reason: "time" },
     ]),
+  );
+});
+
+test("Shelves is a view of the library: the boards in place of the list, in the address (Sprint 144)", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request) => {
+      const url = String(request);
+      if (url === "/api/shelves")
+        return new Response(
+          JSON.stringify([
+            {
+              id: 1,
+              name: "Favorites",
+              slug: "favorites",
+              entry_count: 0,
+              preview: [],
+              members_by_type: {},
+            },
+          ]),
+        );
+      if (url.startsWith("/api/entries"))
+        return new Response(JSON.stringify(populated));
+      return new Response("[]");
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  await screen.findByText("Rayuela");
+  await user.click(screen.getByRole("button", { name: "Shelves view" }));
+  expect(
+    await screen.findByRole("link", { name: "Favorites" }),
+  ).toHaveAttribute("href", "/shelves/favorites");
+  expect(screen.getByRole("region", { name: "Shelves" })).toBeVisible();
+  expect(screen.queryByText("Rayuela")).toBeNull();
+
+  await user.click(screen.getByRole("button", { name: "Grid view" }));
+  expect(await screen.findByText("Rayuela")).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Shelves" })).toBeNull();
+});
+
+test("a link to the shelves view opens on it (Sprint 144)", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request) =>
+      String(request).startsWith("/api/entries")
+        ? new Response(JSON.stringify(populated))
+        : new Response("[]"),
+    ),
+  );
+  renderPage("/?view=shelves");
+  expect(await screen.findByRole("region", { name: "Shelves" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Shelves view" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
 });

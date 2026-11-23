@@ -2,6 +2,70 @@
 
 ## Where the project stands
 
+**2026-11-23, the 4.0 line is built and not released.** Sprints 139–150 (DEC-193, amended by
+DEC-194, and DEC-195 from the owner's first look: a goal's medium, a search in the day's
+question, *Arrange* redrawn as *Personalize* with *On now* and *Lately* movable; the design is `docs/library-first-proposal.md` with its mockup) are complete on branch
+`library-first-4.0`, all commits local, nothing pushed. The project state is `complete`. The
+running board is still 3.1.0. **Do not tag, push or deploy without asking:** the owner asked
+for the build; the standing permission to release applied to the 3.0 line only.
+
+What the line changed, in one paragraph: the Library is at `/` with a front above its grid
+(the greeting, *On now*, *Lately*, showcases arranged in place); the navigation is *Library*
+and *Journal*, with the bar as a field between them and *Add* and *Import* in its footer;
+shelves are a view of the Library, with the pile, what is lent and saved views drawn among
+them; the Journal is the Diary, Insights and the games, opening on a widget (*Every day*,
+*Play*, *Goal*); each person orders their media and marks each Front, Kept or Off; four theme
+presets. Migrations **0039** (`media_preferences`) and **0040** (`lit_days`) are new since
+3.1.0.
+
+**Gates:** on the tree at Sprint 148, `make check`; `make test` (backend 2,229, Vitest 760);
+every Playwright project 249 passed, 2 skipped by design; `make audit` clean. After Sprints
+149–150: Vitest 766, every Playwright project 249 passed, `make check`, and the nine backend
+test files around the change 196 passed; the full backend run was not repeated. Not run:
+`make smoke-container`, and an upgrade of a copy of the board's library (a copy of the
+development library was migrated 0038 → 0040 with counts unchanged).
+
+**For a release, still to do:** move the version surfaces from 3.1.0, write
+`docs/operations/release-notes-v4.0.md` (addresses that redirect: `/library`, `/shelves`,
+`/insights`, `/diary`), `make smoke-container`, rehearse the upgrade on a copy of the board's
+library, then the PR, the tag and the board, each on the owner's word.
+
+**For the owner to settle:** the presets' names and number; DEC-194 (a shelf's page stays
+covers to look at and links into the Library; `/pile` and `/lent` keep their pages; *Pin to
+library* stays); the shell's field opens the bar instead of being typed into in place; saved
+views were not moved into the shelves table.
+
+**Where things are:** `components/PageFrame.tsx`, `Cover.tsx`, `DomainStrip.tsx` (one frame,
+held by `src/test/frame.test.ts`); `features/home/` (the Library's front: `LibraryFront`,
+`Showcase`, `Personalize`, `useArrange`, `Arrange`, `InsightShowcase`); `features/media/`; `features/shelves/ShelvesView`
+and `useRuleShelves`; `pages/JournalPage.tsx` and `features/journal/`; `features/theme/`.
+A new API route needs `test_isolation.py`, `test_app_shape.py` (regenerate the fixture) and
+`test_library_api.py`'s route list; a new migration, `test_migrations.py`.
+
+**Environment warning:** a local Akasha 1.5.7 container (`akasha-akasha-1`) listens on
+127.0.0.1:8000, where the Playwright dev server proxies unstubbed `/api` calls; with it up,
+16–17 accessibility tests fail, on `main` too. Run Playwright with
+`AKASHA_E2E_BACKEND=http://127.0.0.1:9`. The repository has an old stash (`stash@{0}`,
+made on `adc4de4`); leave it. Metadata providers are unreachable from the agent's sandbox.
+
+What 141 left: `/` is the Library and `/library` redirects. `features/home/LibraryFront.tsx`
+draws the greeting, *On now*, *Lately* and the showcases above the grid from `GET /api/home`;
+the showcase keys are `next`, `question`, `suggested`, `year:<type>`, `shelf:<id>`.
+Since 142 they are arranged in place (`useArrange.ts`, `Arrange.tsx`; the dialog is gone) and
+a third family exists, `insight:<type>:<section>`, drawn by `InsightShowcase.tsx`.
+
+What 143 left: `/api/media` and `features/media/` (`useMedia`, `useShownItemTypes`,
+`YourMedia`). A chooser lists `useShownItemTypes().data`; labels and vocabularies still read
+`useItemTypes()`, the whole registry.
+
+What 144 left: shelves are `/?view=shelves` (`features/shelves/ShelvesView.tsx`); DEC-194
+records what was not built from DEC-193 point 5 and why.
+
+What 146 left: `/journal` (`pages/JournalPage.tsx`); a widget is an entry in its `widgets`
+list, drawn by `features/journal/JournalWidgets.tsx`.
+
+## Earlier state (release 3.1.0)
+
 **2026-11-23, 3.1.0 released and running on the board** (#42, tag `v3.1.0`; no migration). The owner reviewed 3.0.0 on the board and
 asked for six changes (DEC-192), built as Sprints 137 (finishing records when; *Mark as read*;
 the pile in rounds by creator; `/pile`, the pile as a list) and 138 (Home's module families: a

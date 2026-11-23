@@ -34,6 +34,10 @@ export const queryKeys = {
   home: ["home"] as const,
   pile: ["pile"] as const,
   homeLayout: ["home-layout"] as const,
+  /** The person's media, in their order (Sprint 143). */
+  media: ["media"] as const,
+  /** The lit days of a span (Sprint 147). */
+  litDays: ["lit-days"] as const,
   /** One round of *More like this* (Sprint 134), re-read as its job reports. */
   suggestionRound: (roundId: number) => ["suggestion-round", roundId] as const,
   diary: (year: number | undefined) => ["diary", year ?? "current"] as const,

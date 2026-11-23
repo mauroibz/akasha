@@ -33,6 +33,7 @@ import { Label } from "@/components/ui/label";
 import { queryKeys } from "@/api/keys";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Loading } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/PageFrame";
 
 function PersonRow({
   person,
@@ -98,7 +99,7 @@ function PersonRow({
     onSuccess: () => {
       onActAs(person);
       // "View Bruno's library": the library itself, not Home (Sprint 130).
-      void navigate("/library", { replace: true });
+      void navigate("/", { replace: true });
     },
   });
   return (
@@ -298,7 +299,7 @@ export function PeoplePage({
     },
   });
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back
         title={user.is_admin ? "People" : "Settings"}
@@ -404,6 +405,6 @@ export function PeoplePage({
           </section>
         ) : null}
       </div>
-    </main>
+    </PageFrame>
   );
 }

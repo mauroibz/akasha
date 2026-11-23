@@ -503,6 +503,12 @@
    ]
   ],
   [
+   "/api/home/preview",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/home/layout",
    [
     "GET"
@@ -512,6 +518,36 @@
    "/api/home/layout",
    [
     "PUT"
+   ]
+  ],
+  [
+   "/api/media",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/media",
+   [
+    "PUT"
+   ]
+  ],
+  [
+   "/api/lit-days",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/lit-days/{day}",
+   [
+    "PUT"
+   ]
+  ],
+  [
+   "/api/lit-days/{day}",
+   [
+    "DELETE"
    ]
   ],
   [

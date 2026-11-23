@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { getPile, type HomeNext } from "@/api/home";
 import { queryKeys } from "@/api/keys";
 import type { LibraryEntry } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/skeleton";
@@ -16,6 +16,7 @@ import { domainsFrom } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { statusWith } from "@/features/rescore/rescore";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
 
 /** The whole pile: the ranking reads it in one pass (Sprint 132's budget is 2,000). */
 const WHOLE = 1000;
@@ -55,7 +56,7 @@ export function PilePage() {
     void queryClient.invalidateQueries({ queryKey: queryKeys.pile });
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back={{ to: "/", label: "Home" }}
         title="The pile"
@@ -120,11 +121,7 @@ export function PilePage() {
                   className="w-10 shrink-0 focus-ring"
                   aria-label={`Open ${entry.item.title}`}
                 >
-                  <CoverImage
-                    src={entry.item.cover_url ?? null}
-                    alt=""
-                    className="aspect-[2/3] w-10 rounded object-cover"
-                  />
+                  <Cover src={entry.item.cover_url} size="s" />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{entry.item.title}</p>
@@ -177,6 +174,6 @@ export function PilePage() {
         onClose={() => setFinishing(null)}
         onFinished={refresh}
       />
-    </main>
+    </PageFrame>
   );
 }

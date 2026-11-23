@@ -107,7 +107,10 @@ test("three EPUBs dropped on Add are previewed, committed and waiting in the Inb
   });
 
   await page.goto("/library");
-  await page.getByRole("link", { name: /add/i }).first().click();
+  // The form is the bar's last resort since Sprint 140, not a navigation item.
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("link", { name: "Enter it by hand" }).click();
   await expect(page).toHaveURL("/add");
 
   const zone = page.getByTestId("epub-export-drop-zone");

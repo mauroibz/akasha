@@ -12,7 +12,8 @@ from book_tracker.api.library import ERRORS, EntryResponse, library_for
 from book_tracker.api.pile import PilePick
 from book_tracker.api.suggestions import SuggestionResponse
 from book_tracker.application.home import HomeService
-from book_tracker.application.home_layout import SHELF, YEAR, HomeLayoutService
+from book_tracker.application.home_layout import SHELF, YEAR, HomeLayoutService, LayoutError
+from book_tracker.application.media import MediaService
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
@@ -34,6 +35,13 @@ async def layout_service(user: CurrentUser, request: Request) -> HomeLayoutServi
 
 
 Layouts = Annotated[HomeLayoutService, Depends(layout_service)]
+
+
+async def media_service(user: CurrentUser, request: Request) -> MediaService:
+    return MediaService(request.app.state.engine, user.effective_user_id)
+
+
+Media = Annotated[MediaService, Depends(media_service)]
 
 
 class HomeActive(BaseModel):
@@ -72,42 +80,12 @@ class HomeCover(BaseModel):
     score: int | None
 
 
-class HomeMonth(BaseModel):
-    #: 1 for January.
-    month: int
-    #: Everything finished that month, per item type and in all.
-    count: int
-    counts: dict[str, int]
-    #: In the order finished; at most 24 even when `count` is more.
-    covers: list[HomeCover]
-
-
 class HomeYearGoal(BaseModel):
     item_type: str
     period: Literal["month", "year"]
     count: int
     target: int
     done: int
-
-
-class HomeYear(BaseModel):
-    year: int
-    months: list[HomeMonth] = Field(min_length=12, max_length=12)
-    goals: list[HomeYearGoal]
-
-
-class HomeDomainTile(BaseModel):
-    item_type: str
-    #: Entries in this library, the Inbox's unsorted ones aside.
-    count: int
-    #: Per status, in the domain's declared order.
-    status_counts: dict[str, int]
-    #: Index `i` counts the entries scored `i + 1`.
-    scores: list[int] = Field(min_length=10, max_length=10)
-    mean_score: float | None
-    #: Up to three, best scored first.
-    covers: list[HomeCover]
-    without_cover: int
 
 
 class HomeLatelyRow(BaseModel):
@@ -124,18 +102,6 @@ class HomeLatelyRow(BaseModel):
     count: int
 
 
-class HomeTidy(BaseModel):
-    #: Pairs that look like one work entered twice.
-    duplicates: int
-    #: Entries without a cover, the Inbox aside.
-    without_cover: int
-    #: Entries in a status their domain declares finished, with no score.
-    unscored: int
-    #: The same per library, in registry order, only those with some: the library
-    #: Tidy up links to opens one domain at a time.
-    unscored_by_type: dict[str, int]
-
-
 class HomeQuestion(BaseModel):
     """One question from Play: an old score to look at again, else a gap to fill."""
 
@@ -143,26 +109,6 @@ class HomeQuestion(BaseModel):
     entry: EntryResponse
     #: When the score was given or last looked at, for a revisit.
     scored_at: str | None
-
-
-class HomeShelf(BaseModel):
-    id: int
-    name: str
-    slug: str
-    entry_count: int
-
-
-class HomeLoan(BaseModel):
-    id: int
-    person: str
-    lent_on: str
-    entry: EntryResponse
-
-
-class HomeLent(BaseModel):
-    #: Open loans in all; `loans` holds the five out longest.
-    total: int
-    loans: list[HomeLoan]
 
 
 class HomeLibraryYear(BaseModel):
@@ -190,19 +136,16 @@ class HomeShelfModule(BaseModel):
 
 
 class HomeResponse(BaseModel):
-    """Every module's payload. A module the person hid is empty or `null`, unread."""
+    """The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase
+    the person hid is empty or `null`, unread."""
 
     greeting: HomeGreeting
     now: list[EntryResponse]
     #: The pile ranked across libraries (Sprint 132): five, each with its reasons.
     next: list[PilePick]
-    year: HomeYear | None
-    domains: list[HomeDomainTile]
-    lately: list[HomeLatelyRow] | None
-    tidy: HomeTidy | None
+    #: What was finished, rescored and added, newest first: the Library's second band.
+    lately: list[HomeLatelyRow]
     question: HomeQuestion | None
-    shelves: list[HomeShelf] | None
-    lent: HomeLent | None
     #: *More like this* (Sprint 134): the newest suggestions found and unanswered,
     #: across libraries, from storage.
     suggested: list[SuggestionResponse] | None
@@ -230,6 +173,7 @@ def home(
     request: Request,
     service: Home,
     layouts: Layouts,
+    media: Media,
     tz: Annotated[str | None, Query(max_length=64)] = None,
 ) -> HomeResponse:
     """Every module of Home from stored data; no provider is consulted.
@@ -252,7 +196,50 @@ def home(
         ]
 
     return HomeResponse.model_validate(
-        service.home(today, hidden, zone, years=shown(YEAR), shelves=shown(SHELF))
+        service.home(
+            today,
+            hidden,
+            zone,
+            years=shown(YEAR),
+            shelves=shown(SHELF),
+            # The bands and Up next are of the media the person keeps in front (Sprint 143).
+            front=media.front(),
+        )
+    )
+
+
+@router.get("/home/preview", response_model=HomeResponse, responses=ERRORS)
+def preview(
+    request: Request,
+    service: Home,
+    layouts: Layouts,
+    media: Media,
+    module: Annotated[str, Query(max_length=120)],
+    tz: Annotated[str | None, Query(max_length=64)] = None,
+) -> HomeResponse:
+    """One module's payload as if it were shown, whatever the layout says (Sprint 150).
+
+    What *Personalize* draws before something is added. Only that module is read, and
+    nothing is stored: looking is not placing. A key that is not something this person
+    can place is refused.
+    """
+    if not layouts.knows(module):
+        raise LayoutError(
+            "unknown_module",
+            "There is nothing by that name to place",
+            status_code=422,
+            details={"module": module},
+        )
+    zone = _zone(request, tz)
+    return HomeResponse.model_validate(
+        service.home(
+            _today(zone),
+            layouts.all() - {module},
+            zone,
+            years=[module[len(YEAR) :]] if module.startswith(YEAR) else [],
+            shelves=[module[len(SHELF) :]] if module.startswith(SHELF) else [],
+            front=media.front(),
+        )
     )
 
 

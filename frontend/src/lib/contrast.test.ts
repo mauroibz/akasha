@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Both themes are held to WCAG AA here (Sprint 090): 4.5:1 for text, 3:1 for the
+ * Every theme is held to WCAG AA here (Sprint 090; the presets since Sprint 148): 4.5:1 for text, 3:1 for the
  * focus ring and the score ramp as a mark. The tokens are read from index.css
  * itself, so a value tuned there is checked the moment it changes.
  */
@@ -67,6 +67,11 @@ const MARKS: [string, string][] = [
 describe.each([
   ["Ink", ':root,\n  [data-theme="ink"]'],
   ["Paper", '[data-theme="paper"]'],
+  // The presets (Sprint 148): each is a complete set and is held to the same pairs.
+  ["Moss", '[data-theme="moss"]'],
+  ["Claret", '[data-theme="claret"]'],
+  ["Dusk", '[data-theme="dusk"]'],
+  ["Sakura", '[data-theme="sakura"]'],
 ])("the %s theme", (_name, selector) => {
   const theme = tokens(selector);
 

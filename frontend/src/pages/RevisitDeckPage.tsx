@@ -48,7 +48,7 @@ export function RevisitDeckPage() {
       label="Revisit"
       progressLabel="Progress through old scores"
       closeLabel="Back to Insights"
-      onClose={() => navigate("/insights")}
+      onClose={() => navigate("/journal")}
       source={{
         cards,
         total: queue.data?.total ?? 0,

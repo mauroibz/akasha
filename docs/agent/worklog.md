@@ -7169,3 +7169,145 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   capabilities, bound to 192.168.100.240:4441 only; `/api/home` and `/api/pile` 401 without a
   session; no error lines in the log.
 - Next: the owner's new work.
+
+## 2026-11-23 — Sprint 139: one frame (complete)
+
+- Done: the owner's request for a unified UX, proposed (`docs/library-first-proposal.md`, mockup
+  beside it), accepted as DEC-193 and planned as Sprints 139–148 on branch `library-first-4.0`
+  (`5627828`). Sprint 139: `PageFrame`, `Cover`, one `DomainStrip` look (`0f70383`).
+- Verified: see the sprint's Outcome (Vitest 649, Playwright 239 passed, `make check`, a look
+  at six screens in both themes at 1440 and 390 px).
+- Deviations: a third width (`focus`); no square covers; the command bar's chooser moved to
+  140; one e2e assertion changed. All in the Outcome.
+- Walkthrough tooling, in the session scratchpad and not tracked: a script that serves the
+  backend on a copy of `data/` (port 8791) with Vite on 5191, and
+  `frontend/e2e/scratchpad/shots.mjs <outdir> <theme> name=/path …` for screenshots at both
+  widths. Providers are unreachable from this sandbox: the bar's web results cannot be looked
+  at live here.
+- Next: Sprint 140, one bar.
+
+## 2026-11-23 — Sprint 140: one bar (complete)
+
+- Done: places-only navigation, the shell's field, "N to sort" in the shell, the bar's footer
+  and chooser, the Library toolbar without *Add* and *Inbox*.
+- Verified: see the sprint's Outcome.
+- Deviations: the shell's field opens the bar rather than being the input; the Library's field
+  stays in its sticky toolbar. Both reasoned in the Outcome.
+- Warning: the first implementation commit of this sprint was made by mistake with one test
+  red; it was amended before anything else was built on it.
+- Next: Sprint 141, the library at `/`.
+
+## 2026-11-23 — Sprint 141: the library is the home (complete)
+
+- Done: the Library at `/` with its front; Home's page and seven modules deleted; the home
+  payload and layout pruned (`1a41bf2`). Product spec 7 and technical spec 7 rewritten for
+  Sprints 140–141.
+- Verified: see the sprint's Outcome.
+- Deviations: showcase defaults, capped cover size, the *Everything* heading. In the Outcome.
+- Next: Sprint 142, Arrange.
+
+## 2026-11-23 — Sprint 142: Arrange (complete)
+
+- Done: arranging in place (`useArrange.ts`, `Arrange.tsx`), the tray, the `insight:` family
+  and `InsightShowcase.tsx`; `EditHome` deleted.
+- Verified: see the sprint's Outcome.
+- Deviations: numbers offered per medium held; every groupable field is a section. In the
+  Outcome.
+- Note for e2e: `getByRole("button", { name: "Move X" })` also matches "Remove X"; use
+  `exact: true`.
+- Next: Sprint 143, your media.
+
+## 2026-11-23 — Sprint 143: your media (complete)
+
+- Done: migration 0039 and `/api/media`; the front filtered to *Front* media; `YourMedia`,
+  `WhatDoYouKeep`, `useShownItemTypes`.
+- Verified: see the sprint's Outcome; a copy of the development library migrated with counts
+  unchanged.
+- Deviations: the derived default before a choice; the registry endpoint unfiltered. In the
+  Outcome.
+- Note: `e2e/console.ts` now stubs `/api/media` (no preference) and the front's new payload.
+  A unit test whose fetch stub never answers unknown URLs must answer `/api/media`, or the
+  Library waits for it.
+- Next: Sprint 144, shelves as a view.
+
+## 2026-11-23 — Sprint 144: shelves are a view (complete)
+
+- Done: `ShelvesView` behind the Library's view switch, the pile as a shelf, `/shelves`
+  redirecting, a shelf linking into the Library.
+- Verified: see the sprint's Outcome.
+- Deviations: DEC-194. A shelf's page was not replaced by the Library's grid, `/pile` and
+  `/lent` do not redirect, *Pin to library* stays. For the owner's attention in the final
+  report.
+- Next: Sprint 145, shelves with a rule.
+
+## 2026-11-23 — Sprint 145: shelves with a rule (complete)
+
+- Done: saved views drawn as shelves (`features/shelves/useRuleShelves.ts`), *Save as a
+  shelf*, *Stop keeping*.
+- Verified: see the sprint's Outcome.
+- Deviations: no migration; saved views stay in their own table. The line now has two
+  migrations planned (0039 done, lit days to come), not three.
+- Next: Sprint 146, the Journal.
+
+## 2026-11-23 — Sprint 146: the Journal (complete)
+
+- Done: `/journal` with its widget switcher (Play, Goal), the Diary and Insights embedded,
+  redirects, two-place navigation.
+- Verified: see the sprint's Outcome.
+- Note for e2e: the goal's band and invitation are behind the *Goal* tab; a spec that opens
+  `/diary` for them clicks it first.
+- Next: Sprint 147, every day.
+
+## 2026-11-23 — Sprint 147: every day (complete)
+
+- Done: migration 0040 and `/api/lit-days`; the edit route lights a day; `EveryDay.tsx` as the
+  Journal's first widget.
+- Verified: see the sprint's Outcome; a copy of the development library migrated with counts
+  unchanged.
+- Correction: Sprint 143 closed with `test_library_api.py`'s route list missing `/api/media`
+  (that file was not among the tests run then). Fixed in this sprint. A new route means three
+  tests: `test_isolation.py`, `test_app_shape.py` (regenerate its fixture) and
+  `test_library_api.py`.
+- Next: Sprint 148, themes, the last of the line.
+
+## 2026-11-23 — Sprint 148: themes (complete); the 4.0 line is built
+
+- Done: four presets and `ThemePicker`. With it Sprints 139–148 (DEC-193) are complete on
+  branch `library-first-4.0`, nothing pushed.
+- Verified: the line's gates on the final tree: `make check`; `make test` (backend 2,229,
+  Vitest 760); every Playwright project, 249 passed and 2 skipped by design; `make audit`
+  clean. `make smoke-container` not run (a release step).
+- Found by the full suites and fixed: a `CHECK` constraint freezing a vocabulary in migration
+  0040; a recommendations test assuming *More like this* is shown by default; the
+  production-bundle spec clicking a navigation link that left in Sprint 140. The first two
+  would have been caught per sprint by running `test_migrations.py` with any migration and
+  the tests that read `/api/home` with any change to its defaults.
+- Not done, on purpose: no version bump, release notes, tag, push or deploy. The owner asked
+  for the build, not a release.
+- Next: the owner's review. Open for them: the presets' names; DEC-194's choices on shelves;
+  whether to release as 4.0.0.
+
+## 2026-11-23 — Sprint 149: the Journal's two gaps (complete)
+
+- Done: the owner's first look at the line planned as Sprints 149–150 (DEC-195). 149: the
+  goal's medium chooser; `DaySearch` in the day's question.
+- Verified: see the sprint's Outcome.
+- Running for the owner's review, outside the repository: the backend on port 8001 against a
+  copy of `data/` in the session scratchpad, Vite on 5173. The old 1.5.7 container still
+  holds 8000.
+- Next: Sprint 150, Personalize.
+
+## 2026-11-23 — Sprint 150: Personalize (complete)
+
+- Done: `now` and `lately` back in the layout; `/api/home/preview`; `Personalize.tsx` (the
+  bar, the plus tile, the add dialog), `Showcase.tsx` as the one renderer; the tray deleted.
+- Verified: see the sprint's Outcome. `make test`'s full backend run was not repeated for
+  149–150: the nine backend files around the change ran, 196 passed.
+- Next: the owner's review. Nothing is released; the version surfaces read 3.1.0.
+
+## 2026-11-23 — Correction to Sprint 150's close
+
+- `make check` failed on lint when Sprint 150 was closed (an unused helper left in
+  `e2e/home.spec.ts`); the command that ran it piped its output, which hid the exit status.
+  Fixed in the commit after the close, and `make check` rerun green. Run `make check` on its
+  own line.

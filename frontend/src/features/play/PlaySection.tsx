@@ -34,9 +34,13 @@ function monthYear(iso: string): string {
 export function PlaySection({
   type,
   types,
+  headless = false,
 }: {
   type: string;
   types: ItemType[] | undefined;
+  /** Without its own heading and margin: inside the Journal's Play widget, whose
+   * tab already names it (Sprint 146). */
+  headless?: boolean;
 }) {
   const distribution = useScoreDistribution({ type });
   const score = bestScore(distribution.data?.counts ?? []);
@@ -129,14 +133,21 @@ export function PlaySection({
         ),
     });
   return (
-    <section id="play" aria-labelledby="play-heading" className="mt-8">
-      <h2
-        id="play-heading"
-        className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-      >
-        Play with your library
-      </h2>
-      <ul className="mt-3 grid gap-3 md:grid-cols-2">
+    <section
+      id="play"
+      aria-labelledby={headless ? undefined : "play-heading"}
+      aria-label={headless ? "Play with your library" : undefined}
+      className={headless ? undefined : "mt-8"}
+    >
+      {!headless && (
+        <h2
+          id="play-heading"
+          className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+        >
+          Play with your library
+        </h2>
+      )}
+      <ul className={cn("grid gap-3 md:grid-cols-2", !headless && "mt-3")}>
         {games.map((game, index) => (
           <li key={game.key}>
             <Link

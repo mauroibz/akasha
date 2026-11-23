@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/popover";
 
 /**
- * Names the library's current filters (Sprint 100). `query` is the library's own
+ * Names the library's current filters (Sprint 100): since Sprint 145 as a shelf that
+ * follows a rule, drawn among the shelves, where a saved view was only in the command
+ * bar. `query` is the library's own
  * URL query, so reopening the view is navigating back to it; saving under a name
  * already used replaces what that name opens.
  */
@@ -26,7 +28,9 @@ export function SaveView({ query }: { query: string }) {
     mutationFn: () => saveView(name.trim(), query),
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.views });
-      toast.success(`Saved “${view.name}”. Find it in the command bar.`);
+      toast.success(
+        `“${view.name}” is on your shelves, and follows these filters.`,
+      );
       setOpen(false);
       setName("");
     },
@@ -41,7 +45,7 @@ export function SaveView({ query }: { query: string }) {
       <PopoverTrigger asChild>
         <Button variant="ghost" className="min-h-11 gap-2">
           <Bookmark className="h-4 w-4" aria-hidden="true" />
-          Save view
+          Save as a shelf
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72">
@@ -53,7 +57,7 @@ export function SaveView({ query }: { query: string }) {
           }}
         >
           <label htmlFor="save-view-name" className="text-sm font-medium">
-            View name
+            Shelf name
           </label>
           <Input
             id="save-view-name"

@@ -102,6 +102,174 @@
     color-scheme: light;
   }
 
+  /* Four presets beside Ink and Paper (Sprint 148, DEC-193), each a complete set held
+     to the same contrast test. Only the surfaces and the one accent change: the score
+     ramp is the dark themes' or Paper's own, because it means score and nothing else
+     (DEC-026), and the mark's dot stays amber in every one (docs/brand/BRAND.md). */
+  /* *Moss*: dark, green. */
+  [data-theme="moss"] {
+    --background: 132 15.2% 6.5%; /* #0E130F */
+    --foreground: 93 25.6% 91.6%; /* #E9EFE4 */
+
+    --surface: 129 14.9% 9.2%; /* #141B15 */
+    --surface-raised: 133 14.8% 12%; /* #1A231C */
+
+    --card: 129 14.9% 9.2%; /* #141B15 */
+    --card-foreground: 93 25.6% 91.6%; /* #E9EFE4 */
+    --popover: 133 14.8% 12%; /* #1A231C */
+    --popover-foreground: 93 25.6% 91.6%; /* #E9EFE4 */
+
+    --primary: 88 50.2% 59.8%; /* #9CCC65 */
+    --primary-foreground: 111 18.9% 7.3%; /* #10160F */
+    --primary-text: 88 56.9% 67.3%; /* #AEDB7C */
+
+    --secondary: 131 15.1% 14.3%; /* #1F2A21 */
+    --secondary-foreground: 93 25.6% 91.6%; /* #E9EFE4 */
+
+    --muted: 131 15.1% 14.3%; /* #1F2A21 */
+    --muted-foreground: 109 8.5% 60.6%; /* #95A392 */
+
+    --accent: 131 15.1% 14.3%; /* #1F2A21 */
+    --accent-foreground: 93 25.6% 91.6%; /* #E9EFE4 */
+
+    --destructive: 0 90.6% 70.8%; /* #F87171 */
+    --destructive-foreground: 24 9.8% 10%; /* #1C1917 */
+
+    --border: 129 14.6% 17.5%; /* #263328 */
+    --input: 129 14.6% 17.5%; /* #263328 */
+    --ring: 88 50.2% 59.8%; /* #9CCC65 */
+
+    --score-low: 5 81.2% 72.9%;
+    --score-mid: 41 86.6% 62%;
+    --score-high: 81 56.7% 59.2%;
+    --score-top: 151 50.2% 57.5%;
+
+    color-scheme: dark;
+  }
+
+  /* *Claret*: dark, wine. */
+  [data-theme="claret"] {
+    --background: 345 25% 6.3%; /* #140C0E */
+    --foreground: 13 38.9% 92.9%; /* #F4E9E6 */
+
+    --surface: 344 24.4% 8.8%; /* #1C1114 */
+    --surface-raised: 343 24.1% 11.4%; /* #24161A */
+
+    --card: 344 24.4% 8.8%; /* #1C1114 */
+    --card-foreground: 13 38.9% 92.9%; /* #F4E9E6 */
+    --popover: 343 24.1% 11.4%; /* #24161A */
+    --popover-foreground: 13 38.9% 92.9%; /* #F4E9E6 */
+
+    --primary: 2 64.6% 65.7%; /* #E0736F */
+    --primary-foreground: 356 35% 7.8%; /* #1B0D0E */
+    --primary-text: 3 77.1% 74.3%; /* #F0908B */
+
+    --secondary: 346 23.9% 13.9%; /* #2C1B1F */
+    --secondary-foreground: 13 38.9% 92.9%; /* #F4E9E6 */
+
+    --muted: 346 23.9% 13.9%; /* #2C1B1F */
+    --muted-foreground: 5 13.2% 64.3%; /* #B09A98 */
+
+    --accent: 346 23.9% 13.9%; /* #2C1B1F */
+    --accent-foreground: 13 38.9% 92.9%; /* #F4E9E6 */
+
+    --destructive: 0 90.6% 70.8%; /* #F87171 */
+    --destructive-foreground: 24 9.8% 10%; /* #1C1917 */
+
+    --border: 349 23.6% 17.5%; /* #372226 */
+    --input: 349 23.6% 17.5%; /* #372226 */
+    --ring: 2 64.6% 65.7%; /* #E0736F */
+
+    --score-low: 5 81.2% 72.9%;
+    --score-mid: 41 86.6% 62%;
+    --score-high: 81 56.7% 59.2%;
+    --score-top: 151 50.2% 57.5%;
+
+    color-scheme: dark;
+  }
+
+  /* *Dusk*: dark, blue. */
+  [data-theme="dusk"] {
+    --background: 229 29.7% 7.3%; /* #0D0F18 */
+    --foreground: 230 35.3% 93.3%; /* #E8EAF4 */
+
+    --surface: 230 31% 11.4%; /* #141726 */
+    --surface-raised: 230 30.7% 14.7%; /* #1A1E31 */
+
+    --card: 230 31% 11.4%; /* #141726 */
+    --card-foreground: 230 35.3% 93.3%; /* #E8EAF4 */
+    --popover: 230 30.7% 14.7%; /* #1A1E31 */
+    --popover-foreground: 230 35.3% 93.3%; /* #E8EAF4 */
+
+    --primary: 229 100% 78%; /* #8FA4FF */
+    --primary-foreground: 231 42.2% 8.8%; /* #0D1020 */
+    --primary-text: 229 100% 83.1%; /* #A9B9FF */
+
+    --secondary: 229 29.7% 17.8%; /* #20253B */
+    --secondary-foreground: 230 35.3% 93.3%; /* #E8EAF4 */
+
+    --muted: 229 29.7% 17.8%; /* #20253B */
+    --muted-foreground: 230 16.7% 64.7%; /* #969BB4 */
+
+    --accent: 229 29.7% 17.8%; /* #20253B */
+    --accent-foreground: 230 35.3% 93.3%; /* #E8EAF4 */
+
+    --destructive: 0 90.6% 70.8%; /* #F87171 */
+    --destructive-foreground: 24 9.8% 10%; /* #1C1917 */
+
+    --border: 229 28.6% 22%; /* #282E48 */
+    --input: 229 28.6% 22%; /* #282E48 */
+    --ring: 229 100% 78%; /* #8FA4FF */
+
+    --score-low: 5 81.2% 72.9%;
+    --score-mid: 41 86.6% 62%;
+    --score-high: 81 56.7% 59.2%;
+    --score-top: 151 50.2% 57.5%;
+
+    color-scheme: dark;
+  }
+
+  /* *Sakura*: light, pink. */
+  [data-theme="sakura"] {
+    --background: 347 36% 95.1%; /* #F7EEF0 */
+    --foreground: 340 14.8% 12%; /* #231A1D */
+
+    --surface: 350 50% 97.6%; /* #FCF6F7 */
+    --surface-raised: 345 100% 99.2%; /* #FFFBFC */
+
+    --card: 350 50% 97.6%; /* #FCF6F7 */
+    --card-foreground: 340 14.8% 12%; /* #231A1D */
+    --popover: 345 100% 99.2%; /* #FFFBFC */
+    --popover-foreground: 340 14.8% 12%; /* #231A1D */
+
+    --primary: 342 63.6% 72%; /* #E58AA5 */
+    --primary-foreground: 340 14.8% 12%; /* #231A1D */
+    --primary-text: 338 53.6% 41.4%; /* #A2315A */
+
+    --secondary: 345 33.3% 90.6%; /* #EFDFE3 */
+    --secondary-foreground: 340 14.8% 12%; /* #231A1D */
+
+    --muted: 345 33.3% 90.6%; /* #EFDFE3 */
+    --muted-foreground: 342 8.6% 38.6%; /* #6B5A5F */
+
+    --accent: 345 33.3% 90.6%; /* #EFDFE3 */
+    --accent-foreground: 340 14.8% 12%; /* #231A1D */
+
+    --destructive: 4 76.5% 40%; /* #B42318 */
+    --destructive-foreground: 347 36% 95.1%; /* #F7EEF0 */
+
+    --border: 345 28.6% 86.3%; /* #E6D2D7 */
+    --input: 345 24% 80.4%; /* #D9C1C7 */
+    --ring: 338 53.6% 41.4%; /* #A2315A */
+
+    --score-low: 6 63.4% 42%;
+    --score-mid: 35 91.7% 30%;
+    --score-high: 86 78.4% 25%;
+    --score-top: 142 71.8% 26%;
+
+    color-scheme: light;
+  }
+
   :root {
     --radius: 0.625rem;
     /* Small controls are sized independently of the card radius: at 10px a

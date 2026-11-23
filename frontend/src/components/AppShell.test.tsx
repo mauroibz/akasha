@@ -25,7 +25,7 @@ function renderShell(routes: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("AppShell", () => {
-  it("renders Home, Library, Add, Import, and Shelves navigation links", () => {
+  it("navigates to places only: Add and Import are in the bar, not the navigation (Sprint 140)", () => {
     renderShell(
       <Routes>
         <Route path="/" element={<div>Library page</div>} />
@@ -36,11 +36,24 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Home", "Library", "Add", "Import", "Shelves"]) {
+    for (const label of ["Library", "Journal"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
+        hidden: true,
       });
       expect(links.length).toBeGreaterThanOrEqual(1);
+    }
+    // Shelves are a view of the Library since Sprint 144.
+    for (const label of [
+      /^add$/i,
+      /^import$/i,
+      /^shelves$/i,
+      /^insights$/i,
+      /^diary$/i,
+    ]) {
+      expect(
+        screen.queryAllByRole("link", { name: label, hidden: true }),
+      ).toHaveLength(0);
     }
   });
 
@@ -51,19 +64,13 @@ describe("AppShell", () => {
         <Route path="/add" element={<div>Add page</div>} />
       </Routes>,
     );
-    // `/` is Home since Sprint 130; the library is `/library` and not current here.
-    const homeLinks = screen.getAllByRole("link", { name: /^home$/i });
-    expect(homeLinks.find((l) => l.hasAttribute("aria-current"))).toBeDefined();
-    for (const link of screen.getAllByRole("link", { name: /^library$/i })) {
-      expect(link.hasAttribute("aria-current")).toBe(false);
-    }
-    const addLinks = screen.getAllByRole("link", { name: /^add$/i });
-    for (const link of addLinks) {
-      expect(link.hasAttribute("aria-current")).toBe(false);
-    }
+    // The Library is at `/` again since Sprint 141 (DEC-193).
+    const links = screen.getAllByRole("link", { name: /^library$/i });
+    expect(links.find((l) => l.hasAttribute("aria-current"))).toBeDefined();
+    expect(screen.queryAllByRole("link", { name: /^home$/i })).toHaveLength(0);
   });
 
-  it("keeps the phone's bar to five, Home first and Import off it", () => {
+  it("puts the bar's button in the middle of the phone's places (Sprint 140)", () => {
     renderShell(
       <Routes>
         <Route path="/" element={<div>Home page</div>} />
@@ -73,10 +80,52 @@ describe("AppShell", () => {
       name: "Primary",
       hidden: true,
     });
-    const labels = Array.from(phone.querySelectorAll("a")).map((link) =>
-      link.getAttribute("aria-label"),
+    const labels = Array.from(phone.querySelectorAll("a, button")).map((el) =>
+      el.getAttribute("aria-label"),
     );
-    expect(labels).toEqual(["Home", "Library", "Add", "Shelves", "Insights"]);
+    // Two places and the bar between them (Sprint 146, the mockup's phone).
+    expect(labels).toEqual(["Library", "Search or add", "Journal"]);
+  });
+
+  it("shows the bar as a field on every screen but the Library, which has its own (Sprint 140)", () => {
+    const door = () =>
+      screen.queryAllByRole("button", {
+        name: /search your library, or add something/i,
+        hidden: true,
+      });
+    const { unmount } = renderShell(
+      <Routes>
+        <Route path="/" element={<div>Library page</div>} />
+      </Routes>,
+    );
+    expect(door()).toHaveLength(0);
+    unmount();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/shelves"]}>
+          <AppShell>
+            <div>Shelves page</div>
+          </AppShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    expect(door()).toHaveLength(1);
+  });
+
+  it("says how many wait to be sorted, as a link to the Inbox, and nothing when none do (Sprint 140)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify({ items: [], total: 4 })),
+    );
+    renderShell(
+      <Routes>
+        <Route path="/" element={<div>Home page</div>} />
+      </Routes>,
+    );
+    const links = await screen.findAllByRole("link", {
+      name: "4 to sort",
+      hidden: true,
+    });
+    expect(links[0]).toHaveAttribute("href", "/inbox");
   });
 
   it("shows a useful 404 for unknown routes", () => {
@@ -159,7 +208,7 @@ describe("AppShell", () => {
             onSignedOut={vi.fn()}
           >
             <Routes>
-              <Route path="/library" element={<h1>Own library</h1>} />
+              <Route path="/" element={<h1>Own library</h1>} />
               <Route
                 path="/books/7"
                 element={<div role="dialog">Edit entry</div>}
@@ -241,9 +290,7 @@ describe("AppShell", () => {
       fetchMock.mock.calls.filter(([url]) =>
         String(url).includes("status=unsorted"),
       ).length;
-    expect(
-      (await screen.findAllByLabelText("1 waiting in the Inbox")).length,
-    ).toBeGreaterThan(0);
+    expect((await screen.findAllByText("1 to sort")).length).toBeGreaterThan(0);
     expect(inboxCalls()).toBe(1);
 
     // A job still running changes nothing in the Inbox yet.
@@ -252,9 +299,7 @@ describe("AppShell", () => {
 
     total = 3;
     act(() => sources[0]?.emit("succeeded"));
-    expect(
-      (await screen.findAllByLabelText("3 waiting in the Inbox")).length,
-    ).toBeGreaterThan(0);
+    expect((await screen.findAllByText("3 to sort")).length).toBeGreaterThan(0);
     expect(inboxCalls()).toBe(2);
     vi.unstubAllGlobals();
   });

@@ -11,6 +11,7 @@ import {
   type ExportViewDefinition,
 } from "@/api/exports";
 import { ImportRequestError } from "@/api/imports";
+import { PageFrame } from "@/components/PageFrame";
 
 /** One (view, domain) pair the screen can offer a download for. */
 interface ExportRow {
@@ -297,9 +298,9 @@ function Shell({
       {children}
     </section>
   ) : (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       {heading}
       {children}
-    </main>
+    </PageFrame>
   );
 }

@@ -76,44 +76,34 @@ export const test = base.extend<{
               goals: [],
             },
             now: [],
-            next: [],
-            year: {
-              year: 2026,
-              months: Array.from({ length: 12 }, (_, index) => ({
-                month: index + 1,
-                count: 0,
-                counts: {},
-                covers: [],
-              })),
-              goals: [],
-            },
-            domains: [],
             lately: [],
-            tidy: {
-              duplicates: 0,
-              without_cover: 0,
-              unscored: 0,
-              unscored_by_type: {},
-            },
+            next: [],
             question: null,
-            shelves: [],
-            lent: { total: 0, loans: [] },
             suggested: [],
           },
         }),
       );
+      // Shelves that follow a rule (Sprint 145) and the pile as a shelf (Sprint 144):
+      // none, unless a spec says so.
+      await page.route("**/api/views", (route) => route.fulfill({ json: [] }));
+      await page.route("**/api/pile?**", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      // Every day (Sprint 147): nothing lit, unless a spec says so.
+      await page.route("**/api/lit-days?**", (route) =>
+        route.fulfill({ json: { days: [] } }),
+      );
+      // Your media (Sprint 143): no preference, so the registry as each spec declares it.
+      await page.route("**/api/media", (route) =>
+        route.fulfill({ json: { media: [], chosen: true } }),
+      );
       // Home's layout (Sprint 131): the default, unless a spec says otherwise.
       await page.route("**/api/home/layout", (route) => {
         const modules = [
-          ["now", "M"],
+          ["now", "L"],
+          ["lately", "L"],
           ["next", "L"],
-          ["year", "L"],
-          ["lately", "M"],
-          ["libraries", "L"],
-          ["tidy", "S"],
           ["question", "S"],
-          ["shelves", "S"],
-          ["lent", "S"],
           ["suggested", "M"],
         ].map(([module, size]) => ({ module, size, hidden: false }));
         return route.fulfill({ json: { modules, defaults: modules } });

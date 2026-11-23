@@ -16,7 +16,6 @@ import { Loading } from "@/components/ui/skeleton";
 import { DomainStrip } from "@/components/DomainStrip";
 import { domainsFrom } from "@/features/library/labels";
 import { defaultLibraryFilters } from "@/features/library/library";
-import { useItemTypes } from "@/features/library/useItemTypes";
 import { TypesetCover } from "@/features/shelves/OpeningCover";
 import {
   boardFrom,
@@ -29,6 +28,8 @@ import {
 } from "@/features/tiers/board";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 /** Every scored entry of one library, all pages of it. */
 async function everyScored(type: string, signal?: AbortSignal) {
@@ -55,8 +56,8 @@ async function everyScored(type: string, signal?: AbortSignal) {
  * is a proposal, listed and written only on *Apply*, as `time` in the score history.
  */
 export function TiersPage() {
-  const itemTypes = useItemTypes();
-  const domains = domainsFrom(itemTypes.data);
+  const shownTypes = useShownItemTypes();
+  const domains = domainsFrom(shownTypes.data);
   const navigate = useNavigate();
   const type = useParams().type ?? domains[0]?.id ?? "";
   const queryClient = useQueryClient();
@@ -118,9 +119,9 @@ export function TiersPage() {
 
   if (scored.isPending || !board)
     return (
-      <main className="mx-auto w-full max-w-6xl px-5 py-8">
+      <PageFrame width="wide">
         <Loading label="Laying out the tiers…" />
-      </main>
+      </PageFrame>
     );
 
   /** A drop: save what can be saved now, and keep the rest as proposals. */
@@ -185,7 +186,7 @@ export function TiersPage() {
   const pickedEntry = picked ? byId.get(picked.id) : undefined;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-5 pb-40 pt-8">
+    <PageFrame width="wide" className="pb-40 pt-8">
       <PageHeader
         back
         title="Tiers"
@@ -350,6 +351,6 @@ export function TiersPage() {
           </div>
         </section>
       )}
-    </main>
+    </PageFrame>
   );
 }

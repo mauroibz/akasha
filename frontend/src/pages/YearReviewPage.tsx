@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
 import { getYearReview } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { Loading } from "@/components/ui/skeleton";
 import { Prose, RatingSection, Section } from "@/features/insights/sections";
 import { countLabel } from "@/features/library/labels";
@@ -13,8 +13,8 @@ import {
   leadSentence,
   monthsSentence,
 } from "@/features/review/prose";
-import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { PageFrame } from "@/components/PageFrame";
 
 const MONTH = new Intl.DateTimeFormat(undefined, { month: "long" });
 const SHORT = new Intl.DateTimeFormat(undefined, { month: "narrow" });
@@ -41,17 +41,17 @@ export function YearReviewPage() {
 
   if (review.isPending)
     return (
-      <main className="mx-auto w-full max-w-5xl px-5 py-8">
+      <PageFrame width="reading">
         <Loading label="Reading the year back…" />
-      </main>
+      </PageFrame>
     );
   if (review.isError)
     return (
-      <main className="mx-auto w-full max-w-5xl px-5 py-8">
+      <PageFrame width="reading">
         <p role="alert" className="text-destructive">
           The year could not be read back.
         </p>
-      </main>
+      </PageFrame>
     );
   const data = review.data;
   const sections: Array<{ title: string; body: React.ReactNode }> = [];
@@ -75,19 +75,12 @@ export function YearReviewPage() {
                   to={`/books/${row.entry.id}`}
                   className="block rounded-md focus-ring"
                 >
-                  <CoverImage
-                    src={row.entry.item.cover_url ?? null}
-                    alt=""
-                    className="aspect-[2/3] w-full rounded-md object-cover"
+                  <Cover
+                    src={row.entry.item.cover_url}
+                    size="m"
+                    title={row.entry.item.title}
+                    score={row.score}
                   />
-                  <span className="mt-1.5 flex items-center justify-between gap-1 text-xs">
-                    <span className="truncate">{row.entry.item.title}</span>
-                    <span
-                      className={cn(scoreChipShape, scoreChipClass(row.score))}
-                    >
-                      {row.score}
-                    </span>
-                  </span>
                 </Link>
               </li>
             ))}
@@ -199,9 +192,9 @@ export function YearReviewPage() {
     });
 
   return (
-    <main className="mx-auto w-full max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <Link
-        to="/diary"
+        to="/journal#timeline"
         className="text-sm font-medium text-muted-foreground hover:text-foreground focus-ring"
       >
         ← Diary
@@ -248,6 +241,6 @@ export function YearReviewPage() {
           </div>
         </>
       )}
-    </main>
+    </PageFrame>
   );
 }

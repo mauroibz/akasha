@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
 import logging
+from collections.abc import Mapping
+from contextlib import suppress
 from datetime import date
 from functools import partial
 from pathlib import Path
@@ -1045,10 +1047,47 @@ def get_entry(entry_id: int, library: Library) -> EntryResponse:
 
 
 @router.patch("/entries/{entry_id}", response_model=EntryResponse, responses=ERRORS)
-def update_entry(entry_id: int, body: EntryPatch, library: Library) -> EntryResponse:
-    return EntryResponse.model_validate(
-        library.update_entry(entry_id, body.model_dump(mode="json", exclude_unset=True))
-    )
+def update_entry(
+    entry_id: int, body: EntryPatch, library: Library, request: Request, user: CurrentUser
+) -> EntryResponse:
+    changes = body.model_dump(mode="json", exclude_unset=True)
+    entry = library.update_entry(entry_id, changes)
+    _light_the_day(request, user, library, changes, entry)
+    return EntryResponse.model_validate(entry)
+
+
+def _light_the_day(
+    request: Request,
+    user: CurrentUser,
+    library: LibraryService,
+    changes: Mapping[str, Any],
+    entry: Mapping[str, Any],
+) -> None:
+    """Record the day in the Journal's *Every day* (Sprint 147, DEC-193).
+
+    Logging progress lights today; a change that sets a finished date lights that day.
+    Only for a medium the person keeps in front, which is what the widget counts. The
+    edit has already been stored: a day that cannot be recorded is not a reason to
+    fail it.
+    """
+    from book_tracker.api.lit_days import today_for
+    from book_tracker.application.lit_days import LitDayService
+    from book_tracker.application.media import MediaService
+
+    progressed = "progress" in changes or "progress_marks" in changes
+    finished = "date_finished" in changes and entry.get("date_finished")
+    if not progressed and not finished:
+        return
+    engine = request.app.state.engine
+    if entry["item"]["type"] not in MediaService(engine, user.effective_user_id).front():
+        return
+    lit = LitDayService(engine, user.effective_user_id, library)
+    if finished:
+        with suppress(ValueError):
+            lit.record(int(entry["id"]), date.fromisoformat(str(entry["date_finished"])), "finish")
+    logged = changes.get("progress") is not None or bool(changes.get("progress_marks"))
+    if progressed and logged:
+        lit.record(int(entry["id"]), today_for(request), "progress")
 
 
 class DuplicatePairResponse(BaseModel):

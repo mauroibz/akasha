@@ -1,18 +1,13 @@
 import {
   BookOpen,
-  Bookmark,
-  ChartBar,
-  House,
   LibraryBig,
   LogOut,
-  Plus,
   Settings,
-  Upload,
   UserRound,
   Search,
 } from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
-import { type ReactNode, useState } from "react";
+import { createContext, type ReactNode, useContext, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -56,40 +51,21 @@ interface NavItem {
 // what you do there. One label, easy to change if the owner prefers the longer
 // one; nothing downstream depends on the exact word.
 const navItems: readonly NavItem[] = [
-  // Home leads since Sprint 130 (DEC-183); the library moved to `/library`.
-  { to: "/", label: "Home", icon: <House aria-hidden="true" /> },
-  {
-    to: "/library",
-    label: "Library",
-    icon: <LibraryBig aria-hidden="true" />,
-  },
-  { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
-  // One name for one place (Sprint 096, proposal I3): it was "Data", the page
-  // "Import", its step "Triage" and that step's title "Inbox". Off the phone's
-  // bar since Home joined it (Sprint 130): the bar holds five, and the command
-  // bar and Home's tiles reach Import there.
-  {
-    to: "/import",
-    label: "Import",
-    icon: <Upload aria-hidden="true" />,
-    desktopOnly: true,
-  },
-  { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
-  { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
-  // Sprint 098: what you finished, month by month.
-  {
-    to: "/diary",
-    label: "Diary",
-    icon: <BookOpen aria-hidden="true" />,
-    desktopOnly: true,
-  },
+  // The Library is the home again (Sprint 141, DEC-193).
+  { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
+  // No Add and no Import since Sprint 140 (DEC-193): the bar finds and adds, and its
+  // footer holds the form and the importer. The navigation is places only.
+  // Shelves are a view of the Library since Sprint 144, not a place beside it.
+  // Diary, Insights and the games are one place since Sprint 146 (DEC-193).
+  { to: "/journal", label: "Journal", icon: <BookOpen aria-hidden="true" /> },
 ];
 
 /**
- * How many entries wait in the Inbox, on the Import entry (Sprint 096, §5.1): an
- * import's results are one click from anywhere, and an empty Inbox says nothing.
+ * How many entries wait to be sorted, as a link to the Inbox (Sprint 096, §5.1; a
+ * link of its own since Sprint 140, when Import left the navigation): an import's
+ * results are one click from anywhere, and an empty Inbox says nothing.
  */
-function InboxBadge() {
+function useToSort(): number {
   const queryClient = useQueryClient();
   const count = useQuery({
     queryKey: queryKeys.triage.count,
@@ -106,47 +82,73 @@ function InboxBadge() {
     if (!isActive(event))
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
   });
-  if (!count.data) return null;
+  return count.data ?? 0;
+}
+
+const ToSortContext = createContext(0);
+
+/** Counted once for the shell: the desktop bar and the phone's header both show it. */
+function ToSortProvider({ children }: { children: ReactNode }) {
   return (
-    <span
-      className="ml-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground"
-      aria-label={`${count.data} waiting in the Inbox`}
-    >
-      {count.data > 99 ? "99+" : count.data}
-    </span>
+    <ToSortContext.Provider value={useToSort()}>
+      {children}
+    </ToSortContext.Provider>
   );
 }
 
-/** The command bar's visible door (Sprint 094); ⌘K is the other. */
-function SearchButton({ compact = false }: { compact?: boolean }) {
+function ToSort() {
+  const count = useContext(ToSortContext);
+  if (!count) return null;
+  return (
+    <NavLink
+      to="/inbox"
+      className="flex h-11 shrink-0 items-center rounded-lg px-2.5 text-sm font-medium tabular-nums text-primary-text transition-colors hover:bg-accent focus-ring"
+    >
+      {count > 99 ? "99+" : count} to sort
+    </NavLink>
+  );
+}
+
+/**
+ * The bar as a field (Sprint 140, DEC-193): on every screen it reads as the place to
+ * type, and opening it puts the cursor in the bar. ⌘K is the other way in. The
+ * Library has its own field, which filters the grid as it is typed into, so this
+ * one is not drawn there.
+ */
+function SearchField() {
+  const { open } = useCommandBar();
+  return (
+    <button
+      type="button"
+      onClick={() => open()}
+      aria-keyshortcuts="Meta+K Control+K"
+      className="mx-auto flex h-11 min-w-0 max-w-xl flex-1 items-center gap-2.5 rounded-full border border-border bg-surface px-4 text-left text-sm text-muted-foreground transition-colors hover:border-ring/50 hover:text-foreground focus-ring [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:shrink-0"
+    >
+      <Search aria-hidden="true" />
+      <span className="truncate">Search your library, or add something</span>
+      <Kbd className="ml-auto hidden lg:inline-flex">⌘K</Kbd>
+    </button>
+  );
+}
+
+/** The bar's door where there is no room for a field: the phone. */
+function SearchButton({ className }: { className?: string }) {
   const { open } = useCommandBar();
   return (
     <button
       type="button"
       onClick={() => open()}
       aria-label="Search or add"
-      aria-keyshortcuts="Meta+K Control+K"
       className={cn(
-        "flex h-11 items-center justify-center gap-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-ring [&_svg]:h-5 [&_svg]:w-5",
-        // The words need room: at tablet width the nav is full, so the bar's door
-        // is the icon until 1024px (the library spec's no-overflow rule).
-        compact
-          ? "w-11"
-          : "w-11 lg:w-auto lg:border lg:border-border lg:px-3 lg:text-sm",
+        "flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-ring [&_svg]:h-5 [&_svg]:w-5",
+        className,
       )}
     >
       <Search aria-hidden="true" />
-      {compact ? null : (
-        <span className="hidden items-center gap-2 lg:flex">
-          <span>Search or add</span>
-          <Kbd>⌘K</Kbd>
-        </span>
-      )}
     </button>
   );
 }
 
-/** Settings sits apart from the five destinations: visited rarely, found easily. */
 function SettingsLink() {
   return (
     <NavLink
@@ -244,7 +246,7 @@ function ActingAsBanner({
       await stopActingAs();
       onActingAsChanged(null);
       // "Return to your library": the library, not Home (Sprint 130).
-      void navigate("/library", { replace: true });
+      void navigate("/", { replace: true });
     } catch {
       setLeaving(false);
       toast.error("You could not return to your library. Try again.");
@@ -285,6 +287,25 @@ export function AppShell({
   onSignedOut?: () => void;
 }) {
   const location = useLocation();
+  const onLibrary = location.pathname === "/";
+  const phoneItems = navItems.filter((item) => !item.desktopOnly);
+  const phoneLink = (item: NavItem) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.to === "/"}
+      aria-label={item.label}
+      className={({ isActive }) =>
+        cn(
+          "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
+          isActive ? "text-primary" : "text-muted-foreground",
+        )
+      }
+    >
+      <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+      <span>{item.label}</span>
+    </NavLink>
+  );
   return (
     // `domAnimation` deliberately omits Motion's projection features, so
     // `layout` and `layoutId` do nothing anywhere in the application. That is
@@ -293,127 +314,117 @@ export function AppShell({
     // later edit without also changing this line. `strict` turns an accidental
     // eager `motion.*` component into a loud error instead of a silent bundle.
     <JobEventsProvider>
-      <CommandBarProvider>
-        <LazyMotion features={domAnimation} strict>
-          <div className="min-h-screen bg-background text-foreground">
-            {actingAs && onActingAsChanged ? (
-              <>
-                <div className="h-14" aria-hidden="true" />
-                <ActingAsBanner
-                  user={actingAs}
-                  onActingAsChanged={onActingAsChanged}
-                />
-              </>
-            ) : null}
-            <nav
-              aria-label="Primary"
-              className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
-            >
-              {/* Not a second home link: "Home" below already goes to "/". Since
+      <ToSortProvider>
+        <CommandBarProvider>
+          <LazyMotion features={domAnimation} strict>
+            <div className="min-h-screen bg-background text-foreground">
+              {actingAs && onActingAsChanged ? (
+                <>
+                  <div className="h-14" aria-hidden="true" />
+                  <ActingAsBanner
+                    user={actingAs}
+                    onActingAsChanged={onActingAsChanged}
+                  />
+                </>
+              ) : null}
+              <nav
+                aria-label="Primary"
+                className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
+              >
+                {/* Not a second home link: "Home" below already goes to "/". Since
             Sprint 089 the mark is the background-work control: its dot breathes
             while a job runs, and it opens the recent jobs. Sized to 20px so it
             reads as a sibling of the Lucide icons beside it (docs/brand/BRAND.md). */}
-              <ActivityIndicator className="mx-1" />
-              <span
-                className="mr-2 h-5 w-px shrink-0 bg-border"
-                aria-hidden="true"
-              />
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/"}
-                  className={({ isActive }) =>
-                    cn(
-                      // Tighter below 1024px: with the Inbox badge the nav must still
-                      // fit a tablet (the library spec's no-overflow rule).
-                      "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-ring lg:px-4",
-                      isActive
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                    )
-                  }
-                >
-                  <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                  {/* Icons alone below 1024px, where six labels do not fit a tablet;
-                      the label stays the link's name for a screen reader. */}
-                  <span className="sr-only lg:not-sr-only">{item.label}</span>
-                  {item.to === "/import" ? <InboxBadge /> : null}
-                </NavLink>
-              ))}
-              <div className="ml-auto flex items-center gap-1">
-                <SearchButton />
-                <SettingsLink />
-                {user && onSignedOut ? (
-                  <AccountControl user={user} onSignedOut={onSignedOut} />
-                ) : null}
-              </div>
-            </nav>
-            {/* The phone's top bar (Sprint 093): the mark, which is the
-            background-work control as on desktop, and Settings; the account
-            control when signed in. Short, because on a phone every pixel above
-            the first cover counts (the library spec holds it under 300px). */}
-            <header className="flex h-12 items-center justify-between gap-1 border-b border-border/80 px-2 sm:hidden">
-              <ActivityIndicator />
-              <div className="flex items-center gap-1">
-                <SearchButton compact />
-                <SettingsLink />
-                {user && onSignedOut ? (
-                  <AccountControl user={user} onSignedOut={onSignedOut} />
-                ) : null}
-              </div>
-            </header>
-            <nav
-              aria-label="Primary"
-              className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
-            >
-              {navItems
-                .filter((item) => !item.desktopOnly)
-                .map((item) => (
+                <ActivityIndicator className="mx-1" />
+                <span
+                  className="mr-2 h-5 w-px shrink-0 bg-border"
+                  aria-hidden="true"
+                />
+                {navItems.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
                     end={item.to === "/"}
-                    aria-label={item.label}
                     className={({ isActive }) =>
                       cn(
-                        "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
-                        isActive ? "text-primary" : "text-muted-foreground",
+                        // Tighter below 1024px: with the Inbox badge the nav must still
+                        // fit a tablet (the library spec's no-overflow rule).
+                        "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-ring lg:px-4",
+                        isActive
+                          ? "bg-primary/15 text-primary"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground",
                       )
                     }
                   >
                     <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                    <span>{item.label}</span>
+                    {/* Icons alone below 1024px, where six labels do not fit a tablet;
+                      the label stays the link's name for a screen reader. */}
+                    <span className="sr-only lg:not-sr-only">{item.label}</span>
                   </NavLink>
                 ))}
-            </nav>
-            <div
-              key={location.pathname}
-              data-route-key={location.pathname}
-              className="animate-route-enter"
-            >
-              {children}
-            </div>
-            {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
+                {onLibrary ? <span className="flex-1" /> : <SearchField />}
+                <div className="flex items-center gap-1">
+                  <ToSort />
+                  <SettingsLink />
+                  {user && onSignedOut ? (
+                    <AccountControl user={user} onSignedOut={onSignedOut} />
+                  ) : null}
+                </div>
+              </nav>
+              {/* The phone's top bar (Sprint 093): the mark, which is the
+            background-work control as on desktop, and Settings; the account
+            control when signed in. Short, because on a phone every pixel above
+            the first cover counts (the library spec holds it under 300px). */}
+              <header className="flex h-12 items-center justify-between gap-1 border-b border-border/80 px-2 sm:hidden">
+                <ActivityIndicator />
+                <div className="flex items-center gap-1">
+                  <ToSort />
+                  <SettingsLink />
+                  {user && onSignedOut ? (
+                    <AccountControl user={user} onSignedOut={onSignedOut} />
+                  ) : null}
+                </div>
+              </header>
+              <nav
+                aria-label="Primary"
+                className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
+              >
+                {phoneItems.slice(0, 1).map(phoneLink)}
+                {/* The bar between the places (Sprint 140): on a phone it is the
+                  thing done most, so it sits under the thumb. */}
+                <span className="flex h-14 flex-1 items-center justify-center">
+                  <SearchButton className="h-11 w-11 rounded-full bg-primary text-primary-foreground hover:text-primary-foreground" />
+                </span>
+                {phoneItems.slice(1).map(phoneLink)}
+              </nav>
+              <div
+                key={location.pathname}
+                data-route-key={location.pathname}
+                className="animate-route-enter"
+              >
+                {children}
+              </div>
+              {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
             content so it never competes with a control. The mobile bottom padding
             clears the fixed bottom navigation. */}
-            <footer className="pb-20 sm:pb-0">
-              <DataCredit />
-            </footer>
-            <div className="h-16 sm:hidden" aria-hidden="true" />
-            {/* The application's one visible feedback surface. Mounted at the shell so
+              <footer className="pb-20 sm:pb-0">
+                <DataCredit />
+              </footer>
+              <div className="h-16 sm:hidden" aria-hidden="true" />
+              {/* The application's one visible feedback surface. Mounted at the shell so
           a confirmation survives the navigation that follows the action.
           Bottom-right, not top-centre: every screen puts its primary controls in
           the header, and a toast there covers the control the reader just used.
           The mobile offset clears the fixed bottom navigation. */}
-            <Toaster
-              position="bottom-right"
-              closeButton
-              mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
-            />
-          </div>
-        </LazyMotion>
-      </CommandBarProvider>
+              <Toaster
+                position="bottom-right"
+                closeButton
+                mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
+              />
+            </div>
+          </LazyMotion>
+        </CommandBarProvider>
+      </ToSortProvider>
     </JobEventsProvider>
   );
 }

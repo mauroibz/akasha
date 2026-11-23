@@ -60,5 +60,5 @@ test("the command bar finds, adds and navigates from the keyboard", async ({
 
   await input.fill("insights");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/insights$/);
+  await expect(page).toHaveURL(/\/journal#patterns$/);
 });

@@ -40,7 +40,7 @@ test("live provider editions add with metadata and cached covers", async ({
     // goes straight to its detail page (§4.3). This spec used to assert only the
     // second, which no build does for a new add — it never ran, being gated behind
     // an env var.
-    await expect(page).toHaveURL(/\/(books\/\d+|library(\?.*)?$)/, {
+    await expect(page).toHaveURL(/\/(books\/\d+|(\?.*)?$)/, {
       timeout: 20_000,
     });
     if (!/\/books\/\d+/.test(page.url())) {

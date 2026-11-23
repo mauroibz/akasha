@@ -736,6 +736,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/home/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Preview
+     * @description One module's payload as if it were shown, whatever the layout says (Sprint 150).
+     *
+     *     What *Personalize* draws before something is added. Only that module is read, and
+     *     nothing is stored: looking is not placing. A key that is not something this person
+     *     can place is refused.
+     */
+    get: operations["preview_api_home_preview_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/import/batches/{batch_id}": {
     parameters: {
       query?: never;
@@ -1358,6 +1382,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/lit-days": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Lit Days
+     * @description The lit days of a week or a month; at most 62 days at a time.
+     */
+    get: operations["list_lit_days_api_lit_days_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lit-days/{day}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Light Day
+     * @description Light a day by hand, saying what it was for or nothing; a day to come is refused.
+     */
+    put: operations["light_day_api_lit_days__day__put"];
+    post?: never;
+    /**
+     * Unlight Day
+     * @description Take everything off a day.
+     */
+    delete: operations["unlight_day_api_lit_days__day__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/loans": {
     parameters: {
       query?: never;
@@ -1409,6 +1477,30 @@ export interface paths {
      */
     get: operations["list_locations_api_locations_get"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Media
+     * @description This person's media, in their order (Sprint 143).
+     */
+    get: operations["get_media_api_media_get"];
+    /**
+     * Put Media
+     * @description Replace the list; a medium it does not name is appended, kept if held, else off.
+     */
+    put: operations["put_media_api_media_put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -2409,25 +2501,6 @@ export interface components {
       /** Title */
       title: string;
     };
-    /** HomeDomainTile */
-    HomeDomainTile: {
-      /** Count */
-      count: number;
-      /** Covers */
-      covers: components["schemas"]["HomeCover"][];
-      /** Item Type */
-      item_type: string;
-      /** Mean Score */
-      mean_score: number | null;
-      /** Scores */
-      scores: number[];
-      /** Status Counts */
-      status_counts: {
-        [key: string]: number;
-      };
-      /** Without Cover */
-      without_cover: number;
-    };
     /** HomeGoalCount */
     HomeGoalCount: {
       /** Count */
@@ -2481,13 +2554,6 @@ export interface components {
       /** Modules */
       modules: components["schemas"]["HomeModuleLayout"][];
     };
-    /** HomeLent */
-    HomeLent: {
-      /** Loans */
-      loans: components["schemas"]["HomeLoan"][];
-      /** Total */
-      total: number;
-    };
     /**
      * HomeLibraryYear
      * @description One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.
@@ -2502,16 +2568,6 @@ export interface components {
       total: number;
       /** Year */
       year: number;
-    };
-    /** HomeLoan */
-    HomeLoan: {
-      entry: components["schemas"]["EntryResponse"];
-      /** Id */
-      id: number;
-      /** Lent On */
-      lent_on: string;
-      /** Person */
-      person: string;
     };
     /** HomeModuleLayout */
     HomeModuleLayout: {
@@ -2530,19 +2586,6 @@ export interface components {
        */
       size: "S" | "M" | "L";
     };
-    /** HomeMonth */
-    HomeMonth: {
-      /** Count */
-      count: number;
-      /** Counts */
-      counts: {
-        [key: string]: number;
-      };
-      /** Covers */
-      covers: components["schemas"]["HomeCover"][];
-      /** Month */
-      month: number;
-    };
     /**
      * HomeQuestion
      * @description One question from Play: an old score to look at again, else a gap to fill.
@@ -2559,15 +2602,13 @@ export interface components {
     };
     /**
      * HomeResponse
-     * @description Every module's payload. A module the person hid is empty or `null`, unread.
+     * @description The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase
+     *     the person hid is empty or `null`, unread.
      */
     HomeResponse: {
-      /** Domains */
-      domains: components["schemas"]["HomeDomainTile"][];
       greeting: components["schemas"]["HomeGreeting"];
       /** Lately */
-      lately: components["schemas"]["HomeLatelyRow"][] | null;
-      lent: components["schemas"]["HomeLent"] | null;
+      lately: components["schemas"]["HomeLatelyRow"][];
       /** Library Years */
       library_years: components["schemas"]["HomeLibraryYear"][];
       /** Next */
@@ -2577,23 +2618,8 @@ export interface components {
       question: components["schemas"]["HomeQuestion"] | null;
       /** Shelf Modules */
       shelf_modules: components["schemas"]["HomeShelfModule"][];
-      /** Shelves */
-      shelves: components["schemas"]["HomeShelf"][] | null;
       /** Suggested */
       suggested: components["schemas"]["SuggestionResponse"][] | null;
-      tidy: components["schemas"]["HomeTidy"] | null;
-      year: components["schemas"]["HomeYear"] | null;
-    };
-    /** HomeShelf */
-    HomeShelf: {
-      /** Entry Count */
-      entry_count: number;
-      /** Id */
-      id: number;
-      /** Name */
-      name: string;
-      /** Slug */
-      slug: string;
     };
     /**
      * HomeShelfModule
@@ -2610,28 +2636,6 @@ export interface components {
       name: string;
       /** Slug */
       slug: string;
-    };
-    /** HomeTidy */
-    HomeTidy: {
-      /** Duplicates */
-      duplicates: number;
-      /** Unscored */
-      unscored: number;
-      /** Unscored By Type */
-      unscored_by_type: {
-        [key: string]: number;
-      };
-      /** Without Cover */
-      without_cover: number;
-    };
-    /** HomeYear */
-    HomeYear: {
-      /** Goals */
-      goals: components["schemas"]["HomeYearGoal"][];
-      /** Months */
-      months: components["schemas"]["HomeMonth"][];
-      /** Year */
-      year: number;
     };
     /** HomeYearGoal */
     HomeYearGoal: {
@@ -3018,6 +3022,23 @@ export interface components {
       /** State */
       state: string;
     };
+    /** LightBody */
+    LightBody: {
+      /** Entry Ids */
+      entry_ids?: number[];
+    };
+    /** LitDay */
+    LitDay: {
+      /** Day */
+      day: string;
+      /** Entries */
+      entries: components["schemas"]["EntryResponse"][];
+    };
+    /** LitDaysResponse */
+    LitDaysResponse: {
+      /** Days */
+      days: components["schemas"]["LitDay"][];
+    };
     /** LoanCreateBody */
     LoanCreateBody: {
       /**
@@ -3122,6 +3143,42 @@ export interface components {
       /** Setup Required */
       setup_required: boolean;
       user: components["schemas"]["UserResponse"] | null;
+    };
+    /** MediaBody */
+    MediaBody: {
+      /** Media */
+      media: components["schemas"]["MediumChoice"][];
+    };
+    /** MediaResponse */
+    MediaResponse: {
+      /** Chosen */
+      chosen: boolean;
+      /** Media */
+      media: components["schemas"]["MediumResponse"][];
+    };
+    /** MediumChoice */
+    MediumChoice: {
+      /** Item Type */
+      item_type: string;
+      /**
+       * Presence
+       * @enum {string}
+       */
+      presence: "front" | "kept" | "off";
+    };
+    /** MediumResponse */
+    MediumResponse: {
+      /** Held */
+      held: boolean;
+      /** Item Type */
+      item_type: string;
+      /** Label */
+      label: string;
+      /**
+       * Presence
+       * @enum {string}
+       */
+      presence: "front" | "kept" | "off";
     };
     /** MergeBody */
     MergeBody: {
@@ -6399,6 +6456,65 @@ export interface operations {
       };
     };
   };
+  preview_api_home_preview_get: {
+    parameters: {
+      query: {
+        module: string;
+        tz?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   undo_batch_api_import_batches__batch_id__delete: {
     parameters: {
       query?: never;
@@ -8203,6 +8319,185 @@ export interface operations {
       };
     };
   };
+  list_lit_days_api_lit_days_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LitDaysResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  light_day_api_lit_days__day__put: {
+    parameters: {
+      query?: {
+        tz?: string | null;
+      };
+      header?: never;
+      path: {
+        day: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LightBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LitDay"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  unlight_day_api_lit_days__day__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        day: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   list_loans_api_loans_get: {
     parameters: {
       query?: {
@@ -8398,6 +8693,122 @@ export interface operations {
         };
       };
       /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  get_media_api_media_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MediaResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  put_media_api_media_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MediaBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MediaResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
       409: {
         headers: {
           [name: string]: unknown;

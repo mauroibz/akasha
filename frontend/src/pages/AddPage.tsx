@@ -19,6 +19,7 @@ import { AddForm } from "@/features/add/AddForm";
 import { ExportPicker } from "@/features/import/ExportPicker";
 import { handFiles } from "@/features/import/handoff";
 import { domainsFrom, labelFor } from "@/features/library/labels";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Adding something without a provider search: files dropped in, or typed by hand.
@@ -77,11 +78,11 @@ export function AddPage() {
   const label = labelFor(itemType, itemTypes);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <PageHeader
         back
         title="Add"
-        lede="Drop files in, or enter something no provider lists. To add from a provider, press ⌘K or use Search or add: it finds titles and reads links."
+        lede="Drop files in, or enter something no provider lists. To add from a provider, use the search bar at the top or press ⌘K: it finds titles and reads links."
       />
       {droppable.map((importer) => (
         <section
@@ -155,12 +156,12 @@ export function AddPage() {
               // state rather than sessionStorage so a reload does not resurrect a
               // stale highlight, and so the handoff is visible in the navigation
               // itself.
-              navigate("/library", { state: { newEntryId: entryId } });
+              navigate("/", { state: { newEntryId: entryId } });
             }}
             onOpenExisting={(entryId) => navigate(`/books/${entryId}`)}
           />
         </div>
       )}
-    </main>
+    </PageFrame>
   );
 }

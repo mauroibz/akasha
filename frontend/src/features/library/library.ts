@@ -3,6 +3,7 @@ import type {
   EntryStatus,
   LibraryEntry,
   LibraryFilters,
+  SortKey,
 } from "@/api/library";
 
 export type LibraryView = "grid" | "table";
@@ -111,34 +112,6 @@ export function readPinnedShelf(): PinnedShelf | null {
 export function writePinnedShelf(shelf: PinnedShelf | null): void {
   if (shelf) localStorage.setItem(pinnedShelfKey, JSON.stringify(shelf));
   else localStorage.removeItem(pinnedShelfKey);
-}
-
-/**
- * The query parameters the library reads (`LibraryPage`'s `filtersFromParams`).
- * A `/` address carrying any of them was a library link before Sprint 130 moved
- * the library to `/library`, so it is sent there with them (DEC-183).
- */
-export const libraryQueryKeys = [
-  "type",
-  "status",
-  "shelf",
-  "format",
-  "q",
-  "sort",
-  "order",
-  "key",
-  "value",
-  "label",
-  "location",
-  "lent",
-  "unscored",
-] as const;
-
-/** `/library` with whatever library parameters `search` carries, or `null`. */
-export function libraryRedirect(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const carries = libraryQueryKeys.some((key) => params.has(key));
-  return carries ? `/library?${params.toString()}` : null;
 }
 
 export const defaultLibraryFilters: LibraryFilters = {
@@ -342,4 +315,36 @@ export function isEditableTarget(target: EventTarget | null): boolean {
     ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
     target.closest(shortcutBlockingSelector) !== null
   );
+}
+
+/** The Library's filters as its address carries them. */
+export function filtersFromParams(params: URLSearchParams): LibraryFilters {
+  const statuses = params.getAll("status") as EntryStatus[];
+  return {
+    statuses,
+    shelves: params.getAll("shelf"),
+    formats: params.getAll("format") as EntryFormat[],
+    types: params.getAll("type"),
+    query: params.get("q") ?? "",
+    sort: (params.get("sort") as SortKey) ?? "date_added",
+    order: (params.get("order") as "asc" | "desc") ?? "desc",
+    // An insights ranking row links here as `/?type=...&key=...&value=...` — without
+    // reading them back out, the library page would silently ignore the link.
+    key: params.get("key") ?? "",
+    value: params.get("value") ?? "",
+    valueLabel: params.get("label") ?? "",
+    location: params.get("location") ?? "",
+    lent: params.get("lent") === "true",
+    unscored: params.get("unscored") === "true",
+  };
+}
+
+/**
+ * What a shelf that follows a rule keeps (Sprint 145): the Library's address without
+ * what is not a filter, so reopening it lands on the list and not on another view.
+ */
+export function shelfRule(params: URLSearchParams): string {
+  const rule = new URLSearchParams(params);
+  rule.delete("view");
+  return rule.toString();
 }

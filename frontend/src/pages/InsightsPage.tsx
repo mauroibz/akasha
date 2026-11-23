@@ -41,7 +41,9 @@ import { useInsights } from "@/features/library/useInsights";
 import { PlaySection } from "@/features/play/PlaySection";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { useScoreDistribution } from "@/features/library/useScoreDistribution";
-import { cn } from "@/lib/utils";
+import { DomainStrip } from "@/components/DomainStrip";
+import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 /**
  * Ask the library a question it already has the answer to, from the fields items
@@ -54,14 +56,21 @@ import { cn } from "@/lib/utils";
  * than its data. Which key earns which form is still a judgement about this
  * library (`orderKeys`), never a domain name.
  */
-export function InsightsPage() {
+export function InsightsPage({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
+    // Inside the Journal (Sprint 146) the page's own heading takes the focus.
+    if (!embedded) headingRef.current?.focus();
+  }, [embedded]);
 
   const itemTypes = useItemTypes();
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  const shownTypes = useShownItemTypes();
+  const domains = useMemo(
+    () => domainsFrom(shownTypes.data),
+    [shownTypes.data],
+  );
   const [type, setType] = useState("");
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
   // Off by default: the library page keeps the remembered filters current in
@@ -111,7 +120,7 @@ export function InsightsPage() {
 
   const noun = (count: number) => countLabel(count, type, itemTypes.data);
   const linkTo = (key: string, row: Pick<InsightRow, "key" | "label">) =>
-    `/library?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+    `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
       key,
     )}&value=${encodeURIComponent(row.key)}&label=${encodeURIComponent(row.label)}`;
 
@@ -240,43 +249,32 @@ export function InsightsPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 pb-24 pt-8 md:pt-12">
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="font-display text-5xl font-medium tracking-tight focus:outline-none md:text-6xl"
-      >
-        Insights
-      </h1>
-
-      {/* The decks as games, first thing on the page (Sprint 125, DEC-179). */}
-      <PlaySection type={type} types={itemTypes.data} />
+    <Shell embedded={embedded}>
+      {!embedded && (
+        <>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="font-display text-5xl font-medium tracking-tight focus:outline-none md:text-6xl"
+          >
+            Insights
+          </h1>
+          {/* The decks as games, first thing on the page (Sprint 125, DEC-179). */}
+          <PlaySection type={type} types={itemTypes.data} />
+        </>
+      )}
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 border-b border-border">
         {domains.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Choose a domain"
-            className="-mb-px flex min-w-0 max-w-full gap-6 overflow-x-auto"
-          >
-            {domains.map((domain) => (
-              <button
-                key={domain.id}
-                type="button"
-                role="radio"
-                aria-checked={domain.id === type}
-                onClick={() => setType(domain.id)}
-                className={cn(
-                  "min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors focus-ring",
-                  domain.id === type
-                    ? "border-primary text-foreground"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {domain.plural_label ?? domain.label}
-              </button>
-            ))}
-          </div>
+          <DomainStrip
+            className="-mb-px"
+            domains={domains.map((domain) => ({
+              id: domain.id,
+              label: domain.plural_label ?? domain.label,
+            }))}
+            value={type}
+            onChange={setType}
+          />
         )}
         <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
           <input
@@ -326,7 +324,24 @@ export function InsightsPage() {
           {sections.map((render, index) => render(index + 1))}
         </>
       )}
-    </main>
+    </Shell>
+  );
+}
+
+/** The page's own frame, or none inside the Journal, which has one (Sprint 146). */
+function Shell({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  return embedded ? (
+    <div>{children}</div>
+  ) : (
+    <PageFrame width="reading" className="pb-24 pt-8 md:pt-12">
+      {children}
+    </PageFrame>
   );
 }
 

@@ -77,7 +77,7 @@ export function PlannedDeckPage() {
       void queryClient.invalidateQueries({ queryKey: ["chores"] });
     },
   });
-  const close = () => navigate("/insights");
+  const close = () => navigate("/journal");
 
   return (
     <>

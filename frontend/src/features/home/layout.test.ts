@@ -6,49 +6,55 @@ const spans = (modules: Parameters<typeof packRows>[0]) =>
   packRows(modules).map(({ key, span }) => `${key}:${span}`);
 
 describe("packRows", () => {
-  it("puts the year and Lately side by side, 7 and 5", () => {
+  it("puts two showcases side by side, 7 and 5, and gives a band the whole row (Sprint 150)", () => {
     expect(
       spans([
-        { key: "now", size: "M" },
-        { key: "next", size: "L" },
-        { key: "year", size: "L" },
-        { key: "lately", size: "M" },
-        { key: "libraries", size: "L" },
+        { key: "now", size: "L" },
+        { key: "year:book", size: "L" },
+        { key: "suggested", size: "M" },
+        { key: "lately", size: "L" },
+        { key: "question", size: "S" },
       ]),
-    ).toEqual(["now:5", "next:7", "year:7", "lately:5", "libraries:12"]);
+    ).toEqual([
+      "now:12",
+      "year:book:7",
+      "suggested:5",
+      "lately:12",
+      "question:12",
+    ]);
   });
 
   it("gives a module the whole row when nothing fits beside it", () => {
     expect(
       spans([
-        { key: "year", size: "L" },
-        { key: "libraries", size: "S" },
+        { key: "next", size: "L" },
+        { key: "year:book", size: "L" },
       ]),
-    ).toEqual(["year:12", "libraries:12"]);
+    ).toEqual(["next:12", "year:book:12"]);
   });
 
   it("shares a row's spare columns so it ends without a gap", () => {
     expect(
       spans([
-        { key: "tidy", size: "S" },
+        { key: "shelf:1", size: "S" },
         { key: "question", size: "S" },
-        { key: "shelves", size: "S" },
+        { key: "shelf:2", size: "S" },
       ]),
-    ).toEqual(["tidy:4", "question:4", "shelves:4"]);
+    ).toEqual(["shelf:1:4", "question:4", "shelf:2:4"]);
     expect(
       spans([
-        { key: "now", size: "M" },
-        { key: "tidy", size: "S" },
+        { key: "suggested", size: "M" },
+        { key: "question", size: "S" },
       ]),
-    ).toEqual(["now:7", "tidy:5"]);
+    ).toEqual(["suggested:7", "question:5"]);
   });
 
   it("starts a new row for a module that does not fit", () => {
     expect(
       spans([
-        { key: "now", size: "L" },
+        { key: "year:book", size: "L" },
         { key: "next", size: "L" },
       ]),
-    ).toEqual(["now:12", "next:12"]);
+    ).toEqual(["year:book:12", "next:12"]);
   });
 });

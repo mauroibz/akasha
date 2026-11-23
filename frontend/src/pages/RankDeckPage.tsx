@@ -16,6 +16,7 @@ import {
   type Ranking,
 } from "@/features/rank/insertion";
 import { TypesetCover } from "@/features/shelves/OpeningCover";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * A rank inside a score, chosen two at a time (Sprint 116, DEC-176). The entries that
@@ -110,7 +111,7 @@ export function RankDeckPage() {
   const toPlace = state ? state.waiting.length : 0;
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-4xl px-5 pb-24 pt-6 sm:py-8">
+    <PageFrame width="reading" className="pb-24 pt-6 sm:py-8">
       {/* A compact header: on a phone the two covers and the answers have to sit
           above the bottom navigation without scrolling. */}
       <header className="border-b border-border pb-4">
@@ -231,11 +232,11 @@ export function RankDeckPage() {
               <Link to="/rank">Order another score</Link>
             </Button>
             <Button asChild variant="secondary" className="rounded-full px-5">
-              <Link to="/insights">Back to Insights</Link>
+              <Link to="/journal">Back to the Journal</Link>
             </Button>
           </div>
         </section>
       )}
-    </main>
+    </PageFrame>
   );
 }

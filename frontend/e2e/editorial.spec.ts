@@ -97,12 +97,14 @@ test("URL-backed filters are reload-stable", async ({ page }) => {
   await expect(page).toHaveURL(/order=asc/);
 });
 
-test("Inbox button opens the triage tab on Import", async ({ page }) => {
+test("what waits to be sorted is a link in the shell that opens the Inbox", async ({
+  page,
+}) => {
   await stubEntry(page);
   await page.goto("/library");
-  await expect(page.getByText(/Inbox 5/).first()).toBeVisible();
+  // The count lives in the shell since Sprint 140, on every screen.
   await page
-    .getByText(/Inbox 5/)
+    .getByRole("link", { name: /^\d+ to sort$/ })
     .first()
     .click();
   await expect(page).toHaveURL(/\/inbox/);
@@ -153,7 +155,7 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .getByRole("alertdialog", { name: /remove this/i })
     .getByRole("button", { name: /delete entry/i })
     .click();
-  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(deleted).toBe(true);
 });
 
@@ -273,7 +275,7 @@ test("shelf management creates, renames, and deletes shelves", async ({
   await page.getByRole("button", { name: /delete shelf/i }).click();
 
   // Back on the board, the shelf is gone.
-  await expect(page).toHaveURL("/shelves");
+  await expect(page).toHaveURL(/view=shelves/);
   await expect(page.getByText("Space Opera")).toHaveCount(0);
 });
 
@@ -284,7 +286,7 @@ test("unknown route shows a useful 404", async ({ page }) => {
     page.getByRole("button", { name: /go to library/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /go to library/i }).click();
-  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });
 
 test("navigation shell exposes every destination at desktop width", async ({
@@ -292,30 +294,31 @@ test("navigation shell exposes every destination at desktop width", async ({
 }) => {
   await stubEntry(page);
   await page.goto("/library");
-  // Triage is absent on purpose: it folded into Import as a tab (DEC-079).
-  // The Import/Triage/Export destination reads "Data" as of Sprint 069.
-  for (const label of ["Library", "Add", "Data", "Shelves"]) {
+  // Places only since Sprint 140 (DEC-193): Add and Import are in the bar's footer.
+  for (const label of ["Library", "Journal"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();
   }
   await expect(page.getByRole("link", { name: /^triage$/i })).toHaveCount(0);
   // Navigate to each
-  await page
-    .getByRole("link", { name: /shelves/i })
-    .first()
-    .click();
-  await expect(page).toHaveURL("/shelves");
-  await page
-    .getByRole("link", { name: /^import/i })
-    .first()
-    .click();
+  // Shelves are a view of the Library since Sprint 144, reached from its view switch.
+  await expect(page.getByRole("link", { name: /^shelves$/i })).toHaveCount(0);
+  await page.getByRole("button", { name: "Shelves view" }).click();
+  await expect(page).toHaveURL(/view=shelves/);
+  await expect(page.getByRole("region", { name: "Shelves" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^(add|import)$/i })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("link", { name: "Bring a whole list" }).click();
   await expect(page).toHaveURL("/import");
-  await page.getByRole("link", { name: /add/i }).first().click();
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("link", { name: "Enter it by hand" }).click();
   await expect(page).toHaveURL("/add");
   await page
     .getByRole("link", { name: /library/i })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });

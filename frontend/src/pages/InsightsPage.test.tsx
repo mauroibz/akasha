@@ -308,7 +308,7 @@ function renderPage() {
       <MemoryRouter initialEntries={["/insights"]}>
         <Routes>
           <Route path="/insights" element={<InsightsPage />} />
-          <Route path="/library" element={<LibraryStub />} />
+          <Route path="/" element={<LibraryStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

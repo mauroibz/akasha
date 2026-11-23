@@ -66,6 +66,7 @@ import {
   saveStatusDrafts,
   triageFiltersFromParams,
 } from "@/features/triage/deck";
+import { PageFrame } from "@/components/PageFrame";
 
 export function TriagePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -585,7 +586,7 @@ export function TriagePage() {
     allMatching ? !excludedIds.has(id) : selectedIds.has(id);
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
+    <PageFrame width="wide">
       <PageHeader
         back
         eyebrow="Import"
@@ -1031,6 +1032,6 @@ export function TriagePage() {
           </div>
         </>
       )}
-    </main>
+    </PageFrame>
   );
 }

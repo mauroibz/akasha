@@ -21,6 +21,8 @@ from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
+from book_tracker.api.lit_days import router as lit_days_router
+from book_tracker.api.media import router as media_router
 from book_tracker.api.pile import router as pile_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.api.suggestions import router as suggestions_router
@@ -94,7 +96,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     docs_on = configured.auth == "off"
     app = FastAPI(
         title="Akasha",
-        version="3.1.0",
+        version="4.0.0",
         lifespan=make_lifespan(configured),
         responses={422: {"model": ErrorResponse}},
         docs_url="/docs" if docs_on else None,
@@ -136,6 +138,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(library_router, responses=auth_responses)
     app.include_router(goals_router, responses=auth_responses)
     app.include_router(home_router, responses=auth_responses)
+    app.include_router(media_router, responses=auth_responses)
+    app.include_router(lit_days_router, responses=auth_responses)
     app.include_router(pile_router, responses=auth_responses)
     app.include_router(suggestions_router, responses=auth_responses)
     app.include_router(providers_router, responses=auth_responses)

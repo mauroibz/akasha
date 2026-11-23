@@ -91,7 +91,7 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   await page.getByLabel(/^title$/i).fill("Rayuela");
   await page.getByRole("button", { name: /add to library/i }).press("Enter");
   // New entries return to the library with a success toast
-  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(posted).toBe(1);
   // Navigate to detail to verify the entry was created
   await page.goto("/books/7");

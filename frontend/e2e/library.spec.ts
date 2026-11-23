@@ -1008,6 +1008,47 @@ test("the shell's Library link lands on a library, from the library", async ({
   await expect(page).toHaveURL(/type=book/);
 });
 
+test("the strip lists the person's media in their order, without what is off, and opens on the first (Sprint 143)", async ({
+  page,
+}) => {
+  await stubItemTypes(page, [
+    bookItemType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
+  await page.route("**/api/media", (route) =>
+    route.fulfill({
+      json: {
+        chosen: true,
+        media: [
+          { item_type: "anime", label: "Anime", presence: "front", held: true },
+          { item_type: "book", label: "Books", presence: "kept", held: true },
+          { item_type: "album", label: "Albums", presence: "off", held: true },
+          { item_type: "movie", label: "Movies", presence: "off", held: false },
+          {
+            item_type: "series",
+            label: "Series",
+            presence: "kept",
+            held: false,
+          },
+        ],
+      },
+    }),
+  );
+  await seedLibrary(page, 20);
+  await page.goto("/");
+  const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
+  await expect(strip.getByRole("radio")).toHaveText([
+    "Anime",
+    "Book",
+    "Series",
+  ]);
+  await expect(strip.getByRole("radio", { name: "Anime" })).toBeChecked();
+  await expect(page).toHaveURL(/type=anime/);
+});
+
 test("the library fits a phone with five domains, and the domain strip scrolls within itself (DEC-134)", async ({
   page,
 }) => {
@@ -1040,12 +1081,14 @@ test("the library fits a phone with five domains, and the domain strip scrolls w
   );
   expect(overflow, "horizontal page overflow").toBeLessThanOrEqual(0);
 
+  // Since Sprint 139 the strip is underlined tabs, and five of them fit 390px, so
+  // nothing has to scroll here. What still holds is how it would cope with more: it
+  // scrolls inside its own box and never grows past the screen.
   const stripBox = await strip.evaluate((node) => ({
-    scrollWidth: node.scrollWidth,
-    clientWidth: node.clientWidth,
+    overflowX: getComputedStyle(node).overflowX,
     boundingWidth: node.getBoundingClientRect().width,
   }));
-  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.overflowX).toBe("auto");
   expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
 
   // Every domain button keeps its 44px target even while the strip scrolls.

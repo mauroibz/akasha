@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/skeleton";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { OneQuestion } from "@/features/questions/OneQuestion";
+import { PageFrame } from "@/components/PageFrame";
 
 /**
  * Fill in the gaps (Sprint 125, DEC-179): the finished books missing a date or a
@@ -29,9 +30,9 @@ export function GapsPage() {
   const current = entries[index];
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-xl px-5 pb-24 pt-8">
+    <PageFrame width="focus" className="pb-24 pt-8">
       <PageHeader
-        back={{ to: "/insights", label: "Insights" }}
+        back={{ to: "/journal", label: "Journal" }}
         eyebrow="Play"
         title="Fill in the gaps"
         count={
@@ -47,7 +48,7 @@ export function GapsPage() {
       ) : !current ? (
         <EmptyState title="That's every gap for now" className="mt-10">
           Back to{" "}
-          <Link to="/insights" className="underline underline-offset-4">
+          <Link to="/journal" className="underline underline-offset-4">
             Insights
           </Link>
           .
@@ -60,7 +61,7 @@ export function GapsPage() {
           onNext={() => setIndex((value) => value + 1)}
         />
       )}
-    </main>
+    </PageFrame>
   );
 }
 

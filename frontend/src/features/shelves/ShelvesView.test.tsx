@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
-import { ShelvesPage } from "./ShelvesPage";
+import { ShelvesView } from "./ShelvesView";
 
 const bookType = {
   id: "book",
@@ -33,7 +33,7 @@ function renderPage() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ShelvesPage />
+        <ShelvesView />
         <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -86,9 +86,18 @@ function stubApi(
   rows: unknown[] = shelves,
   types: unknown[] = [bookType],
   loans: unknown[] = [],
+  pile: unknown[] = [],
+  views: unknown[] = [],
+  matching: unknown = { items: [], total: 0, next_cursor: null },
 ) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/views") && init?.method === "DELETE")
+      return new Response(null, { status: 204 });
+    if (url === "/api/views") return new Response(JSON.stringify(views));
+    if (url.startsWith("/api/entries"))
+      return new Response(JSON.stringify(matching));
+    if (url.startsWith("/api/pile")) return new Response(JSON.stringify(pile));
     if (url.startsWith("/api/loans"))
       return new Response(JSON.stringify(loans));
     if (url === "/api/item-types") return new Response(JSON.stringify(types));
@@ -114,7 +123,103 @@ const loan = (id: number, person: string, title: string, lentOn: string) => ({
   },
 });
 
-describe("ShelvesPage: what is lent out (Sprint 122)", () => {
+describe("ShelvesView: the pile is a shelf too (Sprint 144)", () => {
+  const pick = (id: number, title: string) => ({
+    entry: {
+      id,
+      status: "to_read",
+      score: null,
+      item: { id, type: "book", title, year: 1965, cover_url: null },
+    },
+    score: 1,
+    reasons: [],
+  });
+
+  it("stands what is waiting as the first ledge, opening its own list", async () => {
+    stubApi(shelves, [bookType], [], [pick(7, "Dune"), pick(8, "Solaris")]);
+    renderPage();
+    const ledge = (await waitFor(() => {
+      const row = document.querySelector('[data-shelf-row="pile"]');
+      expect(row).not.toBeNull();
+      return row;
+    })) as HTMLElement;
+    expect(
+      within(ledge).getByRole("link", { name: "The pile" }),
+    ).toHaveAttribute("href", "/pile");
+    expect(ledge).toHaveTextContent(/2 waiting · Dune is likeliest next/);
+    expect([...document.querySelectorAll("[data-shelf-row]")][0]).toBe(ledge);
+  });
+
+  it("draws no pile when nothing is waiting", async () => {
+    stubApi();
+    renderPage();
+    await screen.findByRole("link", { name: "Favorites" });
+    expect(document.querySelector('[data-shelf-row="pile"]')).toBeNull();
+  });
+});
+
+describe("ShelvesView: shelves that follow a rule (Sprint 145)", () => {
+  const view = { id: 4, name: "The nines", query: "type=book&status=read" };
+  const matching = {
+    total: 14,
+    next_cursor: "more",
+    items: [
+      {
+        id: 31,
+        status: "read",
+        score: 9,
+        item: { id: 31, type: "book", title: "Rayuela", year: 1963 },
+      },
+    ],
+  };
+
+  it("draws a saved view as a shelf: what matches now, opening the library filtered", async () => {
+    stubApi(shelves, [bookType], [], [], [view], matching);
+    renderPage();
+    const row = (await waitFor(() => {
+      const found = document.querySelector('[data-shelf-row="rule-4"]');
+      expect(found).not.toBeNull();
+      return found;
+    })) as HTMLElement;
+    expect(row).toHaveTextContent("Follows a rule");
+    expect(
+      within(row).getByRole("link", { name: "The nines" }),
+    ).toHaveAttribute("href", "/?type=book&status=read");
+    await waitFor(() => expect(row).toHaveTextContent("14 things match now"));
+    expect(
+      within(row).getByRole("link", { name: "Rayuela, 1963, scored 9" }),
+    ).toHaveAttribute("href", "/books/31");
+    // It asks the library what the rule lists now, a few covers' worth.
+    const asked = vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) => String(input))
+      .find((url) => url.startsWith("/api/entries"));
+    expect(asked).toContain("type=book");
+    expect(asked).toContain("status=read");
+    expect(asked).toContain("limit=8");
+  });
+
+  it("stops keeping one, which deletes the rule and no entry", async () => {
+    stubApi(shelves, [bookType], [], [], [view], matching);
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Stop keeping The nines" }),
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input, init]) =>
+              String(input) === "/api/views/4" && init?.method === "DELETE",
+          ),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/no longer kept/)).toBeVisible();
+  });
+});
+
+describe("ShelvesView: what is lent out (Sprint 122)", () => {
   it("stands open loans as the first ledge, with who has the longest out", async () => {
     stubApi(
       shelves,
@@ -150,7 +255,7 @@ describe("ShelvesPage: what is lent out (Sprint 122)", () => {
   });
 });
 
-describe("ShelvesPage", () => {
+describe("ShelvesView", () => {
   it("reads the room back in a sentence, and each shelf in a line", async () => {
     stubApi();
     renderPage();

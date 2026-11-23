@@ -900,42 +900,35 @@ The product-spec route list is authoritative, with these refinements:
 - Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
-- `GET /api/home` (Sprints 130–131, DEC-183–185) is Home's one read, from stored data only — no
-  provider is consulted, and a test fails if one is. Eleven sections:
+- `GET /api/home` (Sprints 130–131, DEC-183–185; the Library's front since Sprint 141, DEC-193)
+  is the one read for what the Library draws above its grid, from stored data only — no
+  provider is consulted, and a test fails if one is. Eight sections:
   `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, an entry under way with `day`, 1 on
   its `date_started` and `null` without one; `entries`, every entry but `unsorted`; `pile`,
   entries in a status their domain declares `planned`; `goals`, at most one `{item_type, target,
   count}` for the current year — `active` and that goal are of one library: the first goal in
   registry order whose library has something under way names that library's entry touched last;
   without one, the entry touched last beside its own library's goal; with nothing under way, the
-  lead goal); `now`, `/now`'s entries; `next`, the first five of `/api/pile` across every library
-  (Sprint 132), each `{entry, score, reasons}`; `year`, twelve `{month, count,
-  counts, covers}` for the current year by `date_finished` (at most 24 `covers` a month, each
-  `{entry_id, item_id, item_type, title, cover_url, score}`) and each goal's `{item_type, period,
-  count, target, done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry,
-  in registry order: `count`, `status_counts` per status in declared order, `scores` (ten bins),
-  `mean_score`, up to three best-scored `covers` and `without_cover`; `lately`, up to ten
+  lead goal); `now`, `/now`'s entries; `lately`, up to ten
   `{kind: finished|score|added, at, entry, score, previous, count}` newest first — finishes and
   score changes are `/diary/timeline`'s, additions are one row per day of `date_added` (its
-  newest entry, `count` in all), the Inbox's `unsorted` entries left out; `tidy`, `{duplicates,
-  without_cover, unscored, unscored_by_type}` — the duplicate pairs `/duplicates` lists, entries
-  without a cover (the covers deck's filter), and entries in a declared `finished` status with
-  no score, in all and per domain in registry order; `question`, `{kind: revisit|gap, entry,
-  scored_at}` — the first card `/revisit` would deal, else the first entry `/gaps` lists, else
-  `null`; `shelves`, up to eight `{id, name, slug, entry_count}` holding something, the one whose
-  members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
-  the five open loans out longest, each `{id, person, lent_on, entry}`; `suggested` (Sprint 134,
-  DEC-189), up to eight unanswered suggestions already found in a provider (`enriched`), newest
-  first, each work once, in the suggestion shape below. `library_years` (Sprint 138, DEC-192),
-  one per shown `year:<item type>` module in layout order, for a library with a finish this year
-  or a goal: `{item_type, year, total, goal: {item_type, period, count, target, done} | null,
-  covers}`, up to 48 covers in finishing order. `shelf_modules`, one per shown `shelf:<id>`
-  module: `{id, name, slug, entry_count, covers}`, up to 24 covers of the members updated last.
-  A module the person hid is not read: `year`, `lately`, `tidy`, `question`, `shelves`, `lent` and `suggested` are `null`, `next` and
-  `domains` empty (`now` is still read, for the greeting). `?tz=` (Sprint 132) is the person's
+  newest entry, `count` in all), the Inbox's `unsorted` entries left out; `next`, the first five
+  of `/api/pile` across every library (Sprint 132), each `{entry, score, reasons}`; `question`,
+  `{kind: revisit|gap, entry, scored_at}` — the first card `/revisit` would deal, else the first
+  entry `/gaps` lists, else `null`; `suggested` (Sprint 134, DEC-189), up to eight unanswered
+  suggestions already found in a provider (`enriched`), newest first, each work once, in the
+  suggestion shape below; `library_years` (Sprint 138, DEC-192), one per shown
+  `year:<item type>` showcase in layout order, for a library with a finish this year or a goal:
+  `{item_type, year, total, goal: {item_type, period, count, target, done} | null, covers}`, up
+  to 48 covers in finishing order; `shelf_modules`, one per shown `shelf:<id>` showcase:
+  `{id, name, slug, entry_count, covers}`, up to 24 covers of the members updated last.
+  A thing the person removed is not read: `question` and `suggested` are `null`, `next`,
+  `now` and `lately` empty; what is under way is still read for `greeting`. The sections Home had
+  and the Library does not (`year`, `domains`, `tidy`, `shelves`, `lent`) were removed in Sprint
+  141. `?tz=` (Sprint 132) is the person's
   IANA zone, which the client sends: today and the day an addition counts under in `lately` are
   that zone's; an absent or unknown zone falls back to the server's `TZ`, then UTC. Answers in
-  under 150 ms on a 10,000-entry library (about 119 ms median in its test after Sprint 132).
+  under 150 ms on a 10,000-entry library.
 - `GET /api/pile?type=&limit=` (Sprint 132, DEC-186; `limit` 1–1000 since Sprint 138's `/pile`
   page, default 20) is the pile
   ranked locally, from stored data only: entries in a status their domain declares `planned`,
@@ -992,12 +985,51 @@ The product-spec route list is authoritative, with these refinements:
     `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
     `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays. *Want* on
     an item already held (a `library` pick) records the answer and adds nothing.
+- `GET /api/lit-days?from=&to=`, `PUT /api/lit-days/{day}` and `DELETE /api/lit-days/{day}`
+  (Sprint 147, DEC-193): the Journal's *Every day*. `lit_days` (migration 0040) holds
+  `(user_id, day, entry_id, source)` with `source` `progress`, `finish` or `tap`; one row per
+  person, day and entry, and one per person and day with no entry; both foreign keys cascade.
+  The migration lights past days from stored `date_finished` and `date_started` values that are
+  whole days. `PATCH /api/entries/{id}` records a row after it stores the edit, for a medium
+  the person keeps in front: a change carrying `progress` or `progress_marks` lights today
+  (the server's `TZ`, else UTC), and one that sets `date_finished` lights that day. `GET`
+  answers `{days: [{day, entries}]}`, lit days only, oldest first, for at most 62 days
+  (`range_too_long`). `PUT` takes `{entry_ids}` and replaces what the hand said for that day:
+  the entries named, or none for a day lit for nothing in particular; a day to come is
+  `future_day` (today from `?tz=`, as `/api/home`), an entry that is not the person's is
+  `unknown_entry`. It changes no entry. `DELETE` takes everything off the day. Nothing counts
+  streaks.
+- `GET /api/media` and `PUT /api/media` (Sprint 143, DEC-193): `{media: [{item_type, presence:
+  front|kept|off, label, held}], chosen}`, the person's media in their order, stored per person
+  in `media_preferences` (migration 0039, one JSON row keyed by `user_id`, cascading with the
+  user). Every registered domain appears once. A stored list is read leniently: an unregistered
+  type is dropped, and one it does not name is appended, `kept` if the person holds a
+  non-`unsorted` entry of it, else `off`. With nothing stored (`chosen: false`) held media are
+  `front` and the rest `off`, or all `front` when nothing is held. A write naming an
+  unregistered type (`unknown_medium`) or one twice (`duplicate_medium`) is refused, and stores
+  the whole normalized list. `GET /api/item-types` is unaffected and stays the whole registry;
+  the client orders and filters choosers with `features/media/useMedia.ts`. `GET /api/home`
+  restricts `now`, `lately`, `next` and the greeting's `active` and `goals` to `front` media,
+  reading the timeline and the pile eight times deeper when some are not, so the bands still
+  fill. No rule names a medium (6.6).
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
-  `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
-  `libraries`, `tidy`, `question`, `shelves`, `lent`, `suggested` (`application/home_layout.py`),
-  and since Sprint 138 (DEC-192) two families: `year:<item type>` for each registered domain
-  whose `entry_fields` hold `date_finished` (default M, shown, after `lately`) and
+  `user_id`, cascading with the user). The module keys are `now` and `lately` (L, shown; the
+  two bands, drawn the full width whatever their size, layout items again since Sprint 150,
+  DEC-195), `next` (L, shown), `question` (S, hidden) and `suggested` (M, hidden)
+  (`application/home_layout.py`). `year`, `libraries`, `tidy`, `shelves` and `lent` stopped
+  being modules in Sprint 141 (DEC-193); a layout stored before then still names them and the
+  lenient read drops them, while a write naming one is refused like any unknown key.
+  `GET /api/home/preview?module=<key>` (Sprint 150) answers `/api/home`'s payload with only
+  that module read, as if it were shown, and stores nothing; a key the person cannot place is
+  `unknown_module`.
+  Since Sprint 142 a third family, `insight:<item type>:<section>` (default S, hidden, at the
+  end), is offered for each medium the person holds a non-`unsorted` entry of: `scores`,
+  `decade` and each field the domain declares `groupable`, labelled from the registry ("How you
+  rate books", "Books by subjects"). The client draws one from `/api/insights/scores` or
+  `/api/insights?key=<section>&limit=3`; `/api/home` carries nothing for it.
+  Since Sprint 138 (DEC-192) two families: `year:<item type>` for each registered domain
+  whose `entry_fields` hold `date_finished` (default M, shown, after `next`) and
   `shelf:<shelf id>` for each of the person's shelves (default M, hidden, at the end). Each row
   carries `label`, a family member's name for *Edit home* ("Books this year", "Shelf: Name"),
   `null` for a fixed module and ignored on write. A read is
@@ -1165,7 +1197,21 @@ Design tokens:
 - these are declared once as Tailwind theme tokens and CSS variables. Inline colour literals in components are a defect;
 - no generic border-shadow card grid;
 - visible focus rings and touch targets at least 44 px where practical;
-- all motion disabled/reduced under `prefers-reduced-motion`.
+- all motion disabled/reduced under `prefers-reduced-motion`;
+- six themes (Sprint 148): each a full token set under `[data-theme="…"]` in `index.css`, listed
+  once in `lib/theme.ts` (`THEMES`) and once in `public/theme-init.js`, which runs before first
+  paint; `lib/theme.test.ts` holds the three to one list and `lib/contrast.test.ts` holds every
+  set to AA.
+
+One frame (Sprint 139, DEC-193), each written once and held by `src/test/frame.test.ts`:
+
+- `components/PageFrame.tsx` is the only `<main>` inside the shell. A page names a width
+  (`wide`, 1440 px, for a screen of covers; `reading`, 960 px, for text and forms; `focus`,
+  576 px, for a screen that holds one thing at a time) and passes only spacing that is its own;
+- `components/DomainStrip.tsx` is the only medium chooser, drawn as underlined tabs;
+- `components/Cover.tsx` is a cover in a list: three sizes, one caption (title, creator, score).
+  The Library's virtualised card, the decks and the dialogs that choose or crop a cover keep
+  their own drawing.
 
 Cross-cutting behavior:
 

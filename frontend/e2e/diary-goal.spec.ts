@@ -18,6 +18,8 @@ test("no goal: one tap sets one from the invitation", async ({ page }) => {
     });
   });
   await page.goto("/diary");
+  // The goal is a widget of the Journal since Sprint 146; `/diary` lands there.
+  await page.getByRole("tab", { name: "Goal" }).click();
   const invite = page.getByRole("region", {
     name: "Want something to aim at this year?",
   });
@@ -41,6 +43,8 @@ test("a goal: slots fill with the year's covers, in order", async ({
 }) => {
   await stubDiaryWithGoal(page);
   await page.goto("/diary");
+  // The goal is a widget of the Journal since Sprint 146; `/diary` lands there.
+  await page.getByRole("tab", { name: "Goal" }).click();
   const slots = page.getByRole("list", { name: /2 of 24 books in/ });
   await expect(slots).toBeVisible();
   await expect(slots.locator('[data-slot="filled"] a').first()).toHaveAttribute(

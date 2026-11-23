@@ -9,6 +9,8 @@ import { stubPlay } from "./play-fixture";
 test("Insights opens with games about your own books", async ({ page }) => {
   await stubPlay(page);
   await page.goto("/insights");
+  // The games are the Journal's Play widget (Sprint 146); Every day leads (147).
+  await page.getByRole("tab", { name: "Play" }).click();
   const play = page.getByRole("region", { name: "Play with your library" });
   await expect(play).toBeVisible();
   await expect(
@@ -25,6 +27,8 @@ test("the gaps are filled one book at a time", async ({ page }) => {
   const calls: Array<{ method: string; url: string; body: unknown }> = [];
   await stubPlay(page, calls);
   await page.goto("/insights");
+  // The games are the Journal's Play widget (Sprint 146); Every day leads (147).
+  await page.getByRole("tab", { name: "Play" }).click();
   await page
     .getByRole("region", { name: "Play with your library" })
     .getByRole("link", { name: /Fill in the gaps/ })
@@ -53,6 +57,8 @@ test("five minutes deals a mixed round and ends with what changed", async ({
   const calls: Array<{ method: string; url: string; body: unknown }> = [];
   await stubPlay(page, calls);
   await page.goto("/insights");
+  // The games are the Journal's Play widget (Sprint 146); Every day leads (147).
+  await page.getByRole("tab", { name: "Play" }).click();
   await page
     .getByRole("region", { name: "Play with your library" })
     .getByRole("link", { name: /Five minutes/ })
@@ -85,6 +91,8 @@ test.describe("on a phone", () => {
   test("Play and the gaps fit without scrolling sideways", async ({ page }) => {
     await stubPlay(page);
     await page.goto("/insights");
+    // The games are the Journal's Play widget (Sprint 146); Every day leads (147).
+    await page.getByRole("tab", { name: "Play" }).click();
     await expect(
       page.getByRole("region", { name: "Play with your library" }),
     ).toBeVisible();

@@ -25,6 +25,7 @@ from book_tracker.application.home_layout import DEFAULT_LAYOUT, MODULES, defaul
 from book_tracker.application.passwords import hash_password
 from book_tracker.application.sessions import SessionStore
 from book_tracker.config import Settings
+from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 from book_tracker.migrations import alembic_config, upgrade
 
@@ -57,8 +58,17 @@ def _keys() -> list[str]:
 
 def test_the_default_names_every_module_once() -> None:
     assert [row["module"] for row in DEFAULT_LAYOUT] == list(MODULES)
-    assert set(MODULES) >= {"now", "next", "year", "libraries", "lately", "tidy"}
-    assert all(row["size"] in {"S", "M", "L"} and row["hidden"] is False for row in DEFAULT_LAYOUT)
+    # Sprint 141 (DEC-193): what the Library's bands and tabs now say is no longer a
+    # module, and only Up next is shown until the person places more.
+    # Sprint 150 (DEC-195): what is under way and what happened lately are layout items
+    # again, first and shown; the rest as Sprint 141 left them.
+    assert list(MODULES) == ["now", "lately", "next", "question", "suggested"]
+    assert all(row["size"] in {"S", "M", "L"} for row in DEFAULT_LAYOUT)
+    assert [row["module"] for row in DEFAULT_LAYOUT if not row["hidden"]] == [
+        "now",
+        "lately",
+        "next",
+    ]
 
 
 @pytest.mark.anyio
@@ -87,22 +97,30 @@ async def test_a_layout_naming_only_some_modules_gets_the_rest_appended(tmp_path
     async with _client(tmp_path) as (_app, client):
         await client.put(
             "/api/home/layout",
-            json={"modules": [{"module": "year", "size": "S", "hidden": False}]},
+            json={"modules": [{"module": "question", "size": "L", "hidden": False}]},
         )
         modules = (await client.get("/api/home/layout")).json()["modules"]
-    assert modules[0] == {"module": "year", "size": "S", "hidden": False, "label": None}
-    assert [row["module"] for row in modules[1:]] == [m for m in _keys() if m != "year"]
+    assert modules[0] == {"module": "question", "size": "L", "hidden": False, "label": None}
+    assert [row["module"] for row in modules[1:]] == [m for m in _keys() if m != "question"]
 
 
 @pytest.mark.anyio
 async def test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads(
     tmp_path: Path,
 ) -> None:
+    # A layout as 3.1 stored it: every module the Library's bands replaced (Sprint 141).
     stored = [
-        {"module": "retired", "size": "L", "hidden": False},
+        {"module": "now", "size": "M", "hidden": False},
         {"module": "lately", "size": "S", "hidden": True},
+        {"module": "retired", "size": "L", "hidden": False},
         "not even an object",
-        {"module": "now", "size": "XL", "hidden": False},
+        {"module": "suggested", "size": "S", "hidden": False},
+        {"module": "libraries", "size": "L", "hidden": False},
+        {"module": "year", "size": "L", "hidden": False},
+        {"module": "tidy", "size": "S", "hidden": False},
+        {"module": "shelves", "size": "S", "hidden": False},
+        {"module": "lent", "size": "S", "hidden": False},
+        {"module": "next", "size": "XL", "hidden": False},
     ]
     async with _client(tmp_path) as (app, client):
         with app.state.engine.begin() as connection:
@@ -116,14 +134,20 @@ async def test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads
         layout = (await client.get("/api/home/layout")).json()["modules"]
         home = await client.get("/api/home")
     assert home.status_code == 200, home.text
-    assert layout[0] == {"module": "lately", "size": "S", "hidden": True, "label": None}
+    # What is a module keeps its order, size and visibility: since Sprint 150 that is
+    # the two bands again, so a 3.1 layout that hid Lately hides it still.
+    assert layout[0] == {"module": "now", "size": "M", "hidden": False, "label": None}
+    assert layout[1] == {"module": "lately", "size": "S", "hidden": True, "label": None}
+    assert layout[2] == {"module": "suggested", "size": "S", "hidden": False, "label": None}
     # An unknown size falls back to the module's default rather than failing the read.
-    now_default = next(row for row in DEFAULT_LAYOUT if row["module"] == "now")
-    assert layout[1] == {**now_default, "label": None}
+    next_default = next(row for row in DEFAULT_LAYOUT if row["module"] == "next")
+    assert layout[3] == {**next_default, "label": None}
     assert [row["module"] for row in layout] == [
-        "lately",
         "now",
-        *[m for m in _keys() if m not in {"lately", "now"}],
+        "lately",
+        "suggested",
+        "next",
+        *[m for m in _keys() if m not in {"now", "lately", "suggested", "next"}],
     ]
 
 
@@ -166,22 +190,64 @@ async def test_a_write_naming_what_is_not_a_module_is_refused(
 
 @pytest.mark.anyio
 async def test_home_skips_a_hidden_module(tmp_path: Path) -> None:
-    hidden = [
-        {
-            **row,
-            "hidden": row["module"] in {"year", "lately", "tidy", "next", "libraries", "suggested"},
-        }
-        for row in _defaults()
-    ]
+    hidden = [{**row, "hidden": row["module"] in {"next", "suggested"}} for row in _defaults()]
     async with _client(tmp_path) as (_app, client):
         await client.put("/api/home/layout", json={"modules": hidden})
         body = (await client.get("/api/home")).json()
-    assert body["year"] is None
-    assert body["lately"] is None
-    assert body["tidy"] is None
     assert body["next"] == []
-    assert body["domains"] == []
     assert body["suggested"] is None
+
+
+@pytest.mark.anyio
+async def test_a_band_the_person_removed_is_not_drawn_and_the_greeting_still_names_it(
+    tmp_path: Path,
+) -> None:
+    """Sprint 150 (DEC-195): On now and Lately can be turned off like a showcase."""
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "reading")
+        shown = (await client.get("/api/home")).json()
+        hidden = [{**row, "hidden": row["module"] in {"now", "lately"}} for row in _defaults()]
+        put = await client.put("/api/home/layout", json={"modules": hidden})
+        body = (await client.get("/api/home")).json()
+    assert put.status_code == 200, put.text
+    assert [row["item"]["title"] for row in shown["now"]] == ["Rayuela"]
+    assert len(shown["lately"]) == 1
+    assert body["now"] == [] and body["lately"] == []
+    # What is under way is still what the greeting names.
+    assert body["greeting"]["active"]["entry"]["item"]["title"] == "Rayuela"
+
+
+@pytest.mark.anyio
+async def test_a_preview_answers_for_one_module_as_if_it_were_shown(tmp_path: Path) -> None:
+    """Sprint 150: what the add dialog draws before anything is added."""
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "reading")
+        shelf = _shelf(app, "Favorites")
+        hidden = [
+            {**row, "hidden": True}
+            for row in (await client.get("/api/home/layout")).json()["modules"]
+        ]
+        await client.put("/api/home/layout", json={"modules": hidden})
+        nothing = (await client.get("/api/home")).json()
+        lately = (await client.get("/api/home/preview", params={"module": "lately"})).json()
+        placed = (await client.get("/api/home/preview", params={"module": f"shelf:{shelf}"})).json()
+        year = (await client.get("/api/home/preview", params={"module": "year:book"})).json()
+        number = await client.get("/api/home/preview", params={"module": "insight:book:scores"})
+        unknown = await client.get("/api/home/preview", params={"module": "shelf:999"})
+        after = (await client.get("/api/home/layout")).json()["modules"]
+    assert nothing["lately"] == [] and nothing["shelf_modules"] == []
+    assert len(lately["lately"]) == 1
+    # Only the one asked for is read.
+    assert lately["now"] == [] and lately["shelf_modules"] == []
+    assert [row["name"] for row in placed["shelf_modules"]] == ["Favorites"]
+    assert placed["lately"] == []
+    assert year["library_years"] == [] or year["library_years"][0]["item_type"] == "book"
+    # A number draws itself from the insights endpoints; its preview has nothing to add.
+    assert number.status_code == 200
+    assert unknown.status_code == 422
+    assert unknown.json()["error"]["code"] == "unknown_module"
+    # Looking is not placing.
+    assert all(row["hidden"] for row in after)
 
 
 def _shelf(app: Any, name: str, user: int = 1) -> int:
@@ -219,9 +285,9 @@ async def test_each_library_has_a_year_and_each_shelf_a_hidden_module(tmp_path: 
         "label": "Shelf: Favorites",
     }
     assert layout["defaults"] == layout["modules"]
-    # The libraries' years follow Lately, so the year and Lately keep their row.
+    # The libraries' years follow Up next.
     keys = [row["module"] for row in layout["modules"]]
-    assert keys.index("year:book") == keys.index("lately") + 1
+    assert keys.index("year:book") == keys.index("next") + 1
 
 
 @pytest.mark.anyio
@@ -258,6 +324,98 @@ async def test_a_family_member_that_does_not_exist_is_refused(tmp_path: Path, mo
         )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "unknown_module"
+
+
+def _held(app: Any, title: str, item_type: str, status: str, user: int = 1) -> None:
+    """One entry of a medium, so the person holds it."""
+    created = DomainRepository(app.state.engine, user).create_or_get_entry(
+        title=title, item_type=item_type
+    )
+    with app.state.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE entries SET status = :status WHERE id = :id"),
+            {"status": status, "id": created.entry_id},
+        )
+
+
+@pytest.mark.anyio
+async def test_a_number_from_the_journal_is_offered_per_medium_held(tmp_path: Path) -> None:
+    """Sprint 142 (DEC-193): `insight:<item type>:<section>`, hidden until placed."""
+    async with _client(tmp_path) as (app, client):
+        before = {row["module"] for row in (await client.get("/api/home/layout")).json()["modules"]}
+        _held(app, "Rayuela", "book", "read")
+        layout = (await client.get("/api/home/layout")).json()
+    assert not any(key.startswith("insight:") for key in before)
+    rows = {row["module"]: row for row in layout["modules"]}
+    assert rows["insight:book:scores"] == {
+        "module": "insight:book:scores",
+        "size": "S",
+        "hidden": True,
+        "label": "How you rate books",
+    }
+    assert rows["insight:book:decade"]["label"] == "Books by decade"
+    # Every key the domain declares groupable, named by the domain's own label.
+    assert rows["insight:book:subjects"]["label"] == "Books by subjects"
+    assert "insight:book:description" not in rows
+    # A medium the person holds nothing of is not offered.
+    assert not any(key.startswith("insight:movie:") for key in rows)
+    # After the fixed showcases, the years and the shelves.
+    keys = [row["module"] for row in layout["modules"]]
+    assert keys.index("insight:book:scores") > keys.index("year:book")
+
+
+@pytest.mark.anyio
+async def test_a_placed_number_round_trips_and_does_not_disturb_home(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "read")
+        saved = [{"module": "insight:book:scores", "size": "M", "hidden": False}]
+        put = await client.put("/api/home/layout", json={"modules": saved})
+        got = (await client.get("/api/home/layout")).json()["modules"]
+        home = await client.get("/api/home")
+    assert put.status_code == 200, put.text
+    assert got[0] == {
+        "module": "insight:book:scores",
+        "size": "M",
+        "hidden": False,
+        "label": "How you rate books",
+    }
+    assert home.status_code == 200, home.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "module",
+    [
+        "insight:book:description",  # a field the domain does not declare groupable
+        "insight:book:nonsense",
+        "insight:movie:scores",  # nothing held of that medium
+        "insight:comic:scores",
+        "insight:book",
+    ],
+)
+async def test_a_number_that_does_not_exist_is_refused(tmp_path: Path, module: str) -> None:
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "read")
+        response = await client.put(
+            "/api/home/layout", json={"modules": [{"module": module, "size": "S"}]}
+        )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "unknown_module"
+
+
+@pytest.mark.anyio
+async def test_one_persons_media_do_not_offer_numbers_to_another(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id,username,display_name,password_hash,password_salt,"
+                    "is_admin,created_at,updated_at) VALUES (2,'bruno','Bruno','x','y',0,'n','n')"
+                )
+            )
+        _held(app, "Up", "movie", "watched", user=2)
+        mine = {row["module"] for row in (await client.get("/api/home/layout")).json()["modules"]}
+    assert not any(key.startswith("insight:") for key in mine)
 
 
 @pytest.mark.anyio

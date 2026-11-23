@@ -31,8 +31,11 @@ test.describe("production bundle", () => {
     await page.goto("/library");
     // Navigate rather than deep-link, so the chunk arrives after the entry has
     // already evaluated: that ordering is what a cyclic split breaks.
-    await page.getByRole("link", { name: /add/i }).first().click();
+    // The Journal: a lazy route still in the navigation (Add left it in Sprint 140).
+    await page.getByRole("link", { name: "Journal" }).first().click();
 
-    await expect(page.getByLabel(/^title$/i)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Journal" }),
+    ).toBeVisible();
   });
 });

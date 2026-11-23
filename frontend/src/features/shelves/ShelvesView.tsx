@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -18,6 +18,11 @@ import { howLong } from "@/features/house/house";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { OpeningCover } from "@/features/shelves/OpeningCover";
 import { cn } from "@/lib/utils";
+import { DomainStrip } from "@/components/DomainStrip";
+import { useShownItemTypes } from "@/features/media/useMedia";
+import { getPile, type HomeNext } from "@/api/home";
+import { deleteView, type SavedView } from "@/api/views";
+import { useRuleShelves } from "@/features/shelves/useRuleShelves";
 
 type ShelfSort = "size" | "recent" | "name";
 
@@ -41,7 +46,7 @@ const searchFrom = 8;
  * Deleting a shelf still only removes the tag; that is said on the shelf's own
  * page, where deleting happens.
  */
-export function ShelvesPage() {
+export function ShelvesView() {
   const cache = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -52,7 +57,11 @@ export function ShelvesPage() {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const itemTypes = useItemTypes();
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  const shownTypes = useShownItemTypes();
+  const domains = useMemo(
+    () => domainsFrom(shownTypes.data),
+    [shownTypes.data],
+  );
   const shelves = useQuery({
     queryKey: queryKeys.shelves,
     queryFn: getShelves,
@@ -67,6 +76,22 @@ export function ShelvesPage() {
     retry: false,
   });
   const lent = Array.isArray(loans.data) ? loans.data : [];
+  // The pile is a shelf too (Sprint 144): the same read its own page makes.
+  const pile = useQuery({
+    queryKey: [...queryKeys.pile, PILE_DEPTH],
+    queryFn: ({ signal }) => getPile(PILE_DEPTH, signal),
+    retry: false,
+  });
+  const waiting = Array.isArray(pile.data) ? pile.data : [];
+  const ruled = useRuleShelves();
+  const forget = useMutation({
+    mutationFn: (view: SavedView) => deleteView(view.id),
+    onSuccess: (_data, view) => {
+      toast.success(`“${view.name}” is no longer kept`);
+      void cache.invalidateQueries({ queryKey: queryKeys.views });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -126,18 +151,22 @@ export function ShelvesPage() {
   );
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-[1280px] px-5 pb-24 pt-8 md:px-8 md:pt-12">
+    // A view of the Library since Sprint 144 (DEC-193), not a screen of its own: the
+    // Library's frame and title are around it, so this opens with a second-level
+    // heading and the sentence that was the page's lede.
+    <section aria-labelledby="shelves-heading" className="pb-16 pt-8">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div>
-          <h1
+          <h2
+            id="shelves-heading"
             ref={headingRef}
             tabIndex={-1}
-            className="font-display text-6xl font-normal leading-[0.95] tracking-[-0.02em] focus:outline-none md:text-8xl"
+            className="font-display text-xl font-medium focus:outline-none"
           >
             Shelves
-          </h1>
+          </h2>
           {all.length > 0 && (
-            <p className="mt-4 max-w-[40ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
+            <p className="mt-2 max-w-[40ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
               {capital(spelled(all.length))}{" "}
               {all.length === 1 ? "shelf" : "shelves"},{" "}
               <span className="text-primary">
@@ -218,32 +247,18 @@ export function ShelvesPage() {
       {(domainsInUse.length > 1 || all.length > searchFrom) && (
         <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border">
           {domainsInUse.length > 1 && (
-            <div
-              role="radiogroup"
-              aria-label="Choose a domain"
-              className="-mb-px flex gap-5 overflow-x-auto"
-            >
-              {[
-                { id: allDomains, label: "All", plural_label: "All" },
-                ...domainsInUse,
-              ].map((domain) => (
-                <button
-                  key={domain.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={domain.id === domainFilter}
-                  onClick={() => setDomainFilter(domain.id)}
-                  className={cn(
-                    "min-h-11 shrink-0 border-b-2 text-sm font-medium focus-ring",
-                    domain.id === domainFilter
-                      ? "border-primary text-foreground"
-                      : "border-transparent text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {domain.plural_label ?? domain.label}
-                </button>
-              ))}
-            </div>
+            <DomainStrip
+              className="-mb-px"
+              domains={[
+                { id: allDomains, label: "All" },
+                ...domainsInUse.map((domain) => ({
+                  id: domain.id,
+                  label: domain.plural_label ?? domain.label,
+                })),
+              ]}
+              value={domainFilter}
+              onChange={setDomainFilter}
+            />
           )}
           {all.length > searchFrom && (
             <label className="ml-auto min-w-48">
@@ -283,7 +298,32 @@ export function ShelvesPage() {
       )}
 
       <ol className="mt-6">
+        {/* The two shelves the application keeps for you (Sprint 144): what is
+            waiting, and what is with other people. Each opens its own list. */}
+        {waiting.length > 0 && <PileRow picks={waiting} />}
         {lent.length > 0 && <LentRow loans={lent} />}
+        {/* Shelves that follow a rule (Sprint 145): saved views, drawn as shelves.
+            Each opens the Library filtered as its rule says. */}
+        {ruled.map((rule) => (
+          <ShelfRow
+            key={rule.shelf.slug}
+            shelf={rule.shelf}
+            types={undefined}
+            lead={false}
+            href={rule.href}
+            kind="Follows a rule"
+            line={`${rule.shelf.entry_count} ${rule.shelf.entry_count === 1 ? "thing matches" : "things match"} now`}
+            after={
+              <button
+                type="button"
+                onClick={() => forget.mutate(rule.view)}
+                className="mt-2 min-h-11 text-sm text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground focus-ring"
+              >
+                Stop keeping {rule.view.name}
+              </button>
+            }
+          />
+        ))}
         {room.map((shelf) => (
           <ShelfRow
             key={shelf.id}
@@ -293,9 +333,12 @@ export function ShelvesPage() {
           />
         ))}
       </ol>
-    </main>
+    </section>
   );
 }
+
+/** The whole pile, as its own page reads it. */
+const PILE_DEPTH = 1000;
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -367,6 +410,33 @@ function fits(index: number, lead: boolean): string | false {
  * The open loans as a ledge (Sprint 122): longest out first, as the list orders
  * them, and the line names who has had something longest.
  */
+/** The pile as a shelf: what is waiting, the likeliest next first, opening its list. */
+function PileRow({ picks }: { picks: HomeNext[] }) {
+  const shelf: ShelfWithCount = {
+    id: 0,
+    name: "The pile",
+    slug: "pile",
+    entry_count: picks.length,
+    preview: picks.slice(0, 8).map((pick) => ({
+      entry_id: pick.entry.id,
+      title: pick.entry.item.title,
+      year: pick.entry.item.year ?? null,
+      score: pick.entry.score ?? null,
+      cover_url: pick.entry.item.cover_url ?? null,
+    })),
+  };
+  return (
+    <ShelfRow
+      shelf={shelf}
+      types={undefined}
+      lead={false}
+      href="/pile"
+      kind="Waiting for you"
+      line={`${picks.length} waiting · ${picks[0].entry.item.title} is likeliest next`}
+    />
+  );
+}
+
 function LentRow({ loans }: { loans: LoanWithEntry[] }) {
   const longest = loans[0];
   const shelf: ShelfWithCount = {
@@ -402,6 +472,7 @@ function ShelfRow({
   href = `/shelves/${encodeURIComponent(shelf.slug)}`,
   kind,
   line,
+  after,
 }: {
   shelf: ShelfWithCount;
   types: ItemType[] | undefined;
@@ -409,6 +480,8 @@ function ShelfRow({
   href?: string;
   kind?: string;
   line?: string;
+  /** Beneath the shelf's line: what only this kind of shelf offers. */
+  after?: ReactNode;
 }) {
   const preview = shelf.preview ?? [];
   return (
@@ -433,6 +506,7 @@ function ShelfRow({
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           {line ?? lineOf(shelf, types)}
         </p>
+        {after}
       </div>
       <div className="min-w-0">
         <div

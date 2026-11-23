@@ -83,6 +83,7 @@ import {
 } from "@/features/library/cachedEntry";
 import { FilePicker } from "@/components/ui/file-picker";
 import { Loading } from "@/components/ui/skeleton";
+import { PageFrame } from "@/components/PageFrame";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
 /**
@@ -272,7 +273,7 @@ export function DetailPage() {
   // working through, instead of the library. Absent (a deep link, the library)
   // means the library — the only place left to go back to.
   const from = (useLocation().state as { from?: string } | null)?.from;
-  const backTo = from === "triage" ? "/inbox" : "/library";
+  const backTo = from === "triage" ? "/inbox" : "/";
   const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
     | "opinion"
@@ -352,9 +353,9 @@ export function DetailPage() {
 
   if (detail.isPending)
     return (
-      <main className="mx-auto max-w-5xl px-4 py-10">
+      <PageFrame width="reading">
         <Loading label="Loading detail…" shape="detail" />
-      </main>
+      </PageFrame>
     );
   if (!detail.data) return <p role="alert">Detail could not be loaded</p>;
   const entry = detail.data;
@@ -422,7 +423,7 @@ export function DetailPage() {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: queryKeys.library.all });
       toast.success("Removed from your library");
-      navigate("/library");
+      navigate("/");
     } catch (e) {
       // Reported inside the dialog, which is still open and still covering the
       // page: an alert rendered behind a modal is an alert nobody sees.
@@ -452,7 +453,7 @@ export function DetailPage() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <PageFrame width="reading">
       <BackToLibrary to={backTo} label={backLabel} />
       <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-[240px_1fr]">
         <aside>
@@ -1077,6 +1078,6 @@ export function DetailPage() {
           {error}
         </p>
       )}
-    </main>
+    </PageFrame>
   );
 }

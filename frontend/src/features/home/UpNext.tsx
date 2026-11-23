@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import type { HomeNext, ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
+import { Cover } from "@/components/Cover";
 import { FinishDialog } from "@/features/finish/FinishDialog";
 import { finishAction, finishActionFor } from "@/features/finish/label";
 import { statusWith } from "@/features/rescore/rescore";
@@ -97,7 +97,10 @@ export function UpNext({
             return (
               <li
                 key={pick.entry.id}
-                className="flex w-28 shrink-0 snap-start flex-col gap-1.5 min-[720px]:w-auto"
+                // A cover never grows past a shelf's size: with two picks in a wide
+                // showcase it was 380px across and pushed the Library off the
+                // screen (Sprint 141's walkthrough).
+                className="flex w-28 shrink-0 snap-start flex-col gap-1.5 min-[720px]:w-auto min-[720px]:max-w-[9.5rem]"
               >
                 <span className="text-xs tabular-nums text-primary">
                   {index + 1}
@@ -107,11 +110,7 @@ export function UpNext({
                   className="rounded-md focus-ring"
                   aria-label={`Open ${pick.entry.item.title}`}
                 >
-                  <CoverImage
-                    src={pick.entry.item.cover_url}
-                    alt=""
-                    className="aspect-[2/3] w-full rounded-md object-cover"
-                  />
+                  <Cover src={pick.entry.item.cover_url} size="m" />
                 </Link>
                 <p className="line-clamp-2 text-sm font-medium leading-snug">
                   {pick.entry.item.title}

@@ -22,13 +22,12 @@ import {
 import { AUTH_REQUIRED_EVENT } from "@/api/request";
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
-import { HomePage } from "@/features/home/HomePage";
-import { libraryRedirect } from "@/features/library/library";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
 import { createQueryClient } from "@/lib/queryClient";
+import { PageFrame } from "@/components/PageFrame";
 
 // `/` (Home) and `/library` are the screens the application opens on, so they
 // stay in the entry chunk.
@@ -47,14 +46,11 @@ const DetailPage = lazy(async () => ({
 const ImportPage = lazy(async () => ({
   default: (await import("@/pages/ImportPage")).ImportPage,
 }));
-const ShelvesPage = lazy(async () => ({
-  default: (await import("@/pages/ShelvesPage")).ShelvesPage,
-}));
 const ShelfPage = lazy(async () => ({
   default: (await import("@/pages/ShelfPage")).ShelfPage,
 }));
-const InsightsPage = lazy(async () => ({
-  default: (await import("@/pages/InsightsPage")).InsightsPage,
+const JournalPage = lazy(async () => ({
+  default: (await import("@/pages/JournalPage")).JournalPage,
 }));
 const TriagePage = lazy(async () => ({
   default: (await import("@/pages/TriagePage")).TriagePage,
@@ -101,9 +97,6 @@ const PilePage = lazy(async () => ({
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
 }));
-const DiaryPage = lazy(async () => ({
-  default: (await import("@/pages/DiaryPage")).DiaryPage,
-}));
 const SettingsPage = lazy(async () => ({
   default: (await import("@/pages/SettingsPage")).SettingsPage,
 }));
@@ -118,15 +111,13 @@ const PeoplePage = lazy(async () => ({
 }));
 
 /**
- * `/` is Home since Sprint 130 (DEC-183). A `/` address carrying library filters
- * was a library link before that, in bookmarks and saved views, so it lands on
- * `/library` with them rather than on Home without them.
+ * `/library` was the Library's address while Home held `/` (Sprints 130-140,
+ * DEC-183). The Library is the home again (Sprint 141, DEC-193), so a bookmark or a
+ * saved view lands on `/` with the filters it carried.
  */
-function HomeRoute() {
+function LibraryRedirect() {
   const location = useLocation();
-  const target = libraryRedirect(location.search);
-  if (target) return <Navigate to={`${target}${location.hash}`} replace />;
-  return <HomePage />;
+  return <Navigate to={`/${location.search}${location.hash}`} replace />;
 }
 
 /**
@@ -138,9 +129,9 @@ function HomeRoute() {
  */
 function RouteFallback() {
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <PageFrame width="reading">
       <Loading label="Loading…" shape="page" />
-    </main>
+    </PageFrame>
   );
 }
 
@@ -162,13 +153,14 @@ function currentDestination(pathname: string, search: string, hash: string) {
 
 function AuthLoading() {
   return (
-    <main
-      className="flex min-h-screen items-center justify-center p-6"
+    <PageFrame
+      width="reading"
       role="status"
       aria-live="polite"
+      className="flex items-center justify-center"
     >
       <p className="text-sm text-muted-foreground">Opening Akasha…</p>
-    </main>
+    </PageFrame>
   );
 }
 
@@ -197,14 +189,23 @@ function PrivateRoutes({
       >
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/library" element={<LibraryRedirect />} />
             <Route path="/add" element={<AddPage />} />
             <Route path="/books/:entryId" element={<DetailPage />} />
             <Route path="/import" element={<ImportPage />} />
-            <Route path="/shelves" element={<ShelvesPage />} />
+            {/* Shelves are a view of the Library since Sprint 144 (DEC-193). */}
+            <Route
+              path="/shelves"
+              element={<Navigate to="/?view=shelves" replace />}
+            />
             <Route path="/shelves/:slug" element={<ShelfPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
+            {/* Insights and the Diary are parts of the Journal since Sprint 146. */}
+            <Route path="/journal" element={<JournalPage />} />
+            <Route
+              path="/insights"
+              element={<Navigate to="/journal#patterns" replace />}
+            />
             <Route path="/settings" element={<SettingsPage />} />
             {/* The Inbox is its own page since Sprint 096 (proposal I3), no longer
                 a tab of the import screen. */}
@@ -212,7 +213,10 @@ function PrivateRoutes({
             <Route path="/inbox/deck" element={<TriageDeckPage />} />
             {/* The phone's share sheet (Sprint 097): opens the command bar. */}
             <Route path="/share" element={<SharePage />} />
-            <Route path="/diary" element={<DiaryPage />} />
+            <Route
+              path="/diary"
+              element={<Navigate to="/journal#timeline" replace />}
+            />
             <Route path="/diary/:year/review" element={<YearReviewPage />} />
             <Route path="/lent" element={<LentPage />} />
             <Route path="/pile" element={<PilePage />} />

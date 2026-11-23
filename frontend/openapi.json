@@ -1929,67 +1929,6 @@
         "title": "HomeCover",
         "type": "object"
       },
-      "HomeDomainTile": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "covers": {
-            "items": {
-              "$ref": "#/components/schemas/HomeCover"
-            },
-            "title": "Covers",
-            "type": "array"
-          },
-          "item_type": {
-            "title": "Item Type",
-            "type": "string"
-          },
-          "mean_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mean Score"
-          },
-          "scores": {
-            "items": {
-              "type": "integer"
-            },
-            "maxItems": 10,
-            "minItems": 10,
-            "title": "Scores",
-            "type": "array"
-          },
-          "status_counts": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Status Counts",
-            "type": "object"
-          },
-          "without_cover": {
-            "title": "Without Cover",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_type",
-          "count",
-          "status_counts",
-          "scores",
-          "mean_score",
-          "covers",
-          "without_cover"
-        ],
-        "title": "HomeDomainTile",
-        "type": "object"
-      },
       "HomeGoalCount": {
         "properties": {
           "count": {
@@ -2153,27 +2092,6 @@
         "title": "HomeLayoutResponse",
         "type": "object"
       },
-      "HomeLent": {
-        "properties": {
-          "loans": {
-            "items": {
-              "$ref": "#/components/schemas/HomeLoan"
-            },
-            "title": "Loans",
-            "type": "array"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "total",
-          "loans"
-        ],
-        "title": "HomeLent",
-        "type": "object"
-      },
       "HomeLibraryYear": {
         "description": "One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.",
         "properties": {
@@ -2217,33 +2135,6 @@
         "title": "HomeLibraryYear",
         "type": "object"
       },
-      "HomeLoan": {
-        "properties": {
-          "entry": {
-            "$ref": "#/components/schemas/EntryResponse"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "lent_on": {
-            "title": "Lent On",
-            "type": "string"
-          },
-          "person": {
-            "title": "Person",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "person",
-          "lent_on",
-          "entry"
-        ],
-        "title": "HomeLoan",
-        "type": "object"
-      },
       "HomeModuleLayout": {
         "properties": {
           "hidden": {
@@ -2283,40 +2174,6 @@
         "title": "HomeModuleLayout",
         "type": "object"
       },
-      "HomeMonth": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "counts": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Counts",
-            "type": "object"
-          },
-          "covers": {
-            "items": {
-              "$ref": "#/components/schemas/HomeCover"
-            },
-            "title": "Covers",
-            "type": "array"
-          },
-          "month": {
-            "title": "Month",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "month",
-          "count",
-          "counts",
-          "covers"
-        ],
-        "title": "HomeMonth",
-        "type": "object"
-      },
       "HomeQuestion": {
         "description": "One question from Play: an old score to look at again, else a gap to fill.",
         "properties": {
@@ -2352,41 +2209,17 @@
         "type": "object"
       },
       "HomeResponse": {
-        "description": "Every module's payload. A module the person hid is empty or `null`, unread.",
+        "description": "The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase\nthe person hid is empty or `null`, unread.",
         "properties": {
-          "domains": {
-            "items": {
-              "$ref": "#/components/schemas/HomeDomainTile"
-            },
-            "title": "Domains",
-            "type": "array"
-          },
           "greeting": {
             "$ref": "#/components/schemas/HomeGreeting"
           },
           "lately": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/HomeLatelyRow"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lately"
-          },
-          "lent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeLent"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "items": {
+              "$ref": "#/components/schemas/HomeLatelyRow"
+            },
+            "title": "Lately",
+            "type": "array"
           },
           "library_years": {
             "items": {
@@ -2426,20 +2259,6 @@
             "title": "Shelf Modules",
             "type": "array"
           },
-          "shelves": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/HomeShelf"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shelves"
-          },
           "suggested": {
             "anyOf": [
               {
@@ -2453,72 +2272,19 @@
               }
             ],
             "title": "Suggested"
-          },
-          "tidy": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeTidy"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "year": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeYear"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
           "greeting",
           "now",
           "next",
-          "year",
-          "domains",
           "lately",
-          "tidy",
           "question",
-          "shelves",
-          "lent",
           "suggested",
           "library_years",
           "shelf_modules"
         ],
         "title": "HomeResponse",
-        "type": "object"
-      },
-      "HomeShelf": {
-        "properties": {
-          "entry_count": {
-            "title": "Entry Count",
-            "type": "integer"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "slug": {
-            "title": "Slug",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "entry_count"
-        ],
-        "title": "HomeShelf",
         "type": "object"
       },
       "HomeShelfModule": {
@@ -2556,68 +2322,6 @@
           "covers"
         ],
         "title": "HomeShelfModule",
-        "type": "object"
-      },
-      "HomeTidy": {
-        "properties": {
-          "duplicates": {
-            "title": "Duplicates",
-            "type": "integer"
-          },
-          "unscored": {
-            "title": "Unscored",
-            "type": "integer"
-          },
-          "unscored_by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Unscored By Type",
-            "type": "object"
-          },
-          "without_cover": {
-            "title": "Without Cover",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "duplicates",
-          "without_cover",
-          "unscored",
-          "unscored_by_type"
-        ],
-        "title": "HomeTidy",
-        "type": "object"
-      },
-      "HomeYear": {
-        "properties": {
-          "goals": {
-            "items": {
-              "$ref": "#/components/schemas/HomeYearGoal"
-            },
-            "title": "Goals",
-            "type": "array"
-          },
-          "months": {
-            "items": {
-              "$ref": "#/components/schemas/HomeMonth"
-            },
-            "maxItems": 12,
-            "minItems": 12,
-            "title": "Months",
-            "type": "array"
-          },
-          "year": {
-            "title": "Year",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "year",
-          "months",
-          "goals"
-        ],
-        "title": "HomeYear",
         "type": "object"
       },
       "HomeYearGoal": {
@@ -3697,6 +3401,57 @@
         "title": "JobProgressResponse",
         "type": "object"
       },
+      "LightBody": {
+        "properties": {
+          "entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 24,
+            "title": "Entry Ids",
+            "type": "array"
+          }
+        },
+        "title": "LightBody",
+        "type": "object"
+      },
+      "LitDay": {
+        "properties": {
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryResponse"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "day",
+          "entries"
+        ],
+        "title": "LitDay",
+        "type": "object"
+      },
+      "LitDaysResponse": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/LitDay"
+            },
+            "title": "Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "title": "LitDaysResponse",
+        "type": "object"
+      },
       "LoanCreateBody": {
         "properties": {
           "lent_on": {
@@ -4047,6 +3802,100 @@
           "acting_as"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "MediaBody": {
+        "properties": {
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/MediumChoice"
+            },
+            "maxItems": 64,
+            "title": "Media",
+            "type": "array"
+          }
+        },
+        "required": [
+          "media"
+        ],
+        "title": "MediaBody",
+        "type": "object"
+      },
+      "MediaResponse": {
+        "properties": {
+          "chosen": {
+            "title": "Chosen",
+            "type": "boolean"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/MediumResponse"
+            },
+            "title": "Media",
+            "type": "array"
+          }
+        },
+        "required": [
+          "media",
+          "chosen"
+        ],
+        "title": "MediaResponse",
+        "type": "object"
+      },
+      "MediumChoice": {
+        "properties": {
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "presence": {
+            "enum": [
+              "front",
+              "kept",
+              "off"
+            ],
+            "title": "Presence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_type",
+          "presence"
+        ],
+        "title": "MediumChoice",
+        "type": "object"
+      },
+      "MediumResponse": {
+        "properties": {
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "presence": {
+            "enum": [
+              "front",
+              "kept",
+              "off"
+            ],
+            "title": "Presence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_type",
+          "presence",
+          "label",
+          "held"
+        ],
+        "title": "MediumResponse",
         "type": "object"
       },
       "MergeBody": {
@@ -6121,7 +5970,7 @@
   },
   "info": {
     "title": "Akasha",
-    "version": "3.1.0"
+    "version": "4.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9312,6 +9161,94 @@
         "summary": "Put Layout"
       }
     },
+    "/api/home/preview": {
+      "get": {
+        "description": "One module's payload as if it were shown, whatever the layout says (Sprint 150).\n\nWhat *Personalize* draws before something is added. Only that module is read, and\nnothing is stored: looking is not placing. A key that is not something this person\ncan place is refused.",
+        "operationId": "preview_api_home_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "module",
+            "required": true,
+            "schema": {
+              "maxLength": 120,
+              "title": "Module",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Preview"
+      }
+    },
     "/api/import/batches/{batch_id}": {
       "delete": {
         "operationId": "undo_batch_api_import_batches__batch_id__delete",
@@ -11925,6 +11862,245 @@
         "summary": "Refresh Item"
       }
     },
+    "/api/lit-days": {
+      "get": {
+        "description": "The lit days of a week or a month; at most 62 days at a time.",
+        "operationId": "list_lit_days_api_lit_days_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "maxLength": 10,
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "maxLength": 10,
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LitDaysResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Lit Days"
+      }
+    },
+    "/api/lit-days/{day}": {
+      "delete": {
+        "description": "Take everything off a day.",
+        "operationId": "unlight_day_api_lit_days__day__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Unlight Day"
+      },
+      "put": {
+        "description": "Light a day by hand, saying what it was for or nothing; a day to come is refused.",
+        "operationId": "light_day_api_lit_days__day__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LightBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LitDay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Light Day"
+      }
+    },
     "/api/loans": {
       "get": {
         "description": "The owner's loans with their entries, longest out first (Sprint 110).",
@@ -12180,6 +12356,132 @@
           }
         },
         "summary": "List Locations"
+      }
+    },
+    "/api/media": {
+      "get": {
+        "description": "This person's media, in their order (Sprint 143).",
+        "operationId": "get_media_api_media_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Media"
+      },
+      "put": {
+        "description": "Replace the list; a medium it does not name is appended, kept if held, else off.",
+        "operationId": "put_media_api_media_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Media"
       }
     },
     "/api/now": {

@@ -7658,3 +7658,112 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      default and drawn only when it has data, a shelf is hidden until turned on.
 - **Consequences:** Sprints 137 and 138, then 3.1.0. The layout's write contract changes: a key
   is a static module or an existing family member.
+
+## DEC-193 — The library is the home again: one bar, a Journal, media in the owner's order (Sprints 139–148)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 (Home at `/`, superseded in part), DEC-185 (the stored layout,
+  kept), DEC-192 (module families, kept), DEC-165 (the command bar; *Ink* and *Paper*), DEC-136
+  (one surface), DEC-132 (Insights), DEC-169 and DEC-171 (the lights: nothing says behind),
+  DEC-026 (the score ramp means score). The design is
+  [`library-first-proposal.md`](library-first-proposal.md) and its mockup.
+- **Context:** the owner, after 3.1.0: the library was meant to be the home and its search bar
+  the way to find and add; Home moved the focus away; adding is in three places and *Add*, the
+  last resort, is the door people try; shelves compete with the library, Insights with the
+  Diary; the screens feel slightly different; a home that can be made one's own, media in a
+  chosen order, preset themes. Measured on 3.1.0: six doors for adding; the same content under
+  different names on Home and the Library; a shelf, a saved view and a filter as three
+  mechanisms for one idea; seven page widths and five cover cards.
+- **Decision:** the proposal's alternative A, as the owner revised it over three readings.
+  1. The Library is at `/` in three bands, *Now*, *Lately*, *Everything*, with the person's
+     showcases between the second and third. Home as a screen is removed; `/library`
+     redirects. This supersedes DEC-183's "`/` becomes Home; the library moves to `/library`".
+     `GET /api/home`, the stored layout and the module families are kept and feed the bands and
+     showcases.
+  2. One bar: the top bar's field is an input on every screen, answering from the library and
+     then the web, with *Enter it by hand* and *Bring a whole list* in its footer. *Add* and
+     *Import* leave the navigation; the Library's own search field goes.
+  3. *Arrange* edits the Library in place and replaces the *Edit home* dialog. A showcase can
+     be a shelf, a year, *Up next*, *More like this*, *One question* or a number from the
+     Journal.
+  4. Media are an ordered per-person list, each *Front*, *Kept* or *Off*, read by every
+     chooser, the bands and the bar.
+  5. Shelves are a view of *Everything*; a shelf opens as the library filtered to it; the pile
+     and *Lent out* are built-in shelves; a saved view becomes a shelf with a rule.
+  6. The Journal replaces Diary and Insights. It opens on one widget at a time, *Every day*,
+     *Play* or *Goal*, then the timeline, then the patterns. The owner rejected a page of notes
+     ("not something I do often"). Play has no screen or navigation slot of its own. The
+     navigation is *Library* and *Journal*.
+  7. *Every day* shows this week or this month, never the year, with a light per day: lit by
+     logged progress, a finish or a tap. Lighting a day by hand asks what it was for, offering
+     what is under way, in one calm step that can be skipped. It needs a dated record the application does not
+     keep. Nothing counts streaks.
+  8. Theme presets beside *Ink* and *Paper*, each held to AA; the score ramp and the mark's dot
+     do not follow the theme.
+  9. One frame: two page widths, one header, one cover, one medium chooser.
+- **Rejected:** the stronger style drawn at the owner's request (covers on boards in *Now* and
+  *Lately*, a bookplate, a lamp, *On the table*, actions as underlined words): "not a fan of the
+  home redesign, go back to the previous one". Alternatives B (keep Home), C (frame only) and D
+  (a room per medium) are costed in the proposal.
+- **Consequences:** Sprints 139–148, then 4.0.0: addresses move, each old one redirects. Three
+  migrations (media preferences, shelf rules, lit days). The product spec's screens section is
+  rewritten as each sprint lands. The presets' final list and names are the owner's to change;
+  the mockup's four (*Moss*, *Claret*, *Dusk*, *Sakura*) are the default.
+
+## DEC-194 — A shelf's page stays covers to look at; the Library is where it is edited (Sprint 144)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-193 point 5 (amended here), DEC-169 and Sprint 105 (covers without
+  chips on a shelf), DEC-192 (the pile as a list), DEC-176 (lending).
+- **Context:** DEC-193 said a shelf "opens as the library filtered to it", with the Library's
+  card and controls, and that `/pile` and `/lent` redirect to built-in shelves. Building it
+  met two earlier choices of the owner's. In Sprint 105 the owner asked for a shelf's covers
+  without status and score chips over them: "a shelf is for looking at". And the pile and the
+  loans are not filters of the library: the pile's order is a ranking with reasons, and a loan
+  carries a person and a date, neither of which the library's list has.
+- **Decision:**
+  1. Shelves are a view of the Library (`/?view=shelves`) and leave the navigation, as
+     DEC-193 said.
+  2. A shelf's page keeps its covers-only drawing, now through the shared `Cover`, and gains a
+     link per medium to the same shelf in the Library, where sort, filters, status and score
+     are. It is not replaced by the Library's grid.
+  3. *The pile* and *Lent out* stand in the Shelves view as the application's own shelves and
+     open their existing pages, which keep their own order and actions. `/pile` and `/lent` do
+     not redirect.
+  4. *Pin to library* stays: it is a filter shortcut on the Library's bar, not a third kind of
+     shelf.
+- **Consequences:** the proposal's finding that a shelf had "a different card, a different
+  width and no filters" is answered by the shared cover and width (Sprint 139) and the link,
+  not by one screen. If the owner wants the Library's controls on the shelf's own page, that
+  reverses Sprint 105 and is a small sprint.
+
+## DEC-195 — The owner's first look at the 4.0 line: the Journal's two gaps, and Personalize (Sprints 149–150)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-193 (the line), DEC-185 (the stored layout), Sprint 141 (the bands
+  stopped being modules), Sprint 142 (Arrange), Sprint 147 (Every day).
+- **Context:** the owner ran the branch and said: the Goal widget does not let them choose
+  which medium a goal is for; lighting a day with nothing under way offers nothing, and it
+  should offer a search that finds what they mean, new items included; *Arrange* should be
+  called *Edit* or *Personalize*; its functionality is liked and its UX is not: too much
+  scrolling, and it is hard to tell what is a control and what is on the page, the theme
+  included. "What if we had a more standard widget UI? Blank squares with a + for adding new
+  ones, on click you show a list and preview of what you are adding." The general layout
+  should be configurable too: move *Lately* and turn it on or off. "Overall we are good."
+- **Decision:**
+  1. The Goal widget chooses the medium first, among the media a goal can count.
+  2. The day's question gains a search: the library as it is typed, and the web on request,
+     where adding a result makes the entry and chooses it. Still one step; the search is
+     behind *Something else* until wanted.
+  3. *Arrange* becomes **Personalize**. On the page there are only the things placed, each
+     with its handle, and one dashed square with a plus. The plus opens a dialog: what can be
+     added on one side, a real preview of the chosen one on the other, then *Add*. *Your
+     media*, *Theme*, *Reset* and *Done* live in one bar at the top of the front, the first
+     two as dialogs, not in the page.
+  4. *On now* and *Lately* are layout items again, movable and removable like a showcase and
+     always full width. This reverses Sprint 141's "the bands are not theirs to hide".
+- **Consequences:** Sprints 149 and 150. `GET /api/home/preview` for the dialog's preview. A
+  layout stored before Sprint 141 that hid *On now* or *Lately* hides them again.
