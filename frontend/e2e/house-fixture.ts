@@ -37,6 +37,11 @@ export async function stubHouse(page: Page) {
     route.fulfill({ json: [bookType] }),
   );
   await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
+  // The detail page reads the score history; the real server answers it, and an
+  // unanswered read is retried under the test, re-rendering the questions.
+  await page.route("**/api/entries/7/score-history", (route) =>
+    route.fulfill({ json: [] }),
+  );
   await page.route("**/api/items/3/attachments", (route) =>
     route.fulfill({ json: { attachments: [] } }),
   );

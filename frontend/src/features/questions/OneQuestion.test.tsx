@@ -59,6 +59,15 @@ const mount = (value: LibraryEntry) =>
 afterEach(() => vi.restoreAllMocks());
 
 describe("OneQuestion (Sprint 124)", () => {
+  it("asks nothing until the registry has arrived", () => {
+    const { container } = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <OneQuestion entry={entry()} types={undefined} />
+      </QueryClientProvider>,
+    );
+    expect(container.querySelector("[data-question]")).toBeNull();
+  });
+
   it("asks the most useful gap first and saves a date", async () => {
     const bodies = stub();
     mount(entry());
