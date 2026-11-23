@@ -9,6 +9,7 @@ while it renders, it answers per person, and it stays inside its time budget on 
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import time
 from collections.abc import AsyncIterator
@@ -585,6 +586,13 @@ def _seed_large(app: Any, count: int) -> None:
             _goal(app, item_type, 2, "month")
 
 
+#: Sprint 130's budget is a workstation figure: 117-133 ms measured on the owner's machine.
+#: GitHub's shared runner measured the same code at 228 ms median (PR #41), about 1.9x
+#: slower across the whole request, so CI gets the same budget scaled by 2 rather than
+#: a different test.
+_HOME_BUDGET = 0.150 * (2 if os.environ.get("CI") else 1)
+
+
 @pytest.mark.anyio
 async def test_home_answers_inside_its_budget_on_a_large_library(tmp_path: Path) -> None:
     async with _client(tmp_path) as (app, client):
@@ -599,4 +607,4 @@ async def test_home_answers_inside_its_budget_on_a_large_library(tmp_path: Path)
             timings.append(time.perf_counter() - started)
             assert response.status_code == 200
     print(f"home median {statistics.median(timings) * 1000:.1f} ms")
-    assert statistics.median(timings) < 0.150, timings
+    assert statistics.median(timings) < _HOME_BUDGET, timings
