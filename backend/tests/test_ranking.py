@@ -228,6 +228,49 @@ async def test_a_subject_on_almost_everything_is_no_reason(tmp_path: Path) -> No
 
 
 @pytest.mark.anyio
+async def test_a_catalogue_category_reads_as_a_subject_and_general_is_none(
+    tmp_path: Path,
+) -> None:
+    # The owner's real library (the 3.0 rehearsal): Google Books stores categories as
+    # shouted paths ("FICTION / Horror") and Open Library tags many books "General".
+    # "You rate General 6.9 across 7 books" names nothing, and the path reads as one.
+    async with _app(tmp_path) as app:
+        for index in range(3):
+            _entry(
+                app,
+                f"Horror {index}",
+                "read",
+                score=9,
+                metadata={"subjects": ["FICTION / Horror", "General"]},
+                creators=(f"H{index}",),
+            )
+            _entry(
+                app,
+                f"Shelf filler {index}",
+                "read",
+                score=9,
+                metadata={"subjects": ["Fiction / General"]},
+                creators=(f"G{index}",),
+            )
+        for index in range(6):
+            _entry(app, f"Plain {index}", "read", score=5, creators=(f"P{index}",))
+        horror = _entry(
+            app, "Waiting horror", "to_read", metadata={"subjects": ["Fiction / Horror"]}
+        )
+        general = _entry(
+            app,
+            "Waiting general",
+            "to_read",
+            metadata={"subjects": ["General", "Fiction / General"]},
+        )
+
+        ranked = {pick["entry_id"]: pick for pick in _rank(app)}
+
+    assert _reasons(ranked[horror])["affinity"] == "You rate Fiction / Horror 9.0 across 3 books"
+    assert "affinity" not in _reasons(ranked[general])
+
+
+@pytest.mark.anyio
 async def test_a_favourite_creator_lifts_their_waiting_book(tmp_path: Path) -> None:
     async with _app(tmp_path) as app:
         for index, score in enumerate((9, 8, 9, 8, 8)):

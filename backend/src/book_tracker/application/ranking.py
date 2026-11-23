@@ -487,9 +487,10 @@ def _affinity_signal(
         params,
     ).all():
         key = normalize_text(value)
-        if key and item_type in baseline:
+        name = _subject_name(value)
+        if key and name and item_type in baseline:
             _tally(
-                stats.setdefault((item_type, key), _Taste(value.strip())),
+                stats.setdefault((item_type, key), _Taste(name)),
                 score,
                 month,
                 count,
@@ -520,6 +521,22 @@ def _affinity_signal(
             best = (points, f"You rate {taste.name} {mean:.1f} across {taste.rated} {plural}")
         if best is not None:
             candidate.signals.append(("affinity", *best))
+
+
+def _subject_name(value: str) -> str | None:
+    """A stored subject as a reason can say it, or None when it names nothing.
+
+    Catalogues file books under paths in capitals ("FICTION / Horror") and under
+    "General", alone or at the end of a path ("Fiction / General"); the first reads
+    as "Fiction / Horror", the second is no subject at all (the 3.0 rehearsal on the
+    owner's library showed "You rate General 6.9 across 7 books").
+    """
+    parts = [part.strip() for part in value.split("/") if part.strip()]
+    if not parts or normalize_text(parts[-1]) == "general":
+        return None
+    return " / ".join(
+        part.capitalize() if part.isupper() and len(part) > 1 else part for part in parts
+    )
 
 
 def _tally(taste: _Taste, score: int, month: str | None, count: int, today: date) -> None:
