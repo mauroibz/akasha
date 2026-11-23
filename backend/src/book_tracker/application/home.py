@@ -39,6 +39,11 @@ SHELF_LIMIT = 8
 LENT_LIMIT = 5
 #: Suggestions on Home's *More like this*: the most its L size shows.
 SUGGESTED = 8
+#: Covers in a library's year (Sprint 138): a goal of 24 or fewer fills its slots, and
+#: a year without a goal shows at most this many; `total` still counts them all.
+YEAR_COVERS = 48
+#: Covers on a shelf's module, its members changed last first.
+SHELF_COVERS = 24
 #: The status every domain has for what an import left unsorted (technical spec 6.6).
 #: The library hides it by default, so Home's counts do too.
 UNSORTED = "unsorted"
@@ -91,8 +96,17 @@ class HomeService:
         self.embedding_model = embedding_model
 
     def home(
-        self, today: date, hidden: Set[str] = frozenset(), zone: tzinfo = UTC
+        self,
+        today: date,
+        hidden: Set[str] = frozenset(),
+        zone: tzinfo = UTC,
+        *,
+        years: Sequence[str] = (),
+        shelves: Sequence[str] = (),
     ) -> dict[str, Any]:
+        """Every shown module's payload. `years` and `shelves` are the members of the two
+        module families (Sprint 138) the person shows, in their order: item types, and
+        shelf ids as the layout keys carry them."""
         params = {"user": self.user_id, "unsorted": UNSORTED}
         with self.engine.connect() as connection:
             by_status = connection.execute(
@@ -157,7 +171,92 @@ class HomeService:
             "shelves": self._shelves() if shown("shelves") else None,
             "lent": self._lent() if shown("lent") else None,
             "suggested": self._suggested() if shown("suggested") else None,
+            "library_years": self._library_years(today, years, finished, goals),
+            "shelf_modules": self._shelf_modules(shelves),
         }
+
+    def _library_years(
+        self, today: date, years: Sequence[str], finished: Sequence[Any], goals: GoalService
+    ) -> list[dict[str, Any]]:
+        """Each shown library's year: what it finished, in order, and its goal if any.
+
+        A library with neither a finish this year nor a goal is left out, so Home draws
+        nothing for it.
+        """
+        mine = {goal["item_type"]: goal for goal in self._goals(goals)} if years else {}
+        rows: list[dict[str, Any]] = []
+        for item_type in years:
+            domain = DOMAINS.get(item_type)
+            if domain is None or "date_finished" not in domain.entry_fields:
+                continue
+            done = [row for row in finished if row[2] == item_type]
+            goal = mine.get(item_type)
+            if not done and goal is None:
+                continue
+            rows.append(
+                {
+                    "item_type": item_type,
+                    "year": today.year,
+                    "total": len(done),
+                    "goal": None
+                    if goal is None
+                    else {
+                        "item_type": item_type,
+                        "period": goal["period"],
+                        "count": goal["count"],
+                        "target": _target(goal),
+                        "done": len(done),
+                    },
+                    "covers": [_cover(row) for row in done[:YEAR_COVERS]],
+                }
+            )
+        return rows
+
+    def _shelf_modules(self, shelves: Sequence[str]) -> list[dict[str, Any]]:
+        """Each shown shelf: its name, how many it holds, and the covers changed last."""
+        ids = [int(shelf) for shelf in shelves if shelf.isdigit()]
+        if not ids:
+            return []
+        params: dict[str, Any] = {"user": self.user_id, "covers": SHELF_COVERS}
+        names = ", ".join(f":s{index}" for index in range(len(ids)))
+        params.update({f"s{index}": shelf_id for index, shelf_id in enumerate(ids)})
+        with self.engine.connect() as connection:
+            heads = connection.execute(
+                text(
+                    "SELECT s.id, s.name, s.slug, count(es.entry_id) FROM shelves s"
+                    " LEFT JOIN entry_shelves es ON es.shelf_id = s.id"
+                    f" WHERE s.user_id = :user AND s.id IN ({names}) GROUP BY s.id"
+                ),
+                params,
+            ).all()
+            members = connection.execute(
+                text(
+                    "SELECT shelf_id, entry_id, item_id, type, title, cover_path, updated_at,"
+                    " score FROM ("
+                    " SELECT es.shelf_id, e.id AS entry_id, i.id AS item_id, i.type, i.title,"
+                    " i.cover_path, i.updated_at, e.score, row_number() OVER ("
+                    "  PARTITION BY es.shelf_id ORDER BY e.updated_at DESC, e.id DESC) AS place"
+                    " FROM entry_shelves es JOIN entries e ON e.id = es.entry_id"
+                    " JOIN items i ON i.id = e.item_id"
+                    f" WHERE e.user_id = :user AND es.shelf_id IN ({names})"
+                    ") WHERE place <= :covers ORDER BY shelf_id, place"
+                ),
+                params,
+            ).all()
+        covers: dict[int, list[dict[str, Any]]] = defaultdict(list)
+        for row in members:
+            covers[row[0]].append(_cover(row[1:]))
+        found = {
+            shelf_id: {
+                "id": shelf_id,
+                "name": name,
+                "slug": slug,
+                "entry_count": count,
+                "covers": covers[shelf_id],
+            }
+            for shelf_id, name, slug, count in heads
+        }
+        return [found[shelf_id] for shelf_id in ids if shelf_id in found]
 
     def _suggested(self) -> list[dict[str, Any]]:
         """*More like this*: the newest suggestions found and unanswered (Sprint 134).

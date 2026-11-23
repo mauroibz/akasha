@@ -83,10 +83,15 @@ export function GreetingBar({
           <div className="flex gap-1">
             <dt className="sr-only">Pile</dt>
             <dd>
-              <span className="font-semibold tabular-nums text-foreground">
-                {greeting.pile.toLocaleString()}
-              </span>{" "}
-              on the pile
+              <Link
+                to="/pile"
+                className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
+              >
+                <span className="font-semibold tabular-nums text-foreground">
+                  {greeting.pile.toLocaleString()}
+                </span>{" "}
+                on the pile
+              </Link>
             </dd>
           </div>
         </dl>

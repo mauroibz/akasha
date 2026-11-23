@@ -926,16 +926,23 @@ The product-spec route list is authoritative, with these refinements:
   members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
   the five open loans out longest, each `{id, person, lent_on, entry}`; `suggested` (Sprint 134,
   DEC-189), up to eight unanswered suggestions already found in a provider (`enriched`), newest
-  first, each work once, in the suggestion shape below. A module the person hid
-  is not read: `year`, `lately`, `tidy`, `question`, `shelves`, `lent` and `suggested` are `null`, `next` and
+  first, each work once, in the suggestion shape below. `library_years` (Sprint 138, DEC-192),
+  one per shown `year:<item type>` module in layout order, for a library with a finish this year
+  or a goal: `{item_type, year, total, goal: {item_type, period, count, target, done} | null,
+  covers}`, up to 48 covers in finishing order. `shelf_modules`, one per shown `shelf:<id>`
+  module: `{id, name, slug, entry_count, covers}`, up to 24 covers of the members updated last.
+  A module the person hid is not read: `year`, `lately`, `tidy`, `question`, `shelves`, `lent` and `suggested` are `null`, `next` and
   `domains` empty (`now` is still read, for the greeting). `?tz=` (Sprint 132) is the person's
   IANA zone, which the client sends: today and the day an addition counts under in `lately` are
   that zone's; an absent or unknown zone falls back to the server's `TZ`, then UTC. Answers in
   under 150 ms on a 10,000-entry library (about 119 ms median in its test after Sprint 132).
-- `GET /api/pile?type=&limit=` (Sprint 132, DEC-186; `limit` 1–100, default 20) is the pile
+- `GET /api/pile?type=&limit=` (Sprint 132, DEC-186; `limit` 1–1000 since Sprint 138's `/pile`
+  page, default 20) is the pile
   ranked locally, from stored data only: entries in a status their domain declares `planned`,
   most likely wanted next first, each `{entry, score, reasons: [{signal, text}]}`. `score` is
-  the ranking's points, comparable within one answer. `reasons` are only the signals that fired,
+  the ranking's points, comparable within one answer. The order is in rounds by creator (Sprint
+  137, DEC-192): every creator's best-scored waiting entry before any creator's second, so a
+  lower score can come first; within one creator the score's order holds. `reasons` are only the signals that fired,
   the one moving the score most first; each `text` is a sentence citing the data it rests on.
   Signals (`application/ranking.py`, weights as constants there): `series`, the next waiting
   entry of a series the person has finished or is under way in, after the last one by place
@@ -988,10 +995,17 @@ The product-spec route list is authoritative, with these refinements:
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
   `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
-  `libraries`, `tidy`, `question`, `shelves`, `lent`, `suggested` (`application/home_layout.py`). A read is
+  `libraries`, `tidy`, `question`, `shelves`, `lent`, `suggested` (`application/home_layout.py`),
+  and since Sprint 138 (DEC-192) two families: `year:<item type>` for each registered domain
+  whose `entry_fields` hold `date_finished` (default M, shown, after `lately`) and
+  `shelf:<shelf id>` for each of the person's shelves (default M, hidden, at the end). Each row
+  carries `label`, a family member's name for *Edit home* ("Books this year", "Shelf: Name"),
+  `null` for a fixed module and ignored on write. A read is
   lenient — an unknown key, a malformed row or unreadable JSON is dropped, an unknown size falls
   back to the module's default, and every module not named is appended with its default — and
-  carries `defaults`, what *Reset* restores. A write is strict: an unknown module, a size other
+  carries `defaults`, what *Reset* restores. A row naming a family member that no longer exists
+  (a deleted shelf) drops out on read. A write is strict: an unknown module (another person's
+  shelf among them), a size other
   than S/M/L, or a module named twice is a 422 and nothing is stored. A downgrade past 0036
   drops the stored layouts.
 - `GET /api/entries` takes `unscored=true` (Sprint 131): only entries with no score; part of

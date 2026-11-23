@@ -5,6 +5,7 @@ import type { ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { finishAction, finishActionFor } from "@/features/finish/label";
 import { countLabel, progressFor } from "@/features/library/labels";
 import { stepFor } from "@/features/progress/outline";
 import { statusWith } from "@/features/rescore/rescore";
@@ -86,10 +87,10 @@ export function OnNow({
         <button
           type="button"
           className={shape}
-          aria-label={`Finished ${title}`}
+          aria-label={finishActionFor(title, entry.item.type, types)}
           onClick={() => setFinishing(entry)}
         >
-          Finished
+          {finishAction(entry.item.type, types)}
         </button>
         {planned ? (
           <button

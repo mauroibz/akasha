@@ -47,6 +47,7 @@ import {
   labelFor,
   sortLabels,
   statusLabelFor,
+  statusesFor,
 } from "@/features/library/labels";
 import { ResultsGrid } from "@/features/add/ResultsGrid";
 import { useWebSearch } from "@/features/add/useWebSearch";
@@ -61,7 +62,8 @@ import type { SearchCandidate } from "@/api/add";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { HowFarDialog } from "@/features/progress/HowFarDialog";
 import { isAbandoned } from "@/features/progress/outline";
-import { askStill } from "@/features/rescore/rescore";
+import { askStill, isFinished } from "@/features/rescore/rescore";
+import { FinishDialog } from "@/features/finish/FinishDialog";
 import { StillDialog } from "@/features/rescore/StillDialog";
 import {
   defaultLibraryFilters,
@@ -388,6 +390,20 @@ export function LibraryPage() {
     Boolean(filters.query) &&
     library.isSuccess &&
     firstPage?.items.length === 0;
+
+  const [finishing, setFinishing] = useState<{
+    entry: LibraryEntry;
+    status: EntryStatus;
+  } | null>(null);
+  /** A move into a finished status from outside one. */
+  const finishes = (entry: LibraryEntry, status: EntryStatus) =>
+    status !== entry.status &&
+    !isFinished(entry, itemTypes.data) &&
+    Boolean(
+      statusesFor(entry.item.type, itemTypes.data).find(
+        (row) => row.value === status,
+      )?.finished,
+    );
 
   const mutation = usePatchEntry({
     key: queryKeys.library.list(filters),
@@ -1162,7 +1178,11 @@ export function LibraryPage() {
                 mutation.mutate({ entry, changes: { score } })
               }
               onStatus={(entry, status) =>
-                mutation.mutate({ entry, changes: { status } })
+                // Finishing one thing asks when, in the finish sheet (DEC-192);
+                // Cancel leaves the card as it was.
+                finishes(entry, status)
+                  ? setFinishing({ entry, status })
+                  : mutation.mutate({ entry, changes: { status } })
               }
             />
           </m.div>
@@ -1278,6 +1298,12 @@ export function LibraryPage() {
         onClose={() => setAsking(null)}
       />
       <StillDialog entry={still} onClose={() => setStill(null)} />
+      <FinishDialog
+        entry={finishing?.entry ?? null}
+        status={finishing?.status}
+        types={itemTypes.data}
+        onClose={() => setFinishing(null)}
+      />
     </main>
   );
 }

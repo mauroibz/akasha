@@ -104,6 +104,88 @@ describe("HomePage", () => {
     );
   });
 
+  it("draws a library's year and a placed shelf where the layout puts them (DEC-192)", async () => {
+    const home = {
+      ...fullHome(),
+      library_years: [
+        {
+          item_type: "movie",
+          year: 2026,
+          total: 1,
+          goal: null,
+          covers: [
+            {
+              entry_id: 70,
+              item_id: 70,
+              item_type: "movie",
+              title: "Paris, Texas",
+              cover_url: null,
+              score: 9,
+            },
+          ],
+        },
+      ],
+      shelf_modules: [
+        {
+          id: 3,
+          name: "Favorites",
+          slug: "favorites",
+          entry_count: 1,
+          covers: [
+            {
+              entry_id: 71,
+              item_id: 71,
+              item_type: "book",
+              title: "Rayuela",
+              cover_url: null,
+              score: 10,
+            },
+          ],
+        },
+      ],
+    };
+    serve(home, [
+      {
+        module: "shelf:3",
+        size: "M",
+        hidden: false,
+        label: "Shelf: Favorites",
+      },
+      {
+        module: "year:movie",
+        size: "M",
+        hidden: false,
+        label: "Movies this year",
+      },
+      // Shown, but the payload has nothing for it: not drawn.
+      {
+        module: "year:anime",
+        size: "M",
+        hidden: false,
+        label: "Anime this year",
+      },
+      { module: "shelf:4", size: "M", hidden: true, label: "Hidden" },
+      ...fallbackLayout,
+    ] as ModuleLayout[]);
+    renderWithRouter(<HomePage />);
+    const shelf = await screen.findByRole("region", { name: "Favorites" });
+    expect(
+      within(shelf).getByRole("link", { name: "Rayuela" }),
+    ).toHaveAttribute("href", "/books/71");
+    expect(
+      within(shelf).getByRole("link", { name: "1 on the shelf →" }),
+    ).toHaveAttribute("href", "/shelves/favorites");
+    const year = screen.getByRole("region", { name: "Your 2026 movies" });
+    expect(
+      within(year).getByRole("link", { name: "Paris, Texas" }),
+    ).toBeVisible();
+    expect(regionNames().slice(0, 2)).toEqual([
+      "Favorites",
+      "Your 2026 movies",
+    ]);
+    expect(regionNames()).not.toContain("Your 2026 anime");
+  });
+
   it("stores a change made in Edit home", async () => {
     const puts = serve(fullHome());
     renderWithRouter(<HomePage />);

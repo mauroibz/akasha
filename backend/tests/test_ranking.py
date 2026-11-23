@@ -416,6 +416,39 @@ async def test_something_set_aside_lately_is_pushed_down(tmp_path: Path) -> None
 
 
 @pytest.mark.anyio
+async def test_one_creator_does_not_fill_the_top_of_the_pile(tmp_path: Path) -> None:
+    """DEC-192: every creator's best waiting entry comes before any creator's second."""
+    async with _app(tmp_path) as app:
+        for index in range(4):
+            _entry(app, f"Loved {index}", "read", creators=("Stephen King",), score=9)
+        for index in range(3):
+            _entry(app, f"Fine {index}", "read", creators=(f"Fine {index}",), score=6)
+        king = [
+            _entry(
+                app,
+                f"King {index}",
+                "to_read",
+                creators=("Stephen King",),
+                date_added=f"202{index}-01-01T00:00:00Z",
+            )
+            for index in range(5)
+        ]
+        others = [
+            _entry(app, f"Other {index}", "to_read", creators=(f"Author {index}",))
+            for index in range(3)
+        ]
+
+        ranked = _rank(app)
+        alone = _rank(app, limit=4)
+
+    # The oldest King leads on its score; the other authors follow before a second King.
+    assert _ids(ranked)[:4] == [king[0], *others]
+    # Within one creator the order is still the score's: the longer waiting first.
+    assert _ids(ranked)[4:] == king[1:]
+    assert _ids(alone) == [king[0], *others]
+
+
+@pytest.mark.anyio
 async def test_the_order_is_stable_and_ties_break_on_entry_id(tmp_path: Path) -> None:
     async with _app(tmp_path) as app:
         ids = [
@@ -566,6 +599,9 @@ async def test_the_pile_route_ranks_with_reasons_and_no_network(tmp_path: Path) 
             albums = await client.get("/api/pile", params={"type": "album"})
             refused = await client.get("/api/pile", params={"type": "comic"})
             too_many = await client.get("/api/pile", params={"limit": 0})
+            # The pile page lists all of it (DEC-192): up to a thousand.
+            whole = await client.get("/api/pile", params={"limit": 1000})
+            over = await client.get("/api/pile", params={"limit": 1001})
             picks = await client.get("/api/goals/book/picks")
 
     assert every.status_code == 200, every.text
@@ -581,6 +617,8 @@ async def test_the_pile_route_ranks_with_reasons_and_no_network(tmp_path: Path) 
     assert albums.json() == []
     assert refused.status_code == 422
     assert too_many.status_code == 422
+    assert whole.status_code == 200
+    assert over.status_code == 422
     assert [row["entry"]["id"] for row in picks.json()] == [second]
     assert picks.json()[0]["reasons"][0]["signal"] == "series"
     assert calls == []

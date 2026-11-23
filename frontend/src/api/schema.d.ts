@@ -2488,6 +2488,21 @@ export interface components {
       /** Total */
       total: number;
     };
+    /**
+     * HomeLibraryYear
+     * @description One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.
+     */
+    HomeLibraryYear: {
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
+      goal: components["schemas"]["HomeYearGoal"] | null;
+      /** Item Type */
+      item_type: string;
+      /** Total */
+      total: number;
+      /** Year */
+      year: number;
+    };
     /** HomeLoan */
     HomeLoan: {
       entry: components["schemas"]["EntryResponse"];
@@ -2505,6 +2520,8 @@ export interface components {
        * @default false
        */
       hidden: boolean;
+      /** Label */
+      label?: string | null;
       /** Module */
       module: string;
       /**
@@ -2551,11 +2568,15 @@ export interface components {
       /** Lately */
       lately: components["schemas"]["HomeLatelyRow"][] | null;
       lent: components["schemas"]["HomeLent"] | null;
+      /** Library Years */
+      library_years: components["schemas"]["HomeLibraryYear"][];
       /** Next */
       next: components["schemas"]["PilePick"][];
       /** Now */
       now: components["schemas"]["EntryResponse"][];
       question: components["schemas"]["HomeQuestion"] | null;
+      /** Shelf Modules */
+      shelf_modules: components["schemas"]["HomeShelfModule"][];
       /** Shelves */
       shelves: components["schemas"]["HomeShelf"][] | null;
       /** Suggested */
@@ -2565,6 +2586,22 @@ export interface components {
     };
     /** HomeShelf */
     HomeShelf: {
+      /** Entry Count */
+      entry_count: number;
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
+    };
+    /**
+     * HomeShelfModule
+     * @description A shelf placed on Home (Sprint 138): its name, size and latest covers.
+     */
+    HomeShelfModule: {
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
       /** Entry Count */
       entry_count: number;
       /** Id */

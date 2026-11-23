@@ -1,5 +1,5 @@
 import type { Goal, GoalProgress } from "@/api/goals";
-import type { ItemType } from "@/api/library";
+import type { ItemType, LibraryEntry } from "@/api/library";
 import { spelled, type Segment } from "@/features/insights/prose";
 
 /**
@@ -119,10 +119,20 @@ export function slotsFor<T extends { date_finished: string | null }>(
   target: number,
   finished: T[],
 ): Slot<T>[] | null {
-  if (target > slotCap) return null;
-  const ordered = [...finished].sort((a, b) =>
-    (a.date_finished ?? "").localeCompare(b.date_finished ?? ""),
+  return slotsInOrder(
+    target,
+    [...finished].sort((a, b) =>
+      (a.date_finished ?? "").localeCompare(b.date_finished ?? ""),
+    ),
   );
+}
+
+/** The same slots, for finishes already in the order they happened (Home's, DEC-192). */
+export function slotsInOrder<T>(
+  target: number,
+  ordered: T[],
+): Slot<T>[] | null {
+  if (target > slotCap) return null;
   const total = Math.max(target, ordered.length);
   return Array.from({ length: total }, (_, index) => ({
     entry: ordered[index] ?? null,
@@ -137,4 +147,20 @@ export function yearPassed(year: number, today: Date): number {
   const start = new Date(year, 0, 1).getTime();
   const end = new Date(year + 1, 0, 1).getTime();
   return (today.getTime() - start) / (end - start);
+}
+
+/** What a slot shows: enough of an entry to draw its cover and open it. */
+export interface SlotCover {
+  id: number;
+  title: string;
+  cover_url: string | null;
+}
+
+/** An entry as a slot shows it. */
+export function slotCover(entry: LibraryEntry): SlotCover {
+  return {
+    id: entry.id,
+    title: entry.item.title,
+    cover_url: entry.item.cover_url ?? null,
+  };
 }

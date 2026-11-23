@@ -15,8 +15,14 @@ test("a thing is placed, lent, listed as out, and comes back", async ({
   // Nothing recorded yet: no row, a question (Sprint 124).
   await expect(page.locator("[data-fact='location']")).toHaveCount(0);
   const question = page.locator("[data-question]");
-  while ((await question.getAttribute("data-question")) !== "location")
+  // One Skip at a time: the next is clicked only once the question has changed, or
+  // a second click lands while the first is still settling and cycles past it.
+  for (;;) {
+    const kind = await question.getAttribute("data-question");
+    if (kind === "location") break;
     await question.getByRole("button", { name: "Skip" }).click();
+    await expect(question).not.toHaveAttribute("data-question", kind ?? "");
+  }
   await question.getByRole("textbox", { name: "Where it is" }).fill("Hall");
   await question.getByRole("button", { name: "Save" }).click();
   const where = page.locator("[data-fact='location']");

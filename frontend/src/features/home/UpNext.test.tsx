@@ -23,6 +23,18 @@ describe("UpNext", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
   });
 
+  it("opens the pile as a list, and the deck to sort it (DEC-192)", () => {
+    const home = fullHome();
+    renderWithRouter(<UpNext picks={home.next} pile={41} types={types} />);
+    expect(
+      screen.getByRole("link", { name: "41 on the pile →" }),
+    ).toHaveAttribute("href", "/pile");
+    expect(screen.getByRole("link", { name: "Sort" })).toHaveAttribute(
+      "href",
+      "/deck/planned",
+    );
+  });
+
   it("lists the pile in order, each with its strongest reason under it", () => {
     const home = fullHome();
     renderWithRouter(<UpNext picks={home.next} pile={41} types={types} />);
@@ -68,7 +80,7 @@ describe("UpNext", () => {
       screen.queryByRole("button", { name: "Start Paris, Texas" }),
     ).toBeNull();
     await userEvent.click(
-      screen.getByRole("button", { name: "Finished Paris, Texas" }),
+      screen.getByRole("button", { name: "Mark Paris, Texas as watched" }),
     );
     expect(await screen.findByRole("dialog")).toHaveTextContent(
       "You finished Paris, Texas",

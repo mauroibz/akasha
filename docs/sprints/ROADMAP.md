@@ -1944,6 +1944,24 @@ whole, recorded as **DEC-183**; the design is
   sprint's Outcome. This closes DEC-183's line: `make test` and the full Playwright suite are
   the release's.]
 
+## The owner's first review of 3.0 — the 3.1 line
+
+The owner reviewed 3.0.0 on the board on 2026-11-23 and asked for six changes, recorded as
+**DEC-192**: finishing always records when; the finish button reads as an action; a varied
+*Up next*; the pile as a plain list as well as the deck; each library's year on Home, as the
+Diary's goal grid, with or without a goal; shelves on Home. "This home screen is your library."
+
+- **[137 — Finishing, and the pile](137-finishing-and-the-pile.md)**: the finish sheet from a
+  library card's status, today filled in the opinion dialog, *Mark as read*, a creator's second
+  pick after every creator's first, *N on the pile* as a list with *Sort* beside it.
+  [Closed 2026-11-23 (DEC-192). Four criteria met; the pile is its own page, `/pile`, since
+  the library shows one domain at a time; see the sprint's Outcome.]
+- **[138 — Home is your library](138-home-is-your-library.md)**: module families in the stored
+  layout; a year module per library and a module per shelf, each turned on and placed in
+  *Edit home*.
+  [Closed 2026-11-23 (DEC-192). Four criteria met; `library_years` and `shelf_modules` on
+  `/api/home`; the Diary band's `Slots` and `Bar` shared; see the sprint's Outcome.]
+
 ## Not scheduled
 
 - **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024

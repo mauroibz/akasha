@@ -32,6 +32,7 @@ export const queryKeys = {
   now: ["now"] as const,
   /** Home's one read (Sprint 130); any write Home makes invalidates it. */
   home: ["home"] as const,
+  pile: ["pile"] as const,
   homeLayout: ["home-layout"] as const,
   /** One round of *More like this* (Sprint 134), re-read as its job reports. */
   suggestionRound: (roundId: number) => ["suggestion-round", roundId] as const,

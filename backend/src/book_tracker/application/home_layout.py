@@ -6,9 +6,18 @@ read leniently: an unknown key or a malformed row is dropped, an unknown size fa
 back to the module's default, and every module the layout does not name is appended
 with its default. A write is strict: an unknown key, an unknown size or a module named
 twice is refused.
+
+Since Sprint 138 (DEC-192) two module families sit beside the fixed modules: a year
+per library, `year:<item type>`, for every registered domain whose entries carry a
+finished date, and a shelf, `shelf:<shelf id>`, for each of this person's shelves. The
+registry and the shelves table say which members exist; a row naming one that no
+longer does (a deleted shelf) is dropped like any unknown key. A library's year is
+shown by default, after *Lately*, so *The year* and *Lately* keep their row; a shelf
+is hidden until it is turned on.
 """
 
 import json
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Literal, TypedDict
 
@@ -16,6 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 from book_tracker.application.library import LibraryError
+from book_tracker.domain.registry import DOMAINS
 
 Size = Literal["S", "M", "L"]
 SIZES: tuple[Size, ...] = ("S", "M", "L")
@@ -25,6 +35,17 @@ class ModuleLayout(TypedDict):
     module: str
     size: Size
     hidden: bool
+
+
+class LabelledLayout(ModuleLayout):
+    #: What *Edit home* calls a family member ("Books this year", "Shelf: Favorites");
+    #: `None` for a fixed module, which the client names itself.
+    label: str | None
+
+
+#: The families' prefixes.
+YEAR = "year:"
+SHELF = "shelf:"
 
 
 #: Every module, in its default order, with its default size. Sizes are column
@@ -43,7 +64,6 @@ DEFAULT_LAYOUT: tuple[ModuleLayout, ...] = (
     {"module": "suggested", "size": "M", "hidden": False},
 )
 MODULES: tuple[str, ...] = tuple(row["module"] for row in DEFAULT_LAYOUT)
-_DEFAULTS = {row["module"]: row for row in DEFAULT_LAYOUT}
 
 
 class LayoutError(LibraryError):
@@ -54,22 +74,45 @@ def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def defaults() -> list[ModuleLayout]:
-    return [ModuleLayout(**row) for row in DEFAULT_LAYOUT]
+def year_members() -> list[tuple[str, str]]:
+    """`(key, label)` for each library whose entries can carry a finished date."""
+    return [
+        (f"{YEAR}{domain.item_type}", f"{domain.plural_label} this year")
+        for domain in DOMAINS.values()
+        if "date_finished" in domain.entry_fields
+    ]
 
 
-def normalize(stored: object) -> list[ModuleLayout]:
+def defaults(shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
+    """The default: the fixed modules, each library's year after *Lately*, then shelves."""
+    rows: list[LabelledLayout] = []
+    for row in DEFAULT_LAYOUT:
+        rows.append(LabelledLayout(**row, label=None))
+        if row["module"] == "lately":
+            rows.extend(
+                LabelledLayout(module=key, size="M", hidden=False, label=label)
+                for key, label in year_members()
+            )
+    rows.extend(
+        LabelledLayout(module=f"{SHELF}{shelf_id}", size="M", hidden=True, label=f"Shelf: {name}")
+        for shelf_id, name in shelves
+    )
+    return rows
+
+
+def normalize(stored: object, shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
     """A stored layout made whole: known modules in their order, then the rest."""
-    rows: list[ModuleLayout] = []
+    known = {row["module"]: row for row in defaults(shelves)}
+    rows: list[LabelledLayout] = []
     seen: set[str] = set()
     for row in stored if isinstance(stored, list) else []:
         if not isinstance(row, dict):
             continue
         module = row.get("module")
-        if not isinstance(module, str) or module not in _DEFAULTS or module in seen:
+        if not isinstance(module, str) or module not in known or module in seen:
             continue
         seen.add(module)
-        default = _DEFAULTS[module]
+        default = known[module]
         size = row.get("size")
         hidden = row.get("hidden")
         rows.append(
@@ -77,9 +120,10 @@ def normalize(stored: object) -> list[ModuleLayout]:
                 "module": module,
                 "size": size if size in SIZES else default["size"],
                 "hidden": hidden if isinstance(hidden, bool) else default["hidden"],
+                "label": default["label"],
             }
         )
-    rows.extend(ModuleLayout(**row) for row in DEFAULT_LAYOUT if row["module"] not in seen)
+    rows.extend(row for module, row in known.items() if module not in seen)
     return rows
 
 
@@ -88,27 +132,42 @@ class HomeLayoutService:
         self.engine = engine
         self.user_id = user_id
 
-    def read(self) -> list[ModuleLayout]:
+    def shelves(self) -> list[tuple[int, str]]:
+        """This person's shelves, `(id, name)`, in the order the shelves page lists them."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text("SELECT id, name FROM shelves WHERE user_id = :user ORDER BY name, id"),
+                {"user": self.user_id},
+            ).all()
+        return [(shelf_id, name) for shelf_id, name in rows]
+
+    def defaults(self) -> list[LabelledLayout]:
+        return defaults(self.shelves())
+
+    def read(self) -> list[LabelledLayout]:
         with self.engine.connect() as connection:
             stored = connection.execute(
                 text("SELECT layout_json FROM home_layouts WHERE user_id = :user"),
                 {"user": self.user_id},
             ).scalar()
+        shelves = self.shelves()
         if stored is None:
-            return defaults()
+            return defaults(shelves)
         try:
-            return normalize(json.loads(stored))
+            return normalize(json.loads(stored), shelves)
         except ValueError:
-            return defaults()
+            return defaults(shelves)
 
     def hidden(self) -> set[str]:
         return {row["module"] for row in self.read() if row["hidden"]}
 
-    def write(self, modules: list[dict[str, Any]]) -> list[ModuleLayout]:
+    def write(self, modules: list[dict[str, Any]]) -> list[LabelledLayout]:
+        shelves = self.shelves()
+        known = {row["module"] for row in defaults(shelves)}
         seen: set[str] = set()
         for row in modules:
             module = row.get("module")
-            if module not in _DEFAULTS:
+            if module not in known:
                 raise LayoutError(
                     "unknown_module",
                     "Home has no module by that name",
@@ -127,7 +186,11 @@ class HomeLayoutService:
                     "invalid_size", "A size is S, M or L", status_code=422, details=row
                 )
             seen.add(module)
-        layout = normalize(modules)
+        layout = normalize(modules, shelves)
+        stored = [
+            {"module": row["module"], "size": row["size"], "hidden": row["hidden"]}
+            for row in layout
+        ]
         with self.engine.begin() as connection:
             connection.execute(
                 text(
@@ -136,6 +199,6 @@ class HomeLayoutService:
                     " ON CONFLICT (user_id) DO UPDATE SET layout_json = excluded.layout_json,"
                     " updated_at = excluded.updated_at"
                 ),
-                {"user": self.user_id, "layout": json.dumps(layout), "now": _now()},
+                {"user": self.user_id, "layout": json.dumps(stored), "now": _now()},
             )
         return layout

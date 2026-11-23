@@ -2118,7 +2118,7 @@
             "items": {
               "$ref": "#/components/schemas/HomeModuleLayout"
             },
-            "maxItems": 64,
+            "maxItems": 512,
             "title": "Modules",
             "type": "array"
           }
@@ -2174,6 +2174,49 @@
         "title": "HomeLent",
         "type": "object"
       },
+      "HomeLibraryYear": {
+        "description": "One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.",
+        "properties": {
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "goal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeYearGoal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "year",
+          "total",
+          "goal",
+          "covers"
+        ],
+        "title": "HomeLibraryYear",
+        "type": "object"
+      },
       "HomeLoan": {
         "properties": {
           "entry": {
@@ -2207,6 +2250,17 @@
             "default": false,
             "title": "Hidden",
             "type": "boolean"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
           },
           "module": {
             "title": "Module",
@@ -2334,6 +2388,13 @@
               }
             ]
           },
+          "library_years": {
+            "items": {
+              "$ref": "#/components/schemas/HomeLibraryYear"
+            },
+            "title": "Library Years",
+            "type": "array"
+          },
           "next": {
             "items": {
               "$ref": "#/components/schemas/PilePick"
@@ -2357,6 +2418,13 @@
                 "type": "null"
               }
             ]
+          },
+          "shelf_modules": {
+            "items": {
+              "$ref": "#/components/schemas/HomeShelfModule"
+            },
+            "title": "Shelf Modules",
+            "type": "array"
           },
           "shelves": {
             "anyOf": [
@@ -2418,7 +2486,9 @@
           "question",
           "shelves",
           "lent",
-          "suggested"
+          "suggested",
+          "library_years",
+          "shelf_modules"
         ],
         "title": "HomeResponse",
         "type": "object"
@@ -2449,6 +2519,43 @@
           "entry_count"
         ],
         "title": "HomeShelf",
+        "type": "object"
+      },
+      "HomeShelfModule": {
+        "description": "A shelf placed on Home (Sprint 138): its name, size and latest covers.",
+        "properties": {
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "entry_count",
+          "covers"
+        ],
+        "title": "HomeShelfModule",
         "type": "object"
       },
       "HomeTidy": {
@@ -6014,7 +6121,7 @@
   },
   "info": {
     "title": "Akasha",
-    "version": "3.0.0"
+    "version": "3.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -12165,7 +12272,7 @@
             "required": false,
             "schema": {
               "default": 20,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "title": "Limit",
               "type": "integer"

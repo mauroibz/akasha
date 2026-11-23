@@ -89,7 +89,7 @@ describe("OnNow", () => {
     const fetchMock = stubFetch();
     renderWithRouter(<OnNow entries={[watching]} types={types} />);
     await userEvent.click(
-      screen.getByRole("button", { name: "Finished Frieren" }),
+      screen.getByRole("button", { name: "Mark Frieren as completed" }),
     );
     const sheet = await screen.findByRole("dialog");
     expect(sheet).toBeVisible();

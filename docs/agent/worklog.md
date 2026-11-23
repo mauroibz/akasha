@@ -7133,3 +7133,28 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   Read-only root, no capabilities, 1.5 GB, bound to 192.168.100.240:4441 only; ZeroTier gets
   nothing; `/api/home` without a session is 401; the tile label still names one file.
 - Next: the owner reviews; feedback becomes minor releases.
+
+## 2026-11-23 — Sprint 137: finishing, and the pile
+
+- Done: the owner's first review of 3.0 planned as Sprints 137–138 (DEC-192, plan revision 55,
+  branch `owner-review-3.1`). Sprint 137: a card set to a finished status opens the finish
+  sheet; the opinion dialog fills today; *Mark as read* in the domain's word; the pile ordered
+  in rounds by creator; `/pile`, the pile as a list, with *Sort* to the deck.
+- Verified: see the sprint's Outcome (focused backend and Vitest, three Playwright specs 69
+  passed, `make check`, a seeded walkthrough at 1440 and 390).
+- Warning: a local 1.5.7 container (`akasha-akasha-1`, 127.0.0.1:8000) answers the e2e dev
+  server's proxy; 16–17 accessibility tests fail with it up, on `main` as well. Use
+  `AKASHA_E2E_BACKEND=http://127.0.0.1:9`. A `git stash`/`pop` with a clean tree popped the
+  repository's old stash (`adc4de4`, 2026 deployment line); it was reset to HEAD and the stash
+  entry left in place.
+- Next: Sprint 138, Home's module families (a year per library, a module per shelf).
+
+## 2026-11-23 — Sprint 138: Home is your library
+
+- Done: module families in Home's layout (`year:<item type>`, `shelf:<id>`), `library_years` and
+  `shelf_modules` on `/api/home`, `LibraryYear` and `ShelfModule` on Home, *Edit home* naming
+  them. This closes the 3.1 line (DEC-192).
+- Verified: see the sprint's Outcome; walkthrough on the seeded library at 1440 and 390.
+- Next: the release gates (`make test`, the full Playwright suite with
+  `AKASHA_E2E_BACKEND=http://127.0.0.1:9` while the local 1.5.7 container holds :8000, audit,
+  build, smoke-container), release notes, `v3.1.0`, the board.

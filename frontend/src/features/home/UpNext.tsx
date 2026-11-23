@@ -5,6 +5,7 @@ import type { HomeNext, ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { finishAction, finishActionFor } from "@/features/finish/label";
 import { statusWith } from "@/features/rescore/rescore";
 import { cn } from "@/lib/utils";
 
@@ -57,12 +58,21 @@ export function UpNext({
       className={className}
       aside={
         pile ? (
-          <Link
-            to="/deck/planned"
-            className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
-          >
-            {pile.toLocaleString()} on the pile →
-          </Link>
+          // The list and the deck, both (DEC-192).
+          <span className="flex gap-3">
+            <Link
+              to="/pile"
+              className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
+            >
+              {pile.toLocaleString()} on the pile →
+            </Link>
+            <Link
+              to="/deck/planned"
+              className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
+            >
+              Sort
+            </Link>
+          </span>
         ) : undefined
       }
     >
@@ -133,11 +143,15 @@ export function UpNext({
                 ) : (
                   <button
                     type="button"
-                    aria-label={`Finished ${pick.entry.item.title}`}
+                    aria-label={finishActionFor(
+                      pick.entry.item.title,
+                      pick.entry.item.type,
+                      types,
+                    )}
                     onClick={() => setFinishing(pick.entry)}
                     className="mt-auto min-h-11 rounded-full border border-border text-sm font-medium transition-colors hover:bg-accent focus-ring"
                   >
-                    Finished
+                    {finishAction(pick.entry.item.type, types)}
                   </button>
                 )}
               </li>

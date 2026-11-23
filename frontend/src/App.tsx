@@ -95,6 +95,9 @@ const GapsPage = lazy(async () => ({
 const RevisitDeckPage = lazy(async () => ({
   default: (await import("@/pages/RevisitDeckPage")).RevisitDeckPage,
 }));
+const PilePage = lazy(async () => ({
+  default: (await import("@/features/pile/PilePage")).PilePage,
+}));
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
 }));
@@ -212,6 +215,7 @@ function PrivateRoutes({
             <Route path="/diary" element={<DiaryPage />} />
             <Route path="/diary/:year/review" element={<YearReviewPage />} />
             <Route path="/lent" element={<LentPage />} />
+            <Route path="/pile" element={<PilePage />} />
             <Route path="/rank" element={<RankPage />} />
             <Route path="/tiers" element={<TiersPage />} />
             <Route path="/tiers/:type" element={<TiersPage />} />

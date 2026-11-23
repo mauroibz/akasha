@@ -7,6 +7,7 @@ import { queryKeys } from "@/api/keys";
 import { getNow, patchEntry, type LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
+import { finishAction, finishActionFor } from "@/features/finish/label";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { stepFor } from "@/features/progress/outline";
 import { navigateWithTransition } from "@/lib/viewTransition";
@@ -145,10 +146,14 @@ export function NowStrip() {
               <button
                 type="button"
                 onClick={() => setFinishing(entry)}
-                aria-label={`Finished ${entry.item.title}`}
+                aria-label={finishActionFor(
+                  entry.item.title,
+                  entry.item.type,
+                  itemTypes.data,
+                )}
                 className="mt-2 min-h-11 w-full rounded-full bg-primary/15 px-3 text-sm font-medium text-primary hover:bg-primary/25 focus-ring"
               >
-                Finished
+                {finishAction(entry.item.type, itemTypes.data)}
               </button>
             </li>
           );

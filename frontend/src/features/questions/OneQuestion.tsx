@@ -44,6 +44,9 @@ export function OneQuestion({
   onDone?: (outcome: "answered" | "forgotten" | "skipped") => void;
 }) {
   const [skipped, setSkipped] = useState<Question[]>([]);
+  // Which questions apply is the domain's to say: until the registry has arrived, ask
+  // nothing, or one question shows and is swapped for another a moment later.
+  if (!Array.isArray(types)) return null;
   const questions = questionsFor(entry, types);
   const current = questions.find((question) => !skipped.includes(question));
   if (!current) return null;
