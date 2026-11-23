@@ -632,12 +632,12 @@ did not come through Access must be refused:
 
 ```bash
 docker run --rm --network akasha_ingress --entrypoint python \
-  ghcr.io/mauroibz/akasha:2.9.0 -c \
+  ghcr.io/mauroibz/akasha:3.0.0 -c \
   "import urllib.request as u; u.urlopen('http://akasha:8000/api/auth/me')"
 # expected: urllib.error.HTTPError: HTTP Error 403: Forbidden
 ```
 
-(Use the version you run in place of `2.9.0`.)
+(Use the version you run in place of `3.0.0`.)
 
 ### 5. Keep the containers off the LAN
 

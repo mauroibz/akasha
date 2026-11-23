@@ -7074,3 +7074,48 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   Up next's covers fade in after a full-page screenshot.
 - Next: none planned. Release: `make test`, full Playwright, `make smoke-container`. Owner:
   the live embedding check (`record_embedding_fixtures.py`) and Sprint 135's Claude check.
+
+## 2026-11-23 — Release preparation v3.0.0
+
+- Done: the release gates on `home-and-recommendations`; two fixes; version surfaces
+  2.9.0 → 3.0.0 (pyproject, uv.lock, main.py, compose default image, package and lock,
+  openapi, runbook example, docs index); release notes `docs/operations/release-notes-v3.0.md`.
+  Not pushed, tagged or merged (the owner's).
+- Fixes: `a6f57e4` Up next no longer names "General" as a subject and reads a shouted
+  catalogue path as words ("Fiction / Horror"), both seen on the owner's data; `c7a809f` the
+  add-dialog axe check waits for the dialog's 200 ms fade before sampling contrast (failed 4
+  of 16 repeats before, 40 of 40 passed after; the check is unchanged, the goal dialog's test
+  already waited this way).
+- Verified: `make check`; `make test` backend 2195 passed, Vitest 625 passed (2194 before the ranking test; rerun on the
+  final tree after the fixes); full Playwright 239 passed, 2 skipped (live metadata, by design),
+  heavy-library included; `make audit` no known vulnerabilities; `make build`;
+  `make smoke-container` passed on the 3.0.0 tree. The permission-based prune test
+  (`test_the_report_names_a_cover_that_could_not_be_removed`) passes as uid 1000; it can fail
+  only as root, where a read-only directory does not stop an unlink.
+- Rehearsal: the board's nightly backup (2.9.0, revision 0035) copied to a scratchpad data dir,
+  the image built from this tree, run with `compose.yaml` + `compose.bind-mounts.yaml`
+  (read-only root, no capabilities, limits) and `AKASHA_AUTH=on`, twice (before and after the
+  fixes, each on a fresh copy). Pre-migration backup written (its manifest: 0035, counts as
+  live), 0036–0038 applied, integrity ok, no foreign-key violations, items 359, entries 345,
+  attachments 22, shelves 11, users 2; a restart ran no migration and wrote no backup; root
+  read-only, CapEff 0; `/api/home`, `/openapi.json`, `/docs` 401 without a session. A test
+  password was written to the copy's user 1 with `hash_password` (no admin CLI for it).
+- Walkthrough (real data, 1440 and 390, the production bundle in the container, TMDB token
+  from `.env`): Home in ~115 ms; On now, Up next, the year (2 of 24, Aug and Nov covers, slots
+  for what the goal still needs), Lately, five library tiles, Tidy up (12 duplicate pairs, 32
+  without a cover, 3 unscored, matching the decks), One question, Shelves; More like this on
+  Bojack Horseman, Obsession, The Odyssey and the imdb-only Clone Wars film: 11–12 picked by
+  TMDB, 2–3 found, sheet in 1.3–2.3 s; Home's More like this appeared after. No console errors,
+  no 4xx/5xx, no horizontal overflow at 390.
+- Observed, left for the owner (judgement calls): Up next is five Stephen King books (many
+  waiting) with no variety rule; Open Library's bookkeeping subjects ("Large type books",
+  "Reading Level-Grade 11", "New York Times bestseller") can still be named as reasons;
+  Home's More like this at 1440 shows four posters ~290×440 px, much larger than the rest of
+  the grid; the year module is mostly empty space when few finishes carry dates; the sheet
+  shows Model and From your library segments when neither is configured; a found TMDB pick can
+  have no poster (Seth MacFarlane's Cavalcade); Lately shows imported titles as stored
+  ("JUEGO DE GERALD, EL").
+- Private data, logs and screenshots stay in the scratchpad (`rehearsal/`); the copied
+  library was removed after the run.
+- Next: the owner pushes, opens the PR, merges, tags `v3.0.0`, upgrades the board; the live
+  Claude and embedding fixture checks.

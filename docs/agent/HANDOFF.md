@@ -2,37 +2,42 @@
 
 ## Where the project stands
 
-**2026-11-23, Sprint 136 closed; DEC-183's line (Sprints 130–136) is complete and the project
-state is `complete`.** On branch `home-and-recommendations` (local, not pushed, not merged, no
-tag). What the line adds over 2.9.0: Home at `/` (the library moved to `/library`), the ranked
-pile, *More like this* with three sources (TMDB, a hosted model, *From your library*), Home's
-*More like this*, Settings → Suggestions. Migrations **0036–0038** are new since 2.9.0.
+**2026-11-23, release 3.0.0 prepared, not tagged.** DEC-183's line (Sprints 130–136) is
+complete, the project state is `complete`, and the version surfaces say 3.0.0 on branch
+`home-and-recommendations` (local, not pushed, not merged). Release notes:
+`docs/operations/release-notes-v3.0.md`. What the line adds over 2.9.0: Home at `/` (the
+library moved to `/library`), the ranked pile, *More like this* with three sources (TMDB, a
+hosted model, *From your library*), Home's *More like this*, Settings → Suggestions.
+Migrations **0036–0038** are new since 2.9.0.
 
-Sprint 136 (DEC-191): with a hosted embedding endpoint (`AKASHA_RECS_EMBEDDINGS_PROVIDER`
-`gemini` default or `openai`, `_MODEL`, `_KEY` or `GEMINI_API_KEY`/`OPENAI_API_KEY`, `_URL`),
-items carry a vector of their text (`item_embeddings`, migration 0038; `embed_items` jobs, a
-one-minute sweep for new items, the hourly pass for edits; 1,000 requests a day unless
-`AKASHA_PROVIDER_DAILY_LIMITS` says `{"embeddings": N}`). They give *From your library* (the
-nearest waiting entries), Up next's "Close to what you scored 9: …", and rounds read in order of
-likeness. Without a key nothing changes; a Claude key alone does not turn them on.
+**Release gates, run on this tree:** `make check`; `make test` (backend 2195, Vitest 625);
+full Playwright 239 passed, 2 skipped by design; `make audit` clean; `make build`;
+`make smoke-container`. A copy of the board's library (2.9.0, revision 0035) upgraded under the
+read-only compose with auth on: backup written, 0036–0038 applied, integrity and foreign keys
+clean, counts unchanged (359 items, 345 entries, 22 attachments, 11 shelves, 2 users), restart
+ran no migration. Two fixes came out of it: Up next no longer names "General" as a subject
+(`a6f57e4`), and the add-dialog axe check waits for the fade (`c7a809f`).
 
-**For the release (not run in this sprint, by instruction):** `make test`, the full Playwright
-suite, `make smoke-container`; version surfaces and release notes. New variables since 2.9.0:
-`AKASHA_RECOMMEND_DAILY_LIMITS`, `AKASHA_RECS_MODEL_PROVIDER`/`_MODEL`/`_KEY`/`_URL`,
-`AKASHA_RECS_EMBEDDINGS_PROVIDER`/`_MODEL`/`_KEY`/`_URL`, `ANTHROPIC_API_KEY`,
-`GEMINI_API_KEY`, `OPENAI_API_KEY` (all in `compose.yaml` and `.env.example`). The first start
-with an embeddings key embeds the whole library over the following minutes, 32 items a request.
-
-**Pending, the owner's:** no model or embedding key was in the environment, so the fixtures
-(`model_*`, `embeddings_*` in `backend/tests/fixtures/providers/`) are documented shapes marked
-unrecorded, and no live round or embedding has run. With keys, from `backend/`:
-`ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py` and
-`GEMINI_API_KEY=… uv run python ../scripts/record_embedding_fixtures.py`, then rerun
-`tests/test_model_recommendations.py`, `tests/test_embeddings.py` and
+**The owner's next steps:** push, PR, CI, merge, tag `v3.0.0`, upgrade the board (`git
+checkout v3.0.0`, `docker compose pull && docker compose up -d`). Then the live checks no key
+allowed here: `ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py` and
+`GEMINI_API_KEY=… uv run python ../scripts/record_embedding_fixtures.py` from `backend/`,
+rerun `tests/test_model_recommendations.py`, `tests/test_embeddings.py` and
 `tests/test_library_source.py` (a real reply may name or order things differently: update the
-expectations in their own commit), then one *Model* round and one *From your library* in the
-app. The default model ids for Gemini and OpenAI (both kinds) are the sessions' choices; confirm
-them.
+expectations in their own commit), one *Model* round and one *From your library* in the app,
+and confirm the default Gemini and OpenAI model ids.
+
+**Embeddings settings (Sprint 136, DEC-191):** `AKASHA_RECS_EMBEDDINGS_PROVIDER` (`gemini`
+default or `openai`), `_MODEL`, `_KEY` or `GEMINI_API_KEY`/`OPENAI_API_KEY`, `_URL`; 1,000
+requests a day unless `AKASHA_PROVIDER_DAILY_LIMITS` says `{"embeddings": N}` — that value
+replaces the whole default, so keep `"googlebooks": 900` in it. A Claude key alone does not
+turn embeddings on. The first start with a key embeds the whole library over a few minutes.
+
+**Judgement calls from the real-data walkthrough (not fixed):** Up next is five Stephen King
+books (no variety rule); Open Library bookkeeping subjects ("Large type books", "Reading
+Level-Grade 11") can still be named as reasons; Home's *More like this* posters are very large
+at 1440; the year module is mostly empty when few finishes carry dates; the sheet shows Model
+and From your library segments when neither is configured; a found TMDB pick can lack a poster.
 
 Seen in Sprint 136's walkthrough and left (pre-existing): an add from Open Library can store a
 foreign edition's title ("Bai nian gu du" for *Cien años de soledad*, `original_year` 1999) or
@@ -115,11 +120,10 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. The release step is the owner's (merge, `make test`, full Playwright,
-`make smoke-container`, version, notes, tag). Run checks under `set -o pipefail`.
-Walkthroughs: `uv run python ../scripts/walkthrough.py [--replay module]` from `backend/`, vite
-on 5180 with `AKASHA_E2E_BACKEND` (it listens on `localhost`); export only `TMDB_READ_TOKEN` from
-`.env` (it also sets `AKASHA_AUTH=on`); start a fresh backend after backend changes; stop
-servers by port (`fuser -k`). `accessibility.spec.ts` *the add dialog over the library* failed
-2 of 3 on Sprint 134's base; rerun alone before suspecting a change. Playwright ignores any
-path containing `scratchpad`. The board runs 2.7.0 until the owner upgrades it.
+No sprint is planned; 3.0.0 is prepared and waits on the owner's push, merge and tag. Run
+checks under `set -o pipefail`. Walkthroughs: `uv run python ../scripts/walkthrough.py
+[--replay module]` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND` (it listens on
+`localhost`); export only `TMDB_READ_TOKEN` from `.env` (it also sets `AKASHA_AUTH=on`); start a
+fresh backend after backend changes; stop servers by port (`fuser -k`). Playwright ignores any
+path containing `scratchpad`. `test_prune_items.py`'s unremovable-cover test fails only as root.
+The board runs 2.9.0 until the owner upgrades it.
