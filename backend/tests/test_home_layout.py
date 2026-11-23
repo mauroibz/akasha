@@ -25,6 +25,7 @@ from book_tracker.application.home_layout import DEFAULT_LAYOUT, MODULES, defaul
 from book_tracker.application.passwords import hash_password
 from book_tracker.application.sessions import SessionStore
 from book_tracker.config import Settings
+from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 from book_tracker.migrations import alembic_config, upgrade
 
@@ -262,6 +263,98 @@ async def test_a_family_member_that_does_not_exist_is_refused(tmp_path: Path, mo
         )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "unknown_module"
+
+
+def _held(app: Any, title: str, item_type: str, status: str, user: int = 1) -> None:
+    """One entry of a medium, so the person holds it."""
+    created = DomainRepository(app.state.engine, user).create_or_get_entry(
+        title=title, item_type=item_type
+    )
+    with app.state.engine.begin() as connection:
+        connection.execute(
+            text("UPDATE entries SET status = :status WHERE id = :id"),
+            {"status": status, "id": created.entry_id},
+        )
+
+
+@pytest.mark.anyio
+async def test_a_number_from_the_journal_is_offered_per_medium_held(tmp_path: Path) -> None:
+    """Sprint 142 (DEC-193): `insight:<item type>:<section>`, hidden until placed."""
+    async with _client(tmp_path) as (app, client):
+        before = {row["module"] for row in (await client.get("/api/home/layout")).json()["modules"]}
+        _held(app, "Rayuela", "book", "read")
+        layout = (await client.get("/api/home/layout")).json()
+    assert not any(key.startswith("insight:") for key in before)
+    rows = {row["module"]: row for row in layout["modules"]}
+    assert rows["insight:book:scores"] == {
+        "module": "insight:book:scores",
+        "size": "S",
+        "hidden": True,
+        "label": "How you rate books",
+    }
+    assert rows["insight:book:decade"]["label"] == "Books by decade"
+    # Every key the domain declares groupable, named by the domain's own label.
+    assert rows["insight:book:subjects"]["label"] == "Books by subjects"
+    assert "insight:book:description" not in rows
+    # A medium the person holds nothing of is not offered.
+    assert not any(key.startswith("insight:movie:") for key in rows)
+    # After the fixed showcases, the years and the shelves.
+    keys = [row["module"] for row in layout["modules"]]
+    assert keys.index("insight:book:scores") > keys.index("year:book")
+
+
+@pytest.mark.anyio
+async def test_a_placed_number_round_trips_and_does_not_disturb_home(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "read")
+        saved = [{"module": "insight:book:scores", "size": "M", "hidden": False}]
+        put = await client.put("/api/home/layout", json={"modules": saved})
+        got = (await client.get("/api/home/layout")).json()["modules"]
+        home = await client.get("/api/home")
+    assert put.status_code == 200, put.text
+    assert got[0] == {
+        "module": "insight:book:scores",
+        "size": "M",
+        "hidden": False,
+        "label": "How you rate books",
+    }
+    assert home.status_code == 200, home.text
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "module",
+    [
+        "insight:book:description",  # a field the domain does not declare groupable
+        "insight:book:nonsense",
+        "insight:movie:scores",  # nothing held of that medium
+        "insight:comic:scores",
+        "insight:book",
+    ],
+)
+async def test_a_number_that_does_not_exist_is_refused(tmp_path: Path, module: str) -> None:
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "read")
+        response = await client.put(
+            "/api/home/layout", json={"modules": [{"module": module, "size": "S"}]}
+        )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "unknown_module"
+
+
+@pytest.mark.anyio
+async def test_one_persons_media_do_not_offer_numbers_to_another(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id,username,display_name,password_hash,password_salt,"
+                    "is_admin,created_at,updated_at) VALUES (2,'bruno','Bruno','x','y',0,'n','n')"
+                )
+            )
+        _held(app, "Up", "movie", "watched", user=2)
+        mine = {row["module"] for row in (await client.get("/api/home/layout")).json()["modules"]}
+    assert not any(key.startswith("insight:") for key in mine)
 
 
 @pytest.mark.anyio

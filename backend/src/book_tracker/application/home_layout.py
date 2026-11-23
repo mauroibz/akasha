@@ -19,6 +19,11 @@ its bands and tabs say is no longer a module (`now`, `lately`, `libraries`, `she
 `tidy`, `lent` and the all-media `year`): a layout stored before then still names
 them, and the lenient read drops them like any unknown key. Only *Up next* and the
 libraries' years are shown until the person places more, so the grid stays near.
+
+Sprint 142 adds a third family, a number from the Journal: `insight:<item type>:<section>`,
+where a section is `scores`, `decade`, or a key the domain declares groupable. It is
+offered for each medium the person holds an entry of, hidden until placed. The registry
+says which keys exist, so nothing here names a medium.
 """
 
 import json
@@ -51,6 +56,11 @@ class LabelledLayout(ModuleLayout):
 #: The families' prefixes.
 YEAR = "year:"
 SHELF = "shelf:"
+INSIGHT = "insight:"
+#: The sections every medium has without declaring anything: how it is scored, and the
+#: built-in ranking by decade.
+INSIGHT_SCORES = "scores"
+INSIGHT_DECADE = "decade"
 
 
 #: Every module, in its default order, with its default size. Sizes are column
@@ -81,8 +91,29 @@ def year_members() -> list[tuple[str, str]]:
     ]
 
 
-def defaults(shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
-    """The default: the fixed modules, each library's year after *Up next*, then shelves."""
+def insight_members(held: Sequence[str]) -> list[tuple[str, str]]:
+    """`(key, label)` for each number a medium the person holds can show, in registry order."""
+    members: list[tuple[str, str]] = []
+    for domain in DOMAINS.values():
+        if domain.item_type not in held:
+            continue
+        prefix = f"{INSIGHT}{domain.item_type}:"
+        plural = domain.plural_label
+        members.append((f"{prefix}{INSIGHT_SCORES}", f"How you rate {plural.lower()}"))
+        members.append((f"{prefix}{INSIGHT_DECADE}", f"{plural} by decade"))
+        members.extend(
+            (f"{prefix}{field.name}", f"{plural} by {field.label.lower()}")
+            for field in domain.fields
+            if field.groupable
+        )
+    return members
+
+
+def defaults(
+    shelves: Sequence[tuple[int, str]] = (), held: Sequence[str] = ()
+) -> list[LabelledLayout]:
+    """The default: the fixed modules, each library's year after *Up next*, the shelves,
+    then the numbers of each medium held."""
     rows: list[LabelledLayout] = []
     for row in DEFAULT_LAYOUT:
         rows.append(LabelledLayout(**row, label=None))
@@ -95,12 +126,18 @@ def defaults(shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
         LabelledLayout(module=f"{SHELF}{shelf_id}", size="M", hidden=True, label=f"Shelf: {name}")
         for shelf_id, name in shelves
     )
+    rows.extend(
+        LabelledLayout(module=key, size="S", hidden=True, label=label)
+        for key, label in insight_members(held)
+    )
     return rows
 
 
-def normalize(stored: object, shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
+def normalize(
+    stored: object, shelves: Sequence[tuple[int, str]] = (), held: Sequence[str] = ()
+) -> list[LabelledLayout]:
     """A stored layout made whole: known modules in their order, then the rest."""
-    known = {row["module"]: row for row in defaults(shelves)}
+    known = {row["module"]: row for row in defaults(shelves, held)}
     rows: list[LabelledLayout] = []
     seen: set[str] = set()
     for row in stored if isinstance(stored, list) else []:
@@ -139,8 +176,20 @@ class HomeLayoutService:
             ).all()
         return [(shelf_id, name) for shelf_id, name in rows]
 
+    def held(self) -> list[str]:
+        """The media this person holds an entry of, the Inbox aside."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT DISTINCT i.type FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user AND e.status != 'unsorted'"
+                ),
+                {"user": self.user_id},
+            ).all()
+        return [item_type for (item_type,) in rows]
+
     def defaults(self) -> list[LabelledLayout]:
-        return defaults(self.shelves())
+        return defaults(self.shelves(), self.held())
 
     def read(self) -> list[LabelledLayout]:
         with self.engine.connect() as connection:
@@ -149,19 +198,21 @@ class HomeLayoutService:
                 {"user": self.user_id},
             ).scalar()
         shelves = self.shelves()
+        held = self.held()
         if stored is None:
-            return defaults(shelves)
+            return defaults(shelves, held)
         try:
-            return normalize(json.loads(stored), shelves)
+            return normalize(json.loads(stored), shelves, held)
         except ValueError:
-            return defaults(shelves)
+            return defaults(shelves, held)
 
     def hidden(self) -> set[str]:
         return {row["module"] for row in self.read() if row["hidden"]}
 
     def write(self, modules: list[dict[str, Any]]) -> list[LabelledLayout]:
         shelves = self.shelves()
-        known = {row["module"] for row in defaults(shelves)}
+        held = self.held()
+        known = {row["module"] for row in defaults(shelves, held)}
         seen: set[str] = set()
         for row in modules:
             module = row.get("module")
@@ -184,7 +235,7 @@ class HomeLayoutService:
                     "invalid_size", "A size is S, M or L", status_code=422, details=row
                 )
             seen.add(module)
-        layout = normalize(modules, shelves)
+        layout = normalize(modules, shelves, held)
         stored = [
             {"module": row["module"], "size": row["size"], "hidden": row["hidden"]}
             for row in layout
