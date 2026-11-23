@@ -106,7 +106,7 @@ export function GreetingBar({
             aria-pressed={arranging}
             className="min-h-11 text-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
           >
-            {arranging ? "Done arranging" : "Arrange"}
+            {arranging ? "Done" : "Personalize"}
           </button>
         ) : null}
       </div>

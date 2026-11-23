@@ -922,8 +922,8 @@ The product-spec route list is authoritative, with these refinements:
   `{item_type, year, total, goal: {item_type, period, count, target, done} | null, covers}`, up
   to 48 covers in finishing order; `shelf_modules`, one per shown `shelf:<id>` showcase:
   `{id, name, slug, entry_count, covers}`, up to 24 covers of the members updated last.
-  `greeting`, `now` and `lately` are the Library's bands and are always read. A showcase the
-  person hid is not: `question` and `suggested` are `null`, `next` empty. The sections Home had
+  A thing the person removed is not read: `question` and `suggested` are `null`, `next`,
+  `now` and `lately` empty; what is under way is still read for `greeting`. The sections Home had
   and the Library does not (`year`, `domains`, `tidy`, `shelves`, `lent`) were removed in Sprint
   141. `?tz=` (Sprint 132) is the person's
   IANA zone, which the client sends: today and the day an addition counts under in `lately` are
@@ -1014,11 +1014,15 @@ The product-spec route list is authoritative, with these refinements:
   fill. No rule names a medium (6.6).
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
-  `user_id`, cascading with the user). The module keys are `next` (L, shown), `question` (S,
-  hidden) and `suggested` (M, hidden) (`application/home_layout.py`): the Library's showcases
-  since Sprint 141 (DEC-193), when `now`, `year`, `lately`, `libraries`, `tidy`, `shelves` and
-  `lent` stopped being modules; a layout stored before then still names them and the lenient
-  read drops them, while a write naming one is refused like any unknown key.
+  `user_id`, cascading with the user). The module keys are `now` and `lately` (L, shown; the
+  two bands, drawn the full width whatever their size, layout items again since Sprint 150,
+  DEC-195), `next` (L, shown), `question` (S, hidden) and `suggested` (M, hidden)
+  (`application/home_layout.py`). `year`, `libraries`, `tidy`, `shelves` and `lent` stopped
+  being modules in Sprint 141 (DEC-193); a layout stored before then still names them and the
+  lenient read drops them, while a write naming one is refused like any unknown key.
+  `GET /api/home/preview?module=<key>` (Sprint 150) answers `/api/home`'s payload with only
+  that module read, as if it were shown, and stores nothing; a key the person cannot place is
+  `unknown_module`.
   Since Sprint 142 a third family, `insight:<item type>:<section>` (default S, hidden, at the
   end), is offered for each medium the person holds a non-`unsorted` entry of: `scores`,
   `decade` and each field the domain declares `groupable`, labelled from the registry ("How you

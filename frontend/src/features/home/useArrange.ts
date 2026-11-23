@@ -174,7 +174,7 @@ export function useArrange(
       patch(module, { hidden: true });
       setAnnouncement(`${name} removed`);
     },
-    add: (module: string) => {
+    add: (module: string, size?: ModuleSize) => {
       const name = nameOf(module);
       // Added at the end of what is shown, where the eye lands after the tray.
       const row = latest.current.find((item) => item.module === module);
@@ -186,7 +186,7 @@ export function useArrange(
       );
       commit([
         ...rest.slice(0, last + 1),
-        { ...row, hidden: false },
+        { ...row, hidden: false, size: size ?? row.size },
         ...rest.slice(last + 1),
       ]);
       focusAfter.current = module;

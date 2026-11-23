@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ModuleLayout } from "@/api/home";
 
-import { ArrangeControls, ArrangeTray } from "./Arrange";
+import { ArrangeControls } from "./Arrange";
 import { movedAmongShown, useArrange } from "./useArrange";
 
 type Row = ModuleLayout & { label?: string | null };
@@ -24,15 +24,7 @@ const start: Row[] = [
   },
 ];
 
-function Harness({
-  onChange,
-  onDone = () => undefined,
-  onReset = () => undefined,
-}: {
-  onChange: (next: ModuleLayout[]) => void;
-  onDone?: () => void;
-  onReset?: () => void;
-}) {
+function Harness({ onChange }: { onChange: (next: ModuleLayout[]) => void }) {
   const [layout, setLayout] = useState<ModuleLayout[]>(start);
   const arrange = useArrange(layout, (next) => {
     setLayout(next);
@@ -49,12 +41,10 @@ function Harness({
             </li>
           ))}
       </ul>
-      <ArrangeTray
-        layout={arrange.shown}
-        arrange={arrange}
-        onDone={onDone}
-        onReset={onReset}
-      />
+      <button type="button" onClick={() => arrange.add("shelf:7", "L")}>
+        add the shelf, large
+      </button>
+      <p role="status">{arrange.announcement}</p>
     </>
   );
 }
@@ -122,47 +112,44 @@ describe("arranging the Library (Sprint 142, DEC-193)", () => {
     expect(saved.find((row) => row.module === "next")?.size).toBe("S");
   });
 
-  it("removes a showcase to the tray, and adds one from it after those shown", async () => {
+  it("removes a thing, and adds one after those shown at the size asked", async () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Remove Up next" }));
     expect(placed()).toEqual(["year:book", "suggested"]);
-    const tray = screen.getByRole("region", { name: "Add a showcase" });
-    expect(
-      within(tray).getByRole("button", { name: "Add Up next" }),
-    ).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Up next removed");
 
     await user.click(
-      within(tray).getByRole("button", { name: "Add How you rate books" }),
+      screen.getByRole("button", { name: "add the shelf, large" }),
     );
-    expect(placed()).toEqual(["year:book", "suggested", "insight:book:scores"]);
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "How you rate books added",
-    );
+    expect(placed()).toEqual(["year:book", "suggested", "shelf:7"]);
+    const saved = onChange.mock.lastCall![0] as ModuleLayout[];
+    expect(saved.find((row) => row.module === "shelf:7")).toMatchObject({
+      hidden: false,
+      size: "L",
+    });
     expect(
-      screen.getByRole("button", { name: "Move How you rate books" }),
+      screen.getByRole("button", { name: "Move Shelf: Horror" }),
     ).toHaveFocus();
   });
 
-  it("groups the tray by kind and names a shelf by its own name", () => {
-    render(<Harness onChange={vi.fn()} />);
-    const tray = screen.getByRole("region", { name: "Add a showcase" });
-    expect(within(tray).getByText("A shelf")).toBeVisible();
-    expect(within(tray).getByText("A number from the Journal")).toBeVisible();
-    expect(
-      within(tray).getByRole("button", { name: "Add Shelf: Horror" }),
-    ).toHaveTextContent(/^Horror$/);
-  });
-
-  it("offers Reset and Done", async () => {
-    const onDone = vi.fn();
-    const onReset = vi.fn();
-    render(<Harness onChange={vi.fn()} onDone={onDone} onReset={onReset} />);
-    await userEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await userEvent.click(screen.getByRole("button", { name: "Done" }));
-    expect(onReset).toHaveBeenCalledOnce();
-    expect(onDone).toHaveBeenCalledOnce();
+  it("gives a band no size: it is always the whole row", () => {
+    function Band() {
+      const arrange = useArrange(
+        [{ module: "lately", size: "L", hidden: false }],
+        vi.fn(),
+      );
+      return (
+        <ArrangeControls
+          row={{ module: "lately", size: "L", hidden: false }}
+          arrange={arrange}
+        />
+      );
+    }
+    render(<Band />);
+    expect(screen.getByRole("button", { name: "Remove Lately" })).toBeVisible();
+    expect(screen.queryByRole("group", { name: "Size of Lately" })).toBeNull();
   });
 });
 

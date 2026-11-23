@@ -736,6 +736,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/home/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Preview
+     * @description One module's payload as if it were shown, whatever the layout says (Sprint 150).
+     *
+     *     What *Personalize* draws before something is added. Only that module is read, and
+     *     nothing is stored: looking is not placing. A key that is not something this person
+     *     can place is refused.
+     */
+    get: operations["preview_api_home_preview_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/import/batches/{batch_id}": {
     parameters: {
       query?: never;
@@ -6392,6 +6416,65 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HomeLayoutResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  preview_api_home_preview_get: {
+    parameters: {
+      query: {
+        module: string;
+        tz?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeResponse"];
         };
       };
       /** @description Unauthorized */

@@ -100,6 +100,8 @@ export const test = base.extend<{
       // Home's layout (Sprint 131): the default, unless a spec says otherwise.
       await page.route("**/api/home/layout", (route) => {
         const modules = [
+          ["now", "L"],
+          ["lately", "L"],
           ["next", "L"],
           ["question", "S"],
           ["suggested", "M"],

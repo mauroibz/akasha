@@ -84,9 +84,11 @@ describe("LibraryFront (Sprint 141, DEC-193)", () => {
     expect(urls).toContain(`/api/home?tz=${encodeURIComponent(zone)}`);
   });
 
-  it("shows only what the person placed, in their order; the bands are not theirs to hide", async () => {
+  it("shows only what the person placed, in their order, the bands included (Sprint 150)", async () => {
     serve(fullHome(), [
       { module: "question", size: "S", hidden: false },
+      { module: "lately", size: "L", hidden: false },
+      { module: "now", size: "L", hidden: true },
       { module: "next", size: "L", hidden: true },
       { module: "suggested", size: "M", hidden: true },
     ]);
@@ -94,9 +96,8 @@ describe("LibraryFront (Sprint 141, DEC-193)", () => {
     await screen.findByRole("region", { name: "One question" });
     expect(regionNames()).toEqual([
       "Your library today",
-      "On now",
-      "Lately",
       "One question",
+      "Lately",
     ]);
   });
 
@@ -156,36 +157,55 @@ describe("LibraryFront (Sprint 141, DEC-193)", () => {
     );
   });
 
-  it("arranges in place: removing a showcase stores it, and the tray offers it back", async () => {
+  it("personalizes in place: only what is placed and one plus on the page, the rest in the bar", async () => {
     const puts = serve(fullHome());
     renderWithRouter(<LibraryFront />);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Arrange" }),
+      await screen.findByRole("button", { name: "Personalize" }),
     );
+    const bar = screen.getByRole("toolbar", { name: "Personalize" });
+    // No tray, no media list and no swatches in the page (DEC-195).
+    expect(screen.queryByRole("region", { name: "Add a showcase" })).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Theme" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Your media" })).toBeNull();
+
     await userEvent.click(
-      screen.getByRole("button", { name: "Remove Up next" }),
+      screen.getByRole("button", { name: "Remove Lately" }),
     );
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0].find((row) => row.module === "next")?.hidden).toBe(true);
-    expect(screen.queryByRole("region", { name: "Up next" })).toBeNull();
-    const tray = screen.getByRole("region", { name: "Add a showcase" });
-    expect(
-      within(tray).getByRole("button", { name: "Add Up next" }),
-    ).toBeVisible();
+    expect(puts[0].find((row) => row.module === "lately")?.hidden).toBe(true);
+    expect(screen.queryByRole("region", { name: "Lately" })).toBeNull();
 
-    await userEvent.click(within(tray).getByRole("button", { name: "Done" }));
-    expect(screen.queryByRole("region", { name: "Add a showcase" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Arrange" })).toBeVisible();
+    // The plus offers it back, with its preview.
+    await userEvent.click(
+      screen.getByRole("button", { name: "Add to your library's front" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Add to your library",
+    });
+    await userEvent.click(
+      within(dialog).getByRole("radio", { name: "Lately" }),
+    );
+    await userEvent.click(
+      within(dialog).getByRole("button", { name: "Add Lately" }),
+    );
+    await waitFor(() => expect(puts).toHaveLength(2));
+    expect(puts[1].find((row) => row.module === "lately")?.hidden).toBe(false);
+    expect(await screen.findByRole("region", { name: "Lately" })).toBeVisible();
+
+    await userEvent.click(within(bar).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("toolbar", { name: "Personalize" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Personalize" })).toBeVisible();
   });
 
-  it("keeps a showcase with nothing to show in place while arranging, and leaves it out otherwise", async () => {
+  it("keeps a showcase with nothing to show in place while personalizing, and leaves it out otherwise", async () => {
     const home = fullHome();
     home.question = null;
     serve(home);
     renderWithRouter(<LibraryFront />);
     await screen.findByRole("region", { name: "Up next" });
     expect(document.querySelector('[data-module="question"]')).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Arrange" }));
+    await userEvent.click(screen.getByRole("button", { name: "Personalize" }));
     expect(
       screen.getByRole("button", { name: "Move One question" }),
     ).toBeVisible();

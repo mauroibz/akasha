@@ -55,4 +55,38 @@ One per deliverable, then `[DOCS]` close.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-195). Commits: `BACK` (the bands in the layout, the preview
+endpoint), `FRONTH` (Personalize).
+
+- **Bands in the layout.** `now` and `lately` are layout keys, first and shown by default,
+  always the full width, with a handle and remove and no size.
+- **`GET /api/home/preview?module=`**: one module's payload as if shown; stores nothing.
+- **Personalize.** The greeting's button reads *Personalize*, then *Done*. In the mode a bar
+  holds *Your media* and *Theme* (dialogs), *Reset* and *Done*; the page holds what is placed
+  and one dashed square with a plus. A placed thing with nothing to show is one line.
+- **The add dialog.** What is not placed, by kind, on the left; on the right the chosen one
+  drawn by the component that would stand on the page, inert, from the preview endpoint; its
+  size (not for a band); *Add*. `features/home/Showcase.tsx` is the one renderer for the page
+  and the preview. The tray is deleted.
+
+Acceptance: 1 by `test_home_layout.py`, `LibraryFront.test.tsx` and `e2e/home.spec.ts`
+(remove, add back, reload); 2 by `Personalize.test.tsx` and the e2e test; 3 by
+`LibraryFront.test.tsx`; 4 by the keyboard e2e test and axe in the mode and on the open
+dialog at 390 and 1440 px.
+
+Verification: backend, the nine files around the change, 196 passed; Vitest 766 passed; every
+Playwright project 249 passed, 2 skipped by design; `make check`. In the running app on a copy
+of the development library at 1440 and 390 px: the bar, handles on what is placed, the plus,
+the dialog listing 21 things with *How you rate books* drawn in its preview. No overflow, no
+console errors.
+
+Deviations:
+
+- The preview is drawn at the dialog's width whatever size is chosen; the size changes how
+  much the thing shows, as on a phone.
+- A year is still offered for every medium that records a finish, held or not, so on a small
+  library the dialog and the default page list years with nothing in them. Left: it is how a
+  goal's slots can be shown before the first finish.
+- With many shelves and media the dialog's list is long; it scrolls inside the dialog.
+
+Impact: none planned. This closes DEC-195.

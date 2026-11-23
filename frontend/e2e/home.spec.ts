@@ -7,7 +7,7 @@ import { entry as seededEntry } from "./seed";
 /**
  * Home (Sprints 130-131, DEC-183): the screen Akasha opens on. Renders from one
  * `GET /api/home`; *Start* and *Finished* change the entry; a library tile opens
- * the filtered library; *Arrange* reorders (keys and drag), resizes and removes
+ * the filtered library; *Personalize* reorders (keys and drag), resizes, removes and adds
  * modules, stored so a reload keeps them; no horizontal scroll and no serious axe
  * violations at 390px and 1440px in both themes, with and without the panel open.
  */
@@ -206,9 +206,12 @@ const home = {
   },
 };
 
-// The showcases: what the Library's bands and tabs say is no longer a module
-// (Sprint 141, DEC-193).
+// The front's layout: the two bands, movable and removable since Sprint 150
+// (DEC-195), then the showcases.
+const bands = ["now", "lately"];
 const defaults = [
+  ["now", "L"],
+  ["lately", "L"],
   ["next", "L"],
   ["question", "S"],
   ["suggested", "M"],
@@ -250,6 +253,10 @@ async function stubHome(page: Page) {
     route.fulfill({ json: types }),
   );
   await page.route(isHome, (route) => route.fulfill({ json: home }));
+  // What Personalize's add dialog draws before something is placed (Sprint 150).
+  await page.route("**/api/home/preview?**", (route) =>
+    route.fulfill({ json: home }),
+  );
   await page.route("**/api/entries/*", async (route) => {
     const request = route.request();
     if (request.method() !== "PATCH") return route.fallback();
@@ -313,15 +320,23 @@ test("the pile's count opens the pile as a list, and Sort the deck (DEC-192)", a
   );
 });
 
-test("Arrange reorders with the keyboard, resizes and removes in place, and a reload keeps it", async ({
+/** The showcases in the stored order, the bands aside. */
+const showcases = (modules: Layout) =>
+  modules.map((row) => row.module).filter((module) => !bands.includes(module));
+
+test("Personalize reorders with the keyboard, resizes and removes in place, adds from the plus, and a reload keeps it", async ({
   page,
 }) => {
   await stubHome(page);
   const store = await stubLayout(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Arrange" }).click();
-  // In place: no dialog covers the screen being arranged (Sprint 142).
+  await page.getByRole("button", { name: "Personalize" }).click();
+  const bar = page.getByRole("toolbar", { name: "Personalize" });
+  await expect(bar).toBeVisible();
+  // In place, and nothing in the page but what is placed and one plus (DEC-195).
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("radiogroup", { name: "Theme" })).toHaveCount(0);
+
   await page
     .getByRole("button", { name: "Move One question", exact: true })
     .focus();
@@ -334,47 +349,65 @@ test("Arrange reorders with the keyboard, resizes and removes in place, and a re
     .getByRole("button", { name: "Large" })
     .click();
   await page.getByRole("button", { name: "Remove Up next" }).click();
-  const tray = page.getByRole("region", { name: "Add a showcase" });
-  await expect(tray.getByRole("button", { name: "Add Up next" })).toBeVisible();
-  await tray.getByRole("button", { name: "Done" }).click();
-  await expect(tray).toHaveCount(0);
+  await page.getByRole("button", { name: "Remove Lately" }).click();
+  await expect(page.getByRole("region", { name: "Lately" })).toHaveCount(0);
+
+  // The plus offers what was removed, with a preview, and adds it back.
+  await page
+    .getByRole("button", { name: "Add to your library's front" })
+    .click();
+  const dialog = page.getByRole("dialog", { name: "Add to your library" });
+  await dialog.getByRole("radio", { name: "Lately" }).click();
+  await expect(
+    dialog.getByRole("region", { name: "Preview of Lately" }),
+  ).toContainText("Lately");
+  await expect(dialog.getByRole("radio", { name: "Up next" })).toBeVisible();
+  await dialog.getByRole("button", { name: "Add Lately" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("region", { name: "Lately" })).toBeVisible();
+
+  await bar.getByRole("button", { name: "Done" }).click();
+  await expect(bar).toHaveCount(0);
   await expect
-    .poll(() => store.modules.map((row) => row.module).slice(0, 2))
+    .poll(() => showcases(store.modules).slice(0, 2))
     .toEqual(["question", "next"]);
   expect(store.modules.find((row) => row.module === "question")?.size).toBe(
     "L",
   );
   expect(store.modules.find((row) => row.module === "next")?.hidden).toBe(true);
+  expect(store.modules.find((row) => row.module === "lately")?.hidden).toBe(
+    false,
+  );
 
   await page.reload();
   await expect(
     page.getByRole("region", { name: "One question" }),
   ).toBeVisible();
-  expect((await shown(page))[0]).toBe("question");
   await expect(page.getByRole("region", { name: "Up next" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Arrange" }).click();
+  await page.getByRole("button", { name: "Personalize" }).click();
   await page.getByRole("button", { name: "Reset" }).click();
   await expect.poll(() => store.modules).toEqual(defaults);
 });
 
-test("Arrange reorders by dragging a handle", async ({ page }) => {
+test("Personalize reorders by dragging a handle", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await stubHome(page);
   const store = await stubLayout(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Arrange" }).click();
+  await page.getByRole("button", { name: "Personalize" }).click();
   const handle = page.getByRole("button", {
     name: "Move One question",
     exact: true,
   });
+  await handle.scrollIntoViewIfNeeded();
   await handle.hover();
   const to = (await page.locator('[data-module="next"]').boundingBox())!;
   await page.mouse.down();
   await page.mouse.move(to.x + 10, to.y + to.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect
-    .poll(() => store.modules.map((row) => row.module).slice(0, 2))
+    .poll(() => showcases(store.modules).slice(0, 2))
     .toEqual(["question", "next"]);
 });
 
@@ -467,16 +500,16 @@ for (const theme of ["ink", "paper"] as const) {
 }
 
 for (const width of [390, 1440]) {
-  test(`arranging has no serious axe violations and no overflow at ${width}px`, async ({
+  test(`personalizing has no serious axe violations and no overflow at ${width}px, with and without the add dialog`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
     await stubHome(page);
     await stubLayout(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Arrange" }).click();
+    await page.getByRole("button", { name: "Personalize" }).click();
     await expect(
-      page.getByRole("region", { name: "Add a showcase" }),
+      page.getByRole("toolbar", { name: "Personalize" }),
     ).toBeVisible();
     expect(
       await page.evaluate(
@@ -494,6 +527,35 @@ for (const width of [390, 1440]) {
     );
     expect(
       serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`),
+    ).toEqual([]);
+
+    // And with the add dialog open on a preview.
+    await page.getByRole("button", { name: "Remove Lately" }).click();
+    await page
+      .getByRole("button", { name: "Add to your library's front" })
+      .click();
+    const dialog = page.getByRole("dialog", { name: "Add to your library" });
+    await expect(
+      dialog.getByRole("region", { name: "Preview of Lately" }),
+    ).toContainText("Lately");
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document
+              .querySelector('[role="dialog"]')
+              ?.getAnimations({ subtree: true }).length ?? 0,
+        ),
+      )
+      .toBe(0);
+    const open = await new AxeBuilder({ page })
+      .include('[role="dialog"]')
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      open.violations
+        .filter((v) => v.impact === "serious" || v.impact === "critical")
+        .map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`),
     ).toEqual([]);
   });
 }

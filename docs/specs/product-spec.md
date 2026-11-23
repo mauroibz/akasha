@@ -894,11 +894,16 @@ and if it cannot be read it draws nothing. In order:
   each pick with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you
   gave book 1 a 9"), and *Start*. *One question* asks an old score again ("Still a 9" keeps it,
   *Change* opens the revisit deck) or else one gap of an entry, answered in place. A showcase
-  with nothing to show is left out until it has something. **Arrange** (Sprint 142, replacing
-  the *Edit home* dialog) edits them where they stand: each showcase gains a handle to drag
-  (or, focused, the arrow keys), S/M/L and remove; a tray below lists what can be added, by
-  kind (showcases, a year, a shelf, a number from Insights), with *Reset* and *Done*; each
-  change is stored per person on the server at once. Sizes are column spans (S 3, M 5,
+  with nothing to show is left out until it has something. **Personalize** (Sprint 150,
+  DEC-195; *Arrange* in Sprint 142, the *Edit home* dialog before) edits the front where it
+  stands. A bar at its top holds what belongs to the whole of it: *Your media* and *Theme*,
+  each a dialog, *Reset* and *Done*. Each thing placed gains a handle to drag (or, focused, the
+  arrow keys), S/M/L and remove; *On now* and *Lately* are placed things too, movable and
+  removable, always the full width. After the last stands one dashed square with a plus. It
+  opens a dialog: what is not placed on one side, by kind (the library's own, a year, a shelf,
+  a number from the Journal), and on the other the chosen one drawn as it would stand, from
+  the person's own data, with its size and *Add*. Nothing is placed by looking. Each change is
+  stored per person on the server at once. Sizes are column spans (S 3, M 5,
   L 7) and each row's spare columns are shared out so no row ends in a gap; below 720 px every
   showcase is full width in the same order.
 - **Everything**: the grid below.

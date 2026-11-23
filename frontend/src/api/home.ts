@@ -63,6 +63,18 @@ export function getHome(signal?: AbortSignal) {
   );
 }
 
+/**
+ * One module's payload as if it were shown (Sprint 150): what Personalize draws
+ * before something is added. Nothing is stored by asking.
+ */
+export function getHomePreview(module: string, signal?: AbortSignal) {
+  const tz = zone();
+  return request(
+    `/api/home/preview?module=${encodeURIComponent(module)}${tz ? `&tz=${encodeURIComponent(tz)}` : ""}`,
+    { signal },
+  ).then((r) => jsonOrApiError<Home>(r, "The preview could not be loaded"));
+}
+
 export type ModuleLayout = Schemas["HomeModuleLayout"];
 export type ModuleSize = ModuleLayout["size"];
 export type HomeLayout = Schemas["HomeLayoutResponse"];

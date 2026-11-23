@@ -8,7 +8,19 @@ import type { ModuleLayout, ModuleSize } from "@/api/home";
  * say is not a showcase: what is under way, what happened lately, the libraries,
  * the shelves' names, the small jobs and the loans were modules of Home.
  */
-export const MODULES = ["next", "question", "suggested"] as const;
+export const MODULES = [
+  "now",
+  "lately",
+  "next",
+  "question",
+  "suggested",
+] as const;
+
+/**
+ * The two bands (Sprint 150, DEC-195): layout items like any other, so they can be
+ * moved and removed, and always the whole row; their size is not the person's.
+ */
+export const fullWidth: ReadonlySet<string> = new Set(["now", "lately"]);
 
 export type ModuleKey = (typeof MODULES)[number];
 
@@ -52,6 +64,8 @@ export function labelOf(row: {
 }
 
 export const moduleLabels: Record<ModuleKey, string> = {
+  now: "On now",
+  lately: "Lately",
   next: "Up next",
   question: "One question",
   suggested: "More like this",
@@ -62,6 +76,8 @@ export const moduleLabels: Record<ModuleKey, string> = {
  * be read: `GET /api/home/layout` is the source of truth and carries its own.
  */
 export const fallbackLayout: ModuleLayout[] = [
+  { module: "now", size: "L", hidden: false },
+  { module: "lately", size: "L", hidden: false },
   { module: "next", size: "L", hidden: false },
   { module: "question", size: "S", hidden: true },
   { module: "suggested", size: "M", hidden: true },
@@ -95,7 +111,7 @@ export function packRows<K extends string>(
     used = 0;
   };
   for (const { key, size } of modules) {
-    const span = sizeSpan[size];
+    const span = fullWidth.has(key) ? 12 : sizeSpan[size];
     if (used + span > 12) close();
     row.push({ key, size, span });
     used += span;
