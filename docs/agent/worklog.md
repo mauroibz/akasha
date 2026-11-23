@@ -7008,3 +7008,33 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   On now's lead card wraps *More like this* onto a second line at M; TMDB's year can differ by
   one from Wikidata's (After the Rain 2000 vs 1999).
 - Next: Sprint 135, the model source.
+
+## 2026-11-23 — Sprint 135 (complete)
+- Done: the hosted model source (`1f6e015`): `model_clients.py` (Claude, Gemini,
+  OpenAI-compatible over the shared client, no SDK), `model_recommendations.py`, config and
+  compose pass-through, every domain declares `model`, albums `want_status="wishlist"`,
+  `resolved_only`/`about` on `/api/item-types`, default 50 rounds/day. The sheet's segment as
+  a choice and Settings → Suggestions (`c0d8a1c`). Walkthrough fixes: replay launcher
+  (`880c657`), resolution and prompt (`1ebae80`), rounds kept current across sources
+  (`f3d3229`). DEC-190.
+- Keys: no `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OPENAI_API_KEY` in the process
+  environment. Model fixtures written in each API's documented shape (Claude's from the
+  `claude-api` skill), `"recorded": false` in `model_fixtures.json`; no live round. Open
+  Library searches for the fixture's books recorded live.
+- Verified: `test_model_recommendations.py` 31; touched-module regression 593; Vitest related
+  346 then 73; Playwright more-like-this + home 24, export axe 1; `make check`.
+- Walkthrough: `scratchpad/walk135/run_backend.sh` (walkthrough.py `--keep --replay
+  replay_model.py`, TMDB token exported from `.env` by itself — sourcing the whole `.env` turns
+  `AKASHA_AUTH` on — and a dummy Claude key the replay intercepts), `seed.py` (Rayuela
+  `OL47684105M`, Seven Samurai `imdb:tt0047478`, Kind of Blue MB group), vite on 5180
+  (it listens on `localhost`, not 127.0.0.1), `frontend/e2e/scratchpad/walk135.mjs`. Book,
+  film and album model rounds 9-17 s; invented titles hidden; Want on an album → wishlist;
+  Settings correct; 390 px overflow 0. `sent.jsonl` beside the replay module holds every
+  prompt sent.
+- Observed and fixed: `--replay` broken since Sprint 101 (ObservedProvider wrappers kept the
+  closed client); *Red Beard* and *The Hidden Fortress* unresolved (Cinemeta US-release years,
+  Wikidata Spanish labels); a failed provider made picks unresolved for good; Rayuela sent as
+  2000 and twice; a TMDB round switched away from mid-enrichment stayed on "Finding…".
+- Observed, left: "Found in your providers" on every model row; Settings lists Model before
+  TMDB; MusicBrainz answers 503 under a burst (an album pick stayed pending, *Try again*).
+- Next: Sprint 136, embeddings. Owner: the live Claude check (record_model_fixtures.py).

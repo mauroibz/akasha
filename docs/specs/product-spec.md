@@ -48,7 +48,13 @@ save — takes under 20 seconds and never requires leaving the keyboard.
   on a film's or a series' page and on its *On now* card opens a side sheet of TMDB's picks, the
   first three found in the library's own providers, each answered in place; Home's *More like
   this* shows the newest found ones. Both carry TMDB's attribution, and TMDB's rows are deleted
-  after six months. Without `TMDB_READ_TOKEN` the button says how to set it
+  after six months. Without `TMDB_READ_TOKEN` the button says how to set it. Since Sprint 135 a
+  hosted language model, chosen by configuration and an API key (Claude, Gemini or any
+  OpenAI-compatible endpoint; nothing runs locally), suggests things for every library: the
+  only source for books, anime and albums, the second for films and series. The sheet's source
+  segment is a choice. A model's picks are shown only once the library's own providers found
+  them, so an invented title is never shown; it is sent titles, creators, years and scores and
+  nothing else, and Settings says so. *Want* on an album puts it on the wishlist
 - Mobile app (responsive web is enough)
 
 ---

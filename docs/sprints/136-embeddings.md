@@ -1,7 +1,7 @@
 # Sprint 136 — Embeddings
 
 **Sprint:** 136
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 54
 **Depends on:** 135
 **Owner:** Mauro
@@ -50,6 +50,21 @@ Notes from Sprint 134 (DEC-189): the *From your library* segment is one more ent
 library's `recommendation.sources` on `/api/item-types` (give the source a `label`); the sheet
 lists them. The job runner's `housekeeping` hook (hourly on an idle pass) is where any
 periodic embedding upkeep would go. Home's `suggested` module shows only `enriched` rows.
+
+Notes from Sprint 135 (DEC-190):
+
+- A source may declare `resolved_only` (shown only once found, every pick resolved) and `about`
+  (what Settings → Suggestions shows); the `library` source is the person's own items, so it
+  declares neither. Settings lists every declared source from `/api/item-types`.
+- Configuration follows the model's: `config.py` holds `recs_model_*` and the three
+  provider keys as `SecretStr` with blank-is-unset validators, and `compose.yaml` and
+  `.env.example` must list every new variable (`test_settings.py` checks both). `GEMINI_API_KEY`
+  and `OPENAI_API_KEY` already exist as settings; reuse them as the embeddings fallback.
+- A hosted endpoint is a plain-HTTP adapter over the shared client (`_post` in
+  `model_clients.py` maps failures to `SourceError`); give it its own timeout.
+- `scripts/walkthrough.py --replay` now replaces the lifespan's client factory, so a replay
+  module sees every request; `scripts/record_model_fixtures.py` is the recorder pattern.
+- `taste_profile` reads a work's `original_year` before the item's year.
 
 ## Acceptance criteria
 

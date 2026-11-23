@@ -181,6 +181,11 @@ and never reaches the process.
 | `AKASHA_METRICS`       | `off`            | `on` serves Prometheus text at `/metrics`: queue depth, job outcomes, provider calls and request latency |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
 | `TMDB_READ_TOKEN`     | *empty*          | Optional. Turns on *More like this* for films and series (TMDB's recommendations), and is the movie poster fallback for films with a TMDB id and no IMDb id |
+| `AKASHA_RECS_MODEL_PROVIDER` | `anthropic` | The hosted model *More like this* can ask, for every library: `anthropic` (the Claude API), `gemini`, or `openai` (any OpenAI-compatible endpoint). Nothing runs locally |
+| `AKASHA_RECS_MODEL_KEY` | *empty* | That provider's API key; falls back to `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OPENAI_API_KEY`. Without a key the model source is off and the sheet says how to turn it on. It is sent titles, creators, years and scores only |
+| `AKASHA_RECS_MODEL`    | per provider     | The model: `claude-haiku-5-5`, `gemini-2.5-flash` or `gpt-5-mini` unless set |
+| `AKASHA_RECS_MODEL_URL` | *empty*         | Base URL of an OpenAI-compatible endpoint other than OpenAI's |
+| `AKASHA_RECOMMEND_DAILY_LIMITS` | `{"model": 50}` | Rounds per recommendation source per UTC day, as JSON; a hosted model is held to 50 unless it is named here |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |
 | `AKASHA_MIN_FREE_BYTES` | `524288000` (500 MB) | Below this much free space, a write is refused before it starts rather than failing partway through |
 | `AKASHA_SQLITE_BUSY_TIMEOUT_MS` | `5000`   | How long SQLite waits for a locked database before failing                                 |

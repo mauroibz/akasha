@@ -107,7 +107,11 @@ Environment variables:
 | `AKASHA_LOGIN_WINDOW_SECONDS` | no | `300` | in-process failed-login window; resets on process restart |
 | `AKASHA_ADMIN_USERNAME` | no | empty | paired with `AKASHA_ADMIN_PASSWORD` to bootstrap the first admin at startup |
 | `AKASHA_ADMIN_PASSWORD` | no | empty | optional first-admin secret; plaintext environment/file exposure is the operator's trade-off |
-| `AKASHA_RECOMMEND_DAILY_LIMITS` | no | `{}` | rounds per recommendation source per UTC day, as JSON (`{"tmdb": 200}`); a source absent is counted and never stopped (Sprint 133) |
+| `AKASHA_RECOMMEND_DAILY_LIMITS` | no | `{}` | rounds per recommendation source per UTC day, as JSON (`{"tmdb": 200}`), over the built-in `{"model": 50}`; a source absent from both is counted and never stopped (Sprints 133, 135) |
+| `AKASHA_RECS_MODEL_PROVIDER` | no | `anthropic` | the hosted model's kind of API: `anthropic` (Claude Messages API), `gemini` (`generateContent`), `openai` (any OpenAI-compatible `chat/completions`); blank is the default (Sprint 135, DEC-187) |
+| `AKASHA_RECS_MODEL` | no | per provider | `claude-haiku-5-5`, `gemini-2.5-flash`, `gpt-5-mini` |
+| `AKASHA_RECS_MODEL_KEY` | no | empty | the model's API key; falls back to `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OPENAI_API_KEY` for the chosen provider. None: the `model` source is `not_configured` |
+| `AKASHA_RECS_MODEL_URL` | no | `https://api.openai.com/v1` | base URL for `openai`; ignored by the other two |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -650,7 +654,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `plural_label` | The label counted, for copy that counts: "142 Books", "3 Anime". Declared because an added "s" is wrong for anime and series (Sprint 102). |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
 | `ranking` | A `RankingSpec` (Sprint 132): `series_field`, a declared `one` text field naming a work's series, its place read from "Name #2", "Name, #2" or "Name (2)"; `series_in_title`, whether a trailing "(Series, #N)" in the title names it (a Goodreads title); `affinity_fields`, declared groupable fields whose values are a taste (subjects, genres). The default declares nothing, and the pile is then ranked by creators, waiting and what was set aside. |
-| `recommendation` | A `RecommendationSpec` (Sprint 133) or `None`, the default: `sources`, names in the recommendation source registry in the order a screen offers them (the first configured one answers a round that names none); `resolve`, `async (Candidate, providers) -> SearchCandidate \| None`, finding a candidate in the domain's own providers (`resolve_by_identity_or_search(kinds)` is the common one); `enrich_top`, how many of a round are resolved straight away (3). A domain declaring one must have a `planned` status, where *Want* puts a suggestion. See section 6.7. |
+| `recommendation` | A `RecommendationSpec` (Sprint 133) or `None`, the default: `sources`, names in the recommendation source registry in the order a screen offers them (the first configured one answers a round that names none); `resolve`, `async (Candidate, providers) -> SearchCandidate \| None`, finding a candidate in the domain's own providers (`resolve_by_identity_or_search(kinds)` is the common one); `enrich_top`, how many of a round are resolved straight away (3); `source_options`, what the domain tells each source about itself; `want_status`, where *Want* puts a suggestion (default the first `planned` status; albums declare `wishlist`). A domain declaring one must have a `planned` status or a choosable `want_status`. See section 6.7. |
 | `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
 Plus, outside the record itself:
@@ -753,6 +757,34 @@ SEED -> SELECT (the source, one request) -> STORE -> ENRICH (the domain's resolv
   `fetch_by_identifier("tmdb", …)` through `P4947`/`P4983`, and a provider declaring
   `identifier_kinds` is not asked (nor charged) for a kind outside them. Its rows carry
   TMDB's attribution wherever shown and are deleted after 182 days.
+- **A hosted model** (Sprint 135, DEC-183 point 7, DEC-187, DEC-190;
+  `infrastructure/model_clients.py`, `infrastructure/model_recommendations.py`) is the `model`
+  source, declared by every domain (after `tmdb` for films and series). A `ModelClient`
+  (`provider`, `model`, `async complete(system, prompt) -> str`) has three adapters over the
+  shared provider client, 60 s per request, no SDK: the Claude Messages API (`POST
+  /v1/messages`, `x-api-key`, `anthropic-version: 2026-10-21`, `output_config` with effort
+  `low` and a JSON schema), Gemini (`POST /v1beta/models/{model}:generateContent`,
+  `x-goog-api-key`, `responseMimeType: application/json`) and OpenAI-compatible (`POST
+  {url}/chat/completions`, Bearer, `response_format: json_object`). The key is a header only;
+  every failure is a `SourceError` (`unauthorized`, `not_found`, `busy`, `refused`,
+  `unavailable`, `malformed`) whose message never carries the key or the provider's body. The
+  prompt names the library and its creator word from `source_options["model"]` (`kind`,
+  `creator`), the seed (title, creator, the work's first year: `metadata.original_year` before
+  the item's year), and up to twelve lines each of top scores, recent finishes, *not for me*
+  and the pile, as `- Title — Creator, Year (N/10)`; nothing else of an entry or item is read.
+  The reply must be `{"suggestions": [{title, creator, year, reason}]}` (or the bare list), at
+  most eight; an item without a title is skipped, `0` and `""` read as unknown, and a reply
+  that is not that shape fails the round as malformed. The source is `resolved_only`: the
+  round resolves every candidate, not the first `enrich_top`, and a screen shows only the
+  `enriched` ones (`resolved_only` and `about` — provider, model, what is sent — are published
+  on `/api/item-types`). Books and albums resolve by title and creator
+  (`resolve_by_identity_or_search(with_creator=True)`), the rest by title alone. A record is
+  the same work when the normalized title matches, a creator both give agrees, and a year
+  both give is within one of the record's year or original year, or within three when the
+  creator agreed. A provider that failed, with no match elsewhere, leaves the pick `pending`
+  (`unresolved` means every provider answered and none knew it). No retention, no
+  attribution. Fixtures are written in each API's documented shape and marked unrecorded in
+  `model_fixtures.json` until `scripts/record_model_fixtures.py` runs with a key.
 - **The `recommend` job** (payload `{round_id}`, owner the person) checks the source's daily
   round budget (`provider_usage` under `recommend:<source>`, limits from
   `AKASHA_RECOMMEND_DAILY_LIMITS`), asks the source once, stores the candidates, then resolves

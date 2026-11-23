@@ -1931,9 +1931,11 @@ whole, recorded as **DEC-183**; the design is
   items; rows pruned after 182 days on the runner's idle pass; `/api/item-types` publishes
   each library's sources; Home's `suggested` module; see the sprint's Outcome.]
 - **[135 — The model source](135-the-model-source.md)**: a hosted model by API key (Claude,
-  Gemini or OpenAI-compatible, DEC-187), off until configured. [After 134: albums declare
-  `want_status="wishlist"` (DEC-189 point 8); the sheet's source segment is display-only and
-  must become a choice passing `?source=`.]
+  Gemini or OpenAI-compatible, DEC-187), off until configured.
+  [Closed 2026-11-23 (DEC-190). Four criteria met against documented-shape replies of all
+  three APIs (no key in the environment: **the live Claude check is pending, the owner's**);
+  every domain declares `model`, its picks shown only once found; the sheet's segment is a
+  choice; Settings → Suggestions; albums want onto the wishlist; see the sprint's Outcome.]
 - **[136 — Embeddings](136-embeddings.md)**: similarity re-ranking and *From your library*.
 
 ## Not scheduled

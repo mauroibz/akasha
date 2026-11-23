@@ -815,6 +815,8 @@ the other providers, and the notice clears once the provider answers again.
 | The backup script says the service is not running | start the stack; an online backup needs a live database |
 | Every request answers `403 access_denied` | `AKASHA_CF_ACCESS_*` is set and the request did not carry a valid Cloudflare Access token: a wrong AUD tag or team domain, the hostname not covered by the Access application, or a request that did not come through Cloudflare. The log line `cloudflare_access_refused` names the reason |
 | `Read-only file system` in the logs | something wrote outside `/data`, `/backups` and `/tmp`; the root filesystem is read-only since Sprint 128. Report it; as a stopgap, `read_only: false` in an override file |
+| *More like this* says the model is not configured | no key for the provider in `AKASHA_RECS_MODEL_PROVIDER` (default `anthropic`): set `AKASHA_RECS_MODEL_KEY` or the provider's own variable (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`) and restart; Settings → Suggestions shows what the server sees |
+| A model round fails with "refused the key" or "does not know that model" | the key is wrong or has no credit, or `AKASHA_RECS_MODEL` names a model the account cannot use. The round's message names which; the key itself is never logged |
 | `cloudflared` keeps restarting | `TUNNEL_TOKEN` is missing or wrong; `docker compose -f compose.yaml -f compose.public.yaml logs cloudflared` says which |
 
 On the default named-volume mounts, neither ownership row above is reachable —

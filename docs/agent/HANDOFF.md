@@ -2,23 +2,32 @@
 
 ## Where the project stands
 
-**2026-11-23, Sprint 134 closed.** On branch `home-and-recommendations` (local, not pushed).
-TMDB suggests films and series (DEC-189): *More like this* on a film's or series' page and on
-its On now card opens a side sheet; Home has a tenth module, `suggested`. The pipeline is
-DEC-188 / technical spec 6.7. DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT` 136).
-**Sprint 135 is next and `ready`**: the hosted model source.
+**2026-11-23, Sprint 135 closed.** On branch `home-and-recommendations` (local, not pushed).
+A hosted model suggests things for every library (DEC-187, DEC-190): `AKASHA_RECS_MODEL_PROVIDER`
+(`anthropic` default, `gemini`, `openai`), `AKASHA_RECS_MODEL`, `AKASHA_RECS_MODEL_KEY` (or
+`ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY`), `AKASHA_RECS_MODEL_URL`. Books,
+anime and albums take the model alone; films and series take TMDB, then the model. The sheet's
+source segment is a choice; a model's picks are shown only once found; Settings → Suggestions
+says what is on and what is sent. DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT` 136).
+**Sprint 136 is next and `ready`**: embeddings.
 
-Things to know for 135:
+**Pending, the owner's:** no model key was in the environment, so the model fixtures
+(`backend/tests/fixtures/providers/model_*`) are documented shapes marked unrecorded in
+`model_fixtures.json`, and no live round has run. With a key: `cd backend &&
+ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py`, then rerun
+`tests/test_model_recommendations.py` (a real reply may name other books: update the expected
+titles and record their Open Library searches in their own commit), then one *Model* round in
+the app. Gemini's and OpenAI's default model ids are the session's choice; confirm them.
 
-- Read "Notes from Sprint 134" in its sprint file. Albums declare `want_status="wishlist"`;
-  the sheet's source segment is display-only and must become a choice (`?source=`).
-- `/api/item-types` carries each library's `recommendation` (sources with `configured` and
-  `hint`, and attribution); `NotConfigured` takes `label`, `retention`, `attribution`.
-- Drive rounds in tests as `tests/test_tmdb_recommendations.py` does (Wikidata replay keyed by
-  `wikidata_route_key`, label reads matched by their id set).
-- Live TMDB works with the `.env` token: export it for `scripts/walkthrough.py`.
-- `accessibility.spec.ts` *the add dialog over the library* failed 2 of 3 on the pre-sprint
-  commit too; rerun alone before suspecting a change.
+Things to know for 136:
+
+- Read "Notes from Sprint 135" in its sprint file.
+- `scripts/walkthrough.py --replay` works again (broken since Sprint 101); it replaces the
+  lifespan's client factory. `scratchpad/walk135/` has the run script, replay module and seed.
+- Export only `TMDB_READ_TOKEN` from `.env` for a walkthrough: the file also sets
+  `AKASHA_AUTH=on`. Vite on 5180 listens on `localhost`.
+- `accessibility.spec.ts` *the add dialog over the library* failed 2 of 3 on Sprint 134's base
+  too; rerun alone before suspecting a change.
 - Playwright ignores any path containing `scratchpad`, including a worktree placed there.
 
 ## Earlier state (release 2.9.0)
@@ -97,7 +106,7 @@ Waiting on the owner:
 
 ## Next session
 
-Sprint 135 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
+Sprint 136 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
 ../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
 fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
 owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e

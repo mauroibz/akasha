@@ -7496,3 +7496,64 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   `tmdb` identifier kind is unique across the cache (migration 0002), so a film and a series sharing a
   TMDB number collide; the insert is ignored and the round still answers. Sprint 135 makes the
   sheet's source segment switchable and declares `want_status` for albums.
+
+## DEC-190 — The hosted model source: choices the sprint file left open (Sprint 135)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 7, DEC-187 (hosted, by key, three kinds), DEC-188 (the
+  pipeline), DEC-189 (the sheet, `want_status`). Recorded by the session under the
+  coordinator's instruction to build the line autonomously.
+- **Context:** Sprint 135 made a hosted model a recommendation source for every library. The
+  sprint file named the configuration, the port and the acceptance criteria; these details
+  were open, and the walkthrough turned up three defects.
+- **Decision:**
+  1. **Plain HTTP, no SDK.** Each adapter is a thin call over the app's shared provider
+     client (byte bound, retry policy, streaming read), so one boundary serves three providers
+     and no dependency is added. Claude's request shape, headers (`anthropic-version:
+     2026-10-21`, no sampling parameters) and default model come from the `claude-api` skill:
+     **`claude-haiku-5-5`**, the cheapest current Claude model ($0.10 / $0.50 per million
+     tokens), at effort `low`, held to a JSON schema with `output_config.format`. Gemini's
+     default `gemini-2.5-flash` and OpenAI's `gpt-5-mini` are the session's choice and are for
+     the owner to confirm; `AKASHA_RECS_MODEL` overrides any of them. Requests time out at
+     60 s (the shared 5 s would cut replies off).
+  2. **The provider defaults to `anthropic`,** so an `ANTHROPIC_API_KEY` already in the
+     environment turns the source on; a key for another provider does not. The model is still
+     asked only when a person chooses its segment.
+  3. **Fifty rounds a day by default** (`DEFAULT_RECOMMEND_LIMITS`, merged under
+     `AKASHA_RECOMMEND_DAILY_LIMITS`): the model is paid per call; TMDB stays unbounded.
+  4. **`resolved_only`.** A source may declare that its picks may be inventions. The round
+     then resolves every candidate (not the first `enrich_top`) and the sheet shows only the
+     found ones; pending ones (a provider failed or its budget ran out) are counted and offered
+     *Try again*. `/api/item-types` publishes `resolved_only` and `about` (provider, model,
+     what is sent) per source; Settings → Suggestions lists them.
+  5. **What is sent.** The prompt carries titles, creators, years and scores only: the seed
+     (named once, with the work's first year, `metadata.original_year`, before the item's
+     edition year), up to twelve lines each of top scores, recent finishes, *not for me* and
+     the pile. Domains name themselves to the model through `source_options["model"]`
+     (`kind`, `creator`): books/author, films/director, TV series/creator, anime/studio,
+     albums/artist.
+  6. **Resolution.** Books and albums search by title and creator (`with_creator=True`: a
+     one-word title is many works); films, series and anime by title alone. `same_work`
+     reads a record's `original_year` too (a book's search row is an edition), and widens the
+     year tolerance from one to three when a creator both sides give agrees (walkthrough:
+     Cinemeta dates *Red Beard* 1968 and *The Hidden Fortress* 1960, their US releases, and
+     Wikidata's labels were Spanish, so both real films were stored unresolved). A provider
+     that failed with no match elsewhere now propagates its error, so the pick stays
+     `pending` instead of `unresolved` for good.
+  7. **Albums** declare `want_status="wishlist"` (DEC-189 point 8).
+  8. **The sheet's segment is a radio group;** each source keeps its own round per seed while
+     the sheet is open, and the event stream refreshes every round the sheet asked for (the
+     walkthrough found a TMDB round switched away from mid-enrichment frozen on "Finding the
+     first few…").
+  9. **Fixtures are unrecorded** (DEC-187 point 4): no model key was in the environment.
+     They are written in each API's documented shape, marked in `model_fixtures.json`, and
+     `scripts/record_model_fixtures.py` records real replies when a key is exported. The
+     books the fixtures name resolve against real Open Library searches.
+  10. **Prerequisite repair:** `scripts/walkthrough.py --replay` had been broken since
+      Sprint 101 — it set `client` on the `ObservedProvider` wrappers, leaving the real
+      adapters on a closed client, so every replayed walkthrough's providers failed. The
+      launcher now replaces the lifespan's client factory before the lifespan runs.
+- **Consequences:** the live check against Claude is the owner's: export `ANTHROPIC_API_KEY`
+  and run `scripts/record_model_fixtures.py`, then one *Model* round in the app. Sprint 136's
+  `library` source can declare `resolved_only=False` and reuse the segment as is.
