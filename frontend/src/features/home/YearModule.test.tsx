@@ -10,7 +10,7 @@ const today = new Date(2026, 10, 22);
 describe("YearModule", () => {
   it("draws twelve months with the year's covers and marks this one", () => {
     renderWithRouter(
-      <YearModule year={fullHome().year} types={types} today={today} />,
+      <YearModule year={fullHome().year!} types={types} today={today} />,
     );
     const months = screen.getAllByRole("listitem");
     expect(months).toHaveLength(12);
@@ -22,7 +22,7 @@ describe("YearModule", () => {
   });
 
   it("leaves empty slots only for what the goal still needs, from this month on", () => {
-    const year = fullHome().year;
+    const year = fullHome().year!;
     const cells = yearCells(year, today);
     // Months gone by are not marked short; November has its book and one slot
     // left of two a month, December two.
@@ -34,7 +34,7 @@ describe("YearModule", () => {
   });
 
   it("caps the empty slots at what the goal still needs", () => {
-    const year = fullHome().year;
+    const year = fullHome().year!;
     year.goals = [
       { item_type: "book", period: "year", count: 3, target: 3, done: 2 },
     ];
@@ -43,7 +43,7 @@ describe("YearModule", () => {
   });
 
   it("shows every finish when no goal is set", () => {
-    const year = emptyHome().year;
+    const year = emptyHome().year!;
     renderWithRouter(<YearModule year={year} types={types} today={today} />);
     expect(screen.getByText(/Nothing finished yet in 2026/)).toBeVisible();
   });

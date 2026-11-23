@@ -1,15 +1,37 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
-import { getHome, type Home } from "@/api/home";
+import {
+  getHome,
+  getHomeLayout,
+  putHomeLayout,
+  type Home,
+  type HomeLayout,
+  type ModuleLayout,
+  type ModuleSize,
+} from "@/api/home";
 import { queryKeys } from "@/api/keys";
 import { Loading } from "@/components/ui/skeleton";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
+import { EditHome } from "./EditHome";
 import { GreetingBar } from "./GreetingBar";
-import { defaultLayout, spanClass, type ModuleKey } from "./layout";
+import {
+  fallbackLayout,
+  isModuleKey,
+  packRows,
+  spanClass,
+  type ModuleKey,
+} from "./layout";
+import { Lately } from "./Lately";
+import { LentOut } from "./LentOut";
 import { LibraryTiles } from "./LibraryTiles";
 import { OnNow } from "./OnNow";
+import { QuestionModule } from "./QuestionModule";
+import { ShelvesModule } from "./ShelvesModule";
+import { TidyUp } from "./TidyUp";
 import { UpNext } from "./UpNext";
 import { localDate } from "./year";
 import { YearModule } from "./YearModule";
@@ -19,9 +41,82 @@ function isEmpty(home: Home): boolean {
 }
 
 /**
- * Home (Sprint 130, DEC-183): the screen Akasha opens on. A 12-column grid of
- * modules — what is under way, what is next, the year, every library — all drawn
- * from one `GET /api/home` that reads stored data only.
+ * The stored layout, saved as it is edited. Until it arrives, or when it cannot be
+ * read, the default stands in, so Home never waits on its own arrangement.
+ */
+function useLayout() {
+  const queryClient = useQueryClient();
+  const layout = useQuery({
+    queryKey: queryKeys.homeLayout,
+    queryFn: ({ signal }) => getHomeLayout(signal),
+    staleTime: Infinity,
+    retry: false,
+  });
+  const save = useMutation({
+    mutationFn: putHomeLayout,
+    // One at a time, in the order made, so a quick run of edits is stored as the
+    // last of them rather than whichever request the server answered last.
+    scope: { id: "home-layout" },
+    onSuccess: () => {
+      // A module shown again has to be read; one hidden is no longer read.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+    },
+    onError: (error) => {
+      // Show what the server holds rather than an edit it refused.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.homeLayout });
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Your layout could not be saved",
+      );
+    },
+  });
+  return {
+    modules: layout.data?.modules ?? fallbackLayout,
+    defaults: layout.data?.defaults ?? fallbackLayout,
+    save: (modules: ModuleLayout[]) => {
+      // Shown at once; the request follows in the background.
+      void queryClient.cancelQueries({ queryKey: queryKeys.homeLayout });
+      queryClient.setQueryData<HomeLayout>(queryKeys.homeLayout, (before) => ({
+        modules,
+        defaults: before?.defaults ?? fallbackLayout,
+      }));
+      save.mutate(modules);
+    },
+  };
+}
+
+/** Whether a module has anything to show; one with nothing is hidden until it has. */
+function hasContent(key: ModuleKey, home: Home): boolean {
+  switch (key) {
+    case "year":
+      return home.year !== null;
+    case "lately":
+      return Boolean(home.lately?.length);
+    case "libraries":
+      return home.domains.length > 0;
+    case "tidy":
+      return Boolean(
+        home.tidy &&
+        home.tidy.duplicates + home.tidy.without_cover + home.tidy.unscored,
+      );
+    case "question":
+      return home.question !== null;
+    case "shelves":
+      return Boolean(home.shelves?.length);
+    case "lent":
+      return Boolean(home.lent?.total);
+    default:
+      return true;
+  }
+}
+
+/**
+ * Home (Sprints 130-131, DEC-183): the screen Akasha opens on. A 12-column grid of
+ * modules — what is under way, what is next, the year, what happened lately, every
+ * library, small jobs, one question, shelves and loans — all drawn from one
+ * `GET /api/home` that reads stored data only, in the order, sizes and visibility
+ * the person chose in *Edit home*.
  */
 export function HomePage() {
   const itemTypes = useItemTypes();
@@ -30,6 +125,8 @@ export function HomePage() {
     queryFn: ({ signal }) => getHome(signal),
     staleTime: 30_000,
   });
+  const layout = useLayout();
+  const [editing, setEditing] = useState(false);
   const types = itemTypes.data;
 
   let body;
@@ -83,48 +180,70 @@ export function HomePage() {
     );
   } else {
     const data = home.data;
-    const modules: Record<ModuleKey, (className: string) => React.ReactNode> = {
-      now: (className) => (
-        <OnNow entries={data.now} types={types} className={className} />
-      ),
-      next: (className) => (
+    const modules: Record<ModuleKey, (size: ModuleSize) => React.ReactNode> = {
+      now: (size) => <OnNow entries={data.now} types={types} size={size} />,
+      next: (size) => (
         <UpNext
           picks={data.next}
           pile={data.greeting.pile}
           types={types}
-          className={className}
+          size={size}
         />
       ),
-      year: (className) => (
-        <YearModule
-          year={data.year}
-          types={types}
-          today={localDate(data.greeting.today)}
-          className={className}
-        />
-      ),
-      libraries: (className) =>
-        data.domains.length ? (
-          <LibraryTiles
-            tiles={data.domains}
+      year: () =>
+        data.year ? (
+          <YearModule
+            year={data.year}
             types={types}
-            className={className}
+            today={localDate(data.greeting.today)}
           />
         ) : null,
+      lately: (size) => <Lately rows={data.lately ?? []} size={size} />,
+      libraries: () => <LibraryTiles tiles={data.domains} types={types} />,
+      tidy: () =>
+        data.tidy ? <TidyUp tidy={data.tidy} types={types} /> : null,
+      question: () =>
+        data.question ? (
+          <QuestionModule question={data.question} types={types} />
+        ) : null,
+      shelves: (size) => (
+        <ShelvesModule shelves={data.shelves ?? []} size={size} />
+      ),
+      lent: (size) =>
+        data.lent ? <LentOut lent={data.lent} size={size} /> : null,
     };
+    const placed = packRows(
+      layout.modules.flatMap((row) =>
+        isModuleKey(row.module) && !row.hidden && hasContent(row.module, data)
+          ? [{ key: row.module, size: row.size }]
+          : [],
+      ),
+    );
     body = (
       <div className="space-y-4">
-        <GreetingBar greeting={data.greeting} types={types} />
+        <GreetingBar
+          greeting={data.greeting}
+          types={types}
+          onEdit={() => setEditing(true)}
+        />
         <div className="grid grid-cols-1 gap-3 min-[720px]:grid-cols-12">
-          {defaultLayout.map(({ key, span }) => (
+          {placed.map(({ key, size, span }) => (
             <div
               key={key}
+              data-module={key}
               className={`min-w-0 ${spanClass[span]} [&>section]:h-full`}
             >
-              {modules[key]("")}
+              {modules[key](size)}
             </div>
           ))}
         </div>
+        <EditHome
+          open={editing}
+          onOpenChange={setEditing}
+          layout={layout.modules}
+          defaults={layout.defaults}
+          onChange={layout.save}
+        />
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import type { ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
@@ -19,6 +20,9 @@ const pill =
 const smallPill =
   "inline-flex min-h-9 items-center whitespace-nowrap rounded-full border border-border px-2.5 text-xs font-medium transition-colors hover:bg-accent focus-ring disabled:opacity-50";
 
+/** How many more entries under way show beneath the first, by size. */
+const REST: Record<ModuleSize, number> = { S: 1, M: 3, L: 6 };
+
 function totalOf(entry: LibraryEntry, field: string | null): number | null {
   if (!field) return null;
   const value = entry.item.metadata[field];
@@ -33,10 +37,12 @@ function totalOf(entry: LibraryEntry, field: string | null): number | null {
 export function OnNow({
   entries,
   types,
+  size = "M",
   className,
 }: {
   entries: LibraryEntry[];
   types: ItemType[] | undefined;
+  size?: ModuleSize;
   className?: string;
 }) {
   const write = useHomeWrite();
@@ -44,7 +50,9 @@ export function OnNow({
   const counts = new Map<string, number>();
   for (const entry of entries)
     counts.set(entry.item.type, (counts.get(entry.item.type) ?? 0) + 1);
-  const [lead, ...rest] = entries;
+  const [lead, ...others] = entries;
+  const rest = others.slice(0, REST[size]);
+  const unshown = others.length - rest.length;
 
   function actions(entry: LibraryEntry, primary: boolean) {
     const spec = progressFor(entry.item.type, types);
@@ -206,6 +214,11 @@ export function OnNow({
                 </li>
               ))}
             </ul>
+          ) : null}
+          {unshown > 0 ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              And {unshown} more under way.
+            </p>
           ) : null}
         </>
       )}

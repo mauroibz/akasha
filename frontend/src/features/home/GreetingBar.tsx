@@ -13,16 +13,20 @@ function plural(itemType: string, types: ItemType[] | undefined): string {
 }
 
 /**
- * Home's first line (Sprint 130, DEC-183): the day, what is under way and for how
- * long, and the library in three numbers. "Day N of …" only when the entry has a
+ * Home's first line (Sprints 130-131, DEC-183): the day, what is under way and
+ * for how long, the library in three numbers, and *Edit home*. What it names and the
+ * goal beside it are of one library (the server picks the pair). "Day N of …" only when the entry has a
  * start date; without one the title stands alone.
  */
 export function GreetingBar({
   greeting,
   types,
+  onEdit,
 }: {
   greeting: HomeGreeting;
   types: ItemType[] | undefined;
+  /** Opens *Edit home*; absent on the first-run screen, which has nothing to arrange. */
+  onEdit?: () => void;
 }) {
   const today = localDate(greeting.today);
   const weekday = new Intl.DateTimeFormat("en", { weekday: "long" }).format(
@@ -54,37 +58,48 @@ export function GreetingBar({
           </>
         )}
       </h1>
-      <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-        <div className="flex gap-1">
-          <dt className="sr-only">Entries</dt>
-          <dd>
-            <span className="font-semibold tabular-nums text-foreground">
-              {greeting.entries.toLocaleString()}
-            </span>{" "}
-            entries
-          </dd>
-        </div>
-        {greeting.goals.map((goal) => (
-          <div key={goal.item_type} className="flex gap-1">
-            <dt className="sr-only">Goal</dt>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <div className="flex gap-1">
+            <dt className="sr-only">Entries</dt>
             <dd>
               <span className="font-semibold tabular-nums text-foreground">
-                {goal.count}
+                {greeting.entries.toLocaleString()}
               </span>{" "}
-              of {goal.target} {plural(goal.item_type, types)} in {year}
+              entries
             </dd>
           </div>
-        ))}
-        <div className="flex gap-1">
-          <dt className="sr-only">Pile</dt>
-          <dd>
-            <span className="font-semibold tabular-nums text-foreground">
-              {greeting.pile.toLocaleString()}
-            </span>{" "}
-            on the pile
-          </dd>
-        </div>
-      </dl>
+          {greeting.goals.map((goal) => (
+            <div key={goal.item_type} className="flex gap-1">
+              <dt className="sr-only">Goal</dt>
+              <dd>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {goal.count}
+                </span>{" "}
+                of {goal.target} {plural(goal.item_type, types)} in {year}
+              </dd>
+            </div>
+          ))}
+          <div className="flex gap-1">
+            <dt className="sr-only">Pile</dt>
+            <dd>
+              <span className="font-semibold tabular-nums text-foreground">
+                {greeting.pile.toLocaleString()}
+              </span>{" "}
+              on the pile
+            </dd>
+          </div>
+        </dl>
+        {onEdit ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-sm font-medium text-foreground underline-offset-4 hover:underline focus-ring"
+          >
+            Edit home
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

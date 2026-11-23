@@ -251,6 +251,8 @@ export interface LibraryFilters {
   cover?: "missing";
   /** Only entries with exactly this score (Sprint 116's ranking). */
   score?: number;
+  /** Only entries with no score: Home's *Tidy up* (Sprint 131). */
+  unscored?: boolean;
   /**
    * How to *say* `value`, which is normalized — case folded, diacritics
    * stripped — because that is what groups a ranking row. "julio cortazar" is
@@ -285,6 +287,7 @@ export function libraryQueryString(
   if (filters.lent) params.set("lent", "true");
   if (filters.cover) params.set("cover", filters.cover);
   if (filters.score) params.set("score", String(filters.score));
+  if (filters.unscored) params.set("unscored", "true");
   if (cursor) params.set("after", cursor);
   return params.toString();
 }

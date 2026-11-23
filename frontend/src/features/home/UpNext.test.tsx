@@ -8,6 +8,20 @@ import { entry, fullHome, renderWithRouter, types } from "./testHome";
 afterEach(() => vi.restoreAllMocks());
 
 describe("UpNext", () => {
+  it("shows three picks small and five large", () => {
+    const picks = Array.from({ length: 5 }, (_, index) => ({
+      entry: entry(60 + index, `Pick ${index}`, "book", { status: "to_read" }),
+      reason: "waiting" as const,
+    }));
+    const { unmount } = renderWithRouter(
+      <UpNext picks={picks} pile={41} types={types} size="S" />,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+    unmount();
+    renderWithRouter(<UpNext picks={picks} pile={41} types={types} size="L" />);
+    expect(screen.getAllByRole("listitem")).toHaveLength(5);
+  });
+
   it("lists the pile in order, each with why it is there", () => {
     const home = fullHome();
     renderWithRouter(<UpNext picks={home.next} pile={41} types={types} />);

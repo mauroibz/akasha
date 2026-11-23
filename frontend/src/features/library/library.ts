@@ -131,6 +131,7 @@ export const libraryQueryKeys = [
   "label",
   "location",
   "lent",
+  "unscored",
 ] as const;
 
 /** `/library` with whatever library parameters `search` carries, or `null`. */

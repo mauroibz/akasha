@@ -5,10 +5,11 @@ import { expect, test } from "./console";
 import { entry as seededEntry } from "./seed";
 
 /**
- * Home (Sprint 130, DEC-183): the screen Akasha opens on. Renders from one
+ * Home (Sprints 130-131, DEC-183): the screen Akasha opens on. Renders from one
  * `GET /api/home`; *Start* and *Finished* change the entry; a library tile opens
- * the filtered library; no horizontal scroll and no serious axe violations at
- * 390px and 1440px in both themes.
+ * the filtered library; *Edit home* reorders (keys and drag), resizes and hides
+ * modules, stored so a reload keeps them; no horizontal scroll and no serious axe
+ * violations at 390px and 1440px in both themes, with and without the panel open.
  */
 
 const status = (
@@ -158,7 +159,88 @@ const home = {
       without_cover: 0,
     },
   ],
+  lately: [
+    {
+      kind: "finished",
+      at: "2026-11-06",
+      entry: entry(21, "Pálido fuego", "book", { status: "read", score: 7 }),
+      score: 7,
+      previous: null,
+      count: 1,
+    },
+    {
+      kind: "added",
+      at: "2026-11-02T10:00:00Z",
+      entry: entry(22, "Why Nations Fail", "book", { status: "to_read" }),
+      score: null,
+      previous: null,
+      count: 1,
+    },
+  ],
+  tidy: { duplicates: 12, without_cover: 32, unscored: 3 },
+  question: {
+    kind: "revisit",
+    entry: entry(23, "Pet Sematary", "book", { status: "read", score: 9 }),
+    scored_at: "2019-03-02T00:00:00Z",
+  },
+  shelves: [
+    { id: 1, name: "novela", slug: "novela", entry_count: 11 },
+    { id: 2, name: "distopía", slug: "distopia", entry_count: 5 },
+  ],
+  lent: {
+    total: 1,
+    loans: [
+      {
+        id: 1,
+        person: "Ana",
+        lent_on: "2026-01-05",
+        entry: entry(24, "Rayuela", "book", { status: "read" }),
+      },
+    ],
+  },
 };
+
+const defaults = [
+  ["now", "M"],
+  ["next", "L"],
+  ["year", "L"],
+  ["lately", "M"],
+  ["libraries", "L"],
+  ["tidy", "S"],
+  ["question", "S"],
+  ["shelves", "S"],
+  ["lent", "S"],
+].map(([module, size]) => ({ module, size, hidden: false }));
+
+type Layout = typeof defaults;
+
+/** A layout endpoint that keeps what is put, as the server does, across reloads. */
+async function stubLayout(page: Page) {
+  const store: { modules: Layout; puts: Layout[] } = {
+    modules: defaults,
+    puts: [],
+  };
+  await page.route("**/api/home/layout", async (route) => {
+    if (route.request().method() === "PUT") {
+      const { modules } = route.request().postDataJSON() as {
+        modules: Layout;
+      };
+      store.modules = modules;
+      store.puts.push(modules);
+    }
+    await route.fulfill({ json: { modules: store.modules, defaults } });
+  });
+  return store;
+}
+
+/** The modules on screen, in order, by their `data-module`. */
+function shown(page: Page) {
+  return page
+    .locator("[data-module]")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("data-module")),
+    );
+}
 
 async function stubHome(page: Page) {
   const patches: Array<{ id: string; body: Record<string, unknown> }> = [];
@@ -184,10 +266,100 @@ test("Home renders its modules from the one payload", async ({ page }) => {
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     "Sunday. Day 32 of Designing Data-Intensive Applications.",
   );
-  for (const name of ["On now", "Up next", "2026", "Your libraries"]) {
+  for (const name of [
+    "On now",
+    "Up next",
+    "2026",
+    "Lately",
+    "Your libraries",
+    "Tidy up",
+    "One question",
+    "Shelves",
+    "Lent out",
+  ]) {
     await expect(page.getByRole("region", { name })).toBeVisible();
   }
   await expect(page.getByText("1 / 24")).toBeVisible();
+});
+
+test("the year and Lately share a row, 7 and 5", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await stubHome(page);
+  await page.goto("/");
+  const year = await page.locator('[data-module="year"]').boundingBox();
+  const lately = await page.locator('[data-module="lately"]').boundingBox();
+  expect(year && lately).toBeTruthy();
+  expect(Math.abs(year!.y - lately!.y)).toBeLessThan(2);
+  expect(year!.width / lately!.width).toBeCloseTo(7 / 5, 0);
+});
+
+test("Tidy up's counts open what resolves them", async ({ page }) => {
+  await stubHome(page);
+  await page.goto("/");
+  const tidy = page.getByRole("region", { name: "Tidy up" });
+  await tidy.getByRole("link", { name: /finished, not scored/ }).click();
+  await expect(page).toHaveURL(
+    /\/library\?status=read&status=completed&unscored=true/,
+  );
+  await expect(
+    page.getByRole("button", { name: /No score yet/ }),
+  ).toBeVisible();
+});
+
+test("Edit home reorders with the keyboard, resizes and hides, and a reload keeps it", async ({
+  page,
+}) => {
+  await stubHome(page);
+  const store = await stubLayout(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Edit home" }).click();
+  const panel = page.getByRole("dialog", { name: "Edit home" });
+  await panel.getByRole("button", { name: "Move Lately" }).focus();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await expect(
+    panel.getByRole("button", { name: "Move Lately" }),
+  ).toBeFocused();
+  await panel
+    .getByRole("group", { name: "Size of Lately" })
+    .getByRole("button", { name: "Small" })
+    .click();
+  await panel.getByRole("switch", { name: "Show Lent out" }).click();
+  await panel.getByRole("button", { name: "Done" }).click();
+  await expect(panel).toBeHidden();
+  await expect
+    .poll(() => store.modules.map((row) => row.module).slice(0, 3))
+    .toEqual(["now", "lately", "next"]);
+  expect(store.modules.find((row) => row.module === "lately")?.size).toBe("S");
+  expect(store.modules.find((row) => row.module === "lent")?.hidden).toBe(true);
+
+  await page.reload();
+  await expect(page.getByRole("region", { name: "Lately" })).toBeVisible();
+  expect((await shown(page)).slice(0, 3)).toEqual(["now", "lately", "next"]);
+  await expect(page.getByRole("region", { name: "Lent out" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Edit home" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Reset" }).click();
+  await expect.poll(() => store.modules).toEqual(defaults);
+});
+
+test("Edit home reorders by dragging a handle", async ({ page }) => {
+  await stubHome(page);
+  const store = await stubLayout(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Edit home" }).click();
+  const panel = page.getByRole("dialog", { name: "Edit home" });
+  const handle = panel.getByRole("button", { name: "Move Shelves" });
+  // The panel zooms in; hovering waits for the handle to stand still.
+  await handle.hover();
+  const from = (await handle.boundingBox())!;
+  const to = (await panel.locator('[data-module="next"]').boundingBox())!;
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 });
+  await page.mouse.up();
+  await expect
+    .poll(() => store.modules.map((row) => row.module).slice(0, 3))
+    .toEqual(["now", "shelves", "next"]);
 });
 
 test("Start moves a pile entry under way", async ({ page }) => {
@@ -250,6 +422,15 @@ for (const theme of ["ink", "paper"] as const) {
       await stubHome(page);
       await page.goto("/");
       await expect(page.getByRole("region", { name: "On now" })).toBeVisible();
+      if (width === 390) {
+        // Every module is the full width of the page at 390px, whatever its size.
+        const widths = await page
+          .locator("[data-module]")
+          .evaluateAll((nodes) =>
+            nodes.map((node) => Math.round(node.getBoundingClientRect().width)),
+          );
+        expect(new Set(widths).size).toBe(1);
+      }
       const overflow = await page.evaluate(
         () =>
           document.documentElement.scrollWidth -
@@ -270,6 +451,29 @@ for (const theme of ["ink", "paper"] as const) {
       ).toEqual([]);
     });
   }
+}
+
+for (const width of [390, 1440]) {
+  test(`Edit home has no serious axe violations at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await stubHome(page);
+    await stubLayout(page);
+    await page.goto("/");
+    await page.getByRole("button", { name: "Edit home" }).click();
+    await expect(page.getByRole("dialog", { name: "Edit home" })).toBeVisible();
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    const serious = results.violations.filter(
+      (violation) =>
+        violation.impact === "serious" || violation.impact === "critical",
+    );
+    expect(
+      serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`),
+    ).toEqual([]);
+  });
 }
 
 test("an empty library gets the first-run message", async ({ page }) => {

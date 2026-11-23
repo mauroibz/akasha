@@ -32,6 +32,20 @@ function stubFetch() {
 }
 
 describe("OnNow", () => {
+  it("shows fewer entries beneath the first at a smaller size", () => {
+    const more = [2, 3, 4].map((id) => ({
+      ...watching,
+      id: id + 50,
+      item: { ...watching.item, title: `Show ${id}` },
+    }));
+    renderWithRouter(
+      <OnNow entries={[reading, watching, ...more]} types={types} size="S" />,
+    );
+    expect(screen.getByText("Frieren")).toBeVisible();
+    expect(screen.queryByText("Show 2")).toBeNull();
+    expect(screen.getByText("And 3 more under way.")).toBeVisible();
+  });
+
   it("shows each entry under way with how far through it is", () => {
     renderWithRouter(<OnNow entries={[reading, watching]} types={types} />);
     expect(

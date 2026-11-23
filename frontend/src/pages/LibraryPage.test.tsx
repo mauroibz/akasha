@@ -1829,6 +1829,31 @@ test("the library filters by where things are and by what is lent (Sprint 111)",
   });
 });
 
+test("Home's Tidy up opens the library on what has no score yet (Sprint 131)", async () => {
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    const url = String(request);
+    if (url.startsWith("/api/item-types")) return new Response("[]");
+    return new Response(JSON.stringify(populated), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage("/?status=read&unscored=true");
+  await screen.findByText("Rayuela");
+  const listCalls = () =>
+    fetchMock.mock.calls
+      .map(([request]) => String(request))
+      .filter((url) => url.startsWith("/api/entries?"));
+  await waitFor(() =>
+    expect(listCalls().some((url) => /unscored=true/.test(url))).toBe(true),
+  );
+  const chips = screen.getByRole("region", { name: "Active filters" });
+  await userEvent
+    .setup()
+    .click(within(chips).getByRole("button", { name: /No score yet/ }));
+  await waitFor(() =>
+    expect(listCalls().at(-1) ?? "").not.toMatch(/unscored=/),
+  );
+});
+
 test("finishing a scored entry from its card asks whether the score holds (Sprint 115)", async () => {
   const bookType = {
     id: "book",

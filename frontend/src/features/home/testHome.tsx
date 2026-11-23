@@ -130,7 +130,7 @@ const months = Array.from({ length: 12 }, (_, index) => ({
   month: index + 1,
   count: 0,
   counts: {},
-  covers: [] as Home["year"]["months"][number]["covers"],
+  covers: [] as NonNullable<Home["year"]>["months"][number]["covers"],
 }));
 
 export function emptyHome(): Home {
@@ -150,6 +150,11 @@ export function emptyHome(): Home {
       goals: [],
     },
     domains: [],
+    lately: [],
+    tidy: { duplicates: 0, without_cover: 0, unscored: 0 },
+    question: null,
+    shelves: [],
+    lent: { total: 0, loans: [] },
   };
 }
 
@@ -193,7 +198,8 @@ export function fullHome(): Home {
       since: "2025-09-01",
     },
   ];
-  home.year.months[7] = {
+  const year = home.year!;
+  year.months[7] = {
     month: 8,
     count: 1,
     counts: { book: 1 },
@@ -208,7 +214,7 @@ export function fullHome(): Home {
       },
     ],
   };
-  home.year.months[10] = {
+  year.months[10] = {
     month: 11,
     count: 2,
     counts: { book: 1, anime: 1 },
@@ -231,7 +237,7 @@ export function fullHome(): Home {
       },
     ],
   };
-  home.year.goals = [
+  year.goals = [
     { item_type: "book", period: "month", count: 2, target: 24, done: 2 },
   ];
   home.domains = [
@@ -263,6 +269,63 @@ export function fullHome(): Home {
       without_cover: 21,
     },
   ];
+  const finished = entry(40, "Pálido fuego", "book", {
+    status: "read",
+    score: 7,
+  });
+  home.lately = [
+    {
+      kind: "finished",
+      at: "2026-11-06",
+      entry: finished,
+      score: 7,
+      previous: null,
+      count: 1,
+    },
+    {
+      kind: "score",
+      at: "2026-10-25T10:00:00Z",
+      entry: entry(41, "A Clash of Kings", "book", { status: "read" }),
+      score: 6,
+      previous: 8,
+      count: 1,
+    },
+    {
+      kind: "added",
+      at: "2026-10-02T09:00:00Z",
+      entry: entry(42, "Why Nations Fail", "book", { status: "to_read" }),
+      score: null,
+      previous: null,
+      count: 3,
+    },
+  ];
+  home.tidy = { duplicates: 12, without_cover: 32, unscored: 3 };
+  home.question = {
+    kind: "revisit",
+    entry: entry(43, "Pet Sematary", "book", { status: "read", score: 9 }),
+    scored_at: "2019-03-02T00:00:00Z",
+  };
+  home.shelves = [
+    { id: 1, name: "novela", slug: "novela", entry_count: 11 },
+    { id: 2, name: "distopía", slug: "distopia", entry_count: 5 },
+  ];
+  home.lent = {
+    total: 2,
+    loans: [
+      {
+        id: 1,
+        person: "Ana",
+        lent_on: "2026-01-05",
+        entry: entry(44, "Rayuela", "book", { status: "read" }),
+      },
+      {
+        id: 2,
+        person: "Luis",
+        lent_on: "2026-06-10",
+        entry: entry(45, "Ficciones", "book", { status: "read" }),
+      },
+    ],
+  };
   return home;
 }
 

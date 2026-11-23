@@ -82,9 +82,29 @@ export const test = base.extend<{
               goals: [],
             },
             domains: [],
+            lately: [],
+            tidy: { duplicates: 0, without_cover: 0, unscored: 0 },
+            question: null,
+            shelves: [],
+            lent: { total: 0, loans: [] },
           },
         }),
       );
+      // Home's layout (Sprint 131): the default, unless a spec says otherwise.
+      await page.route("**/api/home/layout", (route) => {
+        const modules = [
+          ["now", "M"],
+          ["next", "L"],
+          ["year", "L"],
+          ["lately", "M"],
+          ["libraries", "L"],
+          ["tidy", "S"],
+          ["question", "S"],
+          ["shelves", "S"],
+          ["lent", "S"],
+        ].map(([module, size]) => ({ module, size, hidden: false }));
+        return route.fulfill({ json: { modules, defaults: modules } });
+      });
       // Shelves asks what is lent out (Sprint 122).
       await page.route("**/api/loans?open=true", (route) =>
         route.fulfill({ json: [] }),

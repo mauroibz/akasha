@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import type { HomeNext } from "@/api/home";
+import type { HomeNext, ModuleSize } from "@/api/home";
 import type { ItemType, LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
@@ -10,6 +10,17 @@ import { cn } from "@/lib/utils";
 
 import { HomeModule } from "./HomeModule";
 import { useHomeWrite } from "./useHomeWrite";
+
+const SHOWN: Record<ModuleSize, number> = { S: 3, M: 4, L: 5 };
+
+/** Written out in full so Tailwind sees each class. */
+const columns: Record<number, string> = {
+  1: "min-[720px]:grid-cols-1",
+  2: "min-[720px]:grid-cols-2",
+  3: "min-[720px]:grid-cols-3",
+  4: "min-[720px]:grid-cols-4",
+  5: "min-[720px]:grid-cols-5",
+};
 
 function since(day: string | null | undefined): string | null {
   if (!day) return null;
@@ -38,14 +49,18 @@ export function UpNext({
   picks,
   pile,
   types,
+  size = "L",
   className,
 }: {
   picks: HomeNext[];
   pile: number;
   types: ItemType[] | undefined;
+  /** How many picks: three small, four medium, five large. */
+  size?: ModuleSize;
   className?: string;
 }) {
   const write = useHomeWrite();
+  const shown = picks.slice(0, SHOWN[size]);
   const [finishing, setFinishing] = useState<LibraryEntry | null>(null);
   return (
     <HomeModule
@@ -62,13 +77,18 @@ export function UpNext({
         ) : undefined
       }
     >
-      {picks.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           Nothing waiting. What you plan to read or watch next lands here.
         </p>
       ) : (
-        <ol className="-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 min-[720px]:grid min-[720px]:grid-cols-5 min-[720px]:overflow-visible">
-          {picks.map((pick, index) => {
+        <ol
+          className={cn(
+            "-mx-1 flex snap-x gap-3 overflow-x-auto px-1 pb-1 min-[720px]:grid min-[720px]:overflow-visible",
+            columns[shown.length],
+          )}
+        >
+          {shown.map((pick, index) => {
             const start = statusWith(
               pick.entry.item.type,
               types,
