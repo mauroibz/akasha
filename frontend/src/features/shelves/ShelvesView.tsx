@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -21,6 +21,8 @@ import { cn } from "@/lib/utils";
 import { DomainStrip } from "@/components/DomainStrip";
 import { useShownItemTypes } from "@/features/media/useMedia";
 import { getPile, type HomeNext } from "@/api/home";
+import { deleteView, type SavedView } from "@/api/views";
+import { useRuleShelves } from "@/features/shelves/useRuleShelves";
 
 type ShelfSort = "size" | "recent" | "name";
 
@@ -81,6 +83,15 @@ export function ShelvesView() {
     retry: false,
   });
   const waiting = Array.isArray(pile.data) ? pile.data : [];
+  const ruled = useRuleShelves();
+  const forget = useMutation({
+    mutationFn: (view: SavedView) => deleteView(view.id),
+    onSuccess: (_data, view) => {
+      toast.success(`“${view.name}” is no longer kept`);
+      void cache.invalidateQueries({ queryKey: queryKeys.views });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -291,6 +302,28 @@ export function ShelvesView() {
             waiting, and what is with other people. Each opens its own list. */}
         {waiting.length > 0 && <PileRow picks={waiting} />}
         {lent.length > 0 && <LentRow loans={lent} />}
+        {/* Shelves that follow a rule (Sprint 145): saved views, drawn as shelves.
+            Each opens the Library filtered as its rule says. */}
+        {ruled.map((rule) => (
+          <ShelfRow
+            key={rule.shelf.slug}
+            shelf={rule.shelf}
+            types={undefined}
+            lead={false}
+            href={rule.href}
+            kind="Follows a rule"
+            line={`${rule.shelf.entry_count} ${rule.shelf.entry_count === 1 ? "thing matches" : "things match"} now`}
+            after={
+              <button
+                type="button"
+                onClick={() => forget.mutate(rule.view)}
+                className="mt-2 min-h-11 text-sm text-muted-foreground underline decoration-border underline-offset-4 hover:text-foreground focus-ring"
+              >
+                Stop keeping {rule.view.name}
+              </button>
+            }
+          />
+        ))}
         {room.map((shelf) => (
           <ShelfRow
             key={shelf.id}
@@ -439,6 +472,7 @@ function ShelfRow({
   href = `/shelves/${encodeURIComponent(shelf.slug)}`,
   kind,
   line,
+  after,
 }: {
   shelf: ShelfWithCount;
   types: ItemType[] | undefined;
@@ -446,6 +480,8 @@ function ShelfRow({
   href?: string;
   kind?: string;
   line?: string;
+  /** Beneath the shelf's line: what only this kind of shelf offers. */
+  after?: ReactNode;
 }) {
   const preview = shelf.preview ?? [];
   return (
@@ -470,6 +506,7 @@ function ShelfRow({
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           {line ?? lineOf(shelf, types)}
         </p>
+        {after}
       </div>
       <div className="min-w-0">
         <div

@@ -83,6 +83,12 @@ export const test = base.extend<{
           },
         }),
       );
+      // Shelves that follow a rule (Sprint 145) and the pile as a shelf (Sprint 144):
+      // none, unless a spec says so.
+      await page.route("**/api/views", (route) => route.fulfill({ json: [] }));
+      await page.route("**/api/pile?**", (route) =>
+        route.fulfill({ json: [] }),
+      );
       // Your media (Sprint 143): no preference, so the registry as each spec declares it.
       await page.route("**/api/media", (route) =>
         route.fulfill({ json: { media: [], chosen: true } }),

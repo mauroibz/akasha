@@ -17,6 +17,7 @@ import {
   readPinnedShelf,
   readViewPreference,
   rememberLibraryFilters,
+  shelfRule,
   tableRowHeight,
   writePinnedShelf,
 } from "./library";
@@ -251,5 +252,15 @@ describe("the pinned shelf (Sprint 074 deliverable 6)", () => {
     expect(readPinnedShelf()).toBeNull();
     localStorage.setItem(pinnedShelfKey, JSON.stringify({ slug: "only-slug" }));
     expect(readPinnedShelf()).toBeNull();
+  });
+});
+
+describe("shelfRule (Sprint 145)", () => {
+  it("keeps the filters and drops what is not one", () => {
+    expect(
+      shelfRule(
+        new URLSearchParams("type=anime&status=completed&view=shelves"),
+      ),
+    ).toBe("type=anime&status=completed");
   });
 });

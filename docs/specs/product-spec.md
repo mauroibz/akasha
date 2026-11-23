@@ -1089,7 +1089,11 @@ Table · Shelves*; *Shelves* draws the boards in place of the list, with the sen
 the sort, the medium filter and *New shelf*, and puts the front of the Library away. Two
 shelves are the application's own and stand first: *The pile*, what is waiting with the
 likeliest next named, opening `/pile`; and *Lent out*, with who has had something longest,
-opening `/lent` (Sprint 122). A shelf's own page (`/shelves/{slug}`) stays covers to look at,
+opening `/lent` (Sprint 122). Then **shelves that follow a rule** (Sprint 145): a saved view
+(Sprint 100), made with *Save as a shelf* on a filtered Library, drawn as a shelf with what
+matches now and its first covers, opening the Library filtered as the rule says; *Stop
+keeping* deletes the rule and no entry. Nothing is put on such a shelf by hand, so the shelf
+picker on an entry never lists one. A shelf's own page (`/shelves/{slug}`) stays covers to look at,
 without status or score on them (Sprint 105), with rename and delete, and links to the same
 shelf in the Library, one per medium it holds, where it can be sorted, filtered and edited
 (DEC-194).

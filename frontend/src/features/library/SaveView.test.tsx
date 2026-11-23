@@ -24,8 +24,8 @@ describe("SaveView", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Save view" }));
-    await user.type(screen.getByLabelText("View name"), "Vinyl{Enter}");
+    await user.click(screen.getByRole("button", { name: "Save as a shelf" }));
+    await user.type(screen.getByLabelText("Shelf name"), "Vinyl{Enter}");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/views",
@@ -38,7 +38,7 @@ describe("SaveView", () => {
       }),
     );
     expect(
-      await screen.findByRole("button", { name: "Save view" }),
+      await screen.findByRole("button", { name: "Save as a shelf" }),
     ).toBeVisible();
   });
 });

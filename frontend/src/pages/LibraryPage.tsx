@@ -72,7 +72,9 @@ import {
   libraryMotionKey,
   mergeUniqueEntries,
   readDomainPreference,
+  filtersFromParams,
   readPinnedShelf,
+  shelfRule,
   readViewPreference,
   rememberLibraryFilters,
   viewPreferenceKey,
@@ -105,27 +107,6 @@ const AddForm = lazy(async () => ({
 const allShelves = "__all__";
 const allFormats = "__all_formats__";
 const allPlaces = "__anywhere__";
-
-function filtersFromParams(params: URLSearchParams): LibraryFilters {
-  const statuses = params.getAll("status") as EntryStatus[];
-  return {
-    statuses,
-    shelves: params.getAll("shelf"),
-    formats: params.getAll("format") as EntryFormat[],
-    types: params.getAll("type"),
-    query: params.get("q") ?? "",
-    sort: (params.get("sort") as SortKey) ?? "date_added",
-    order: (params.get("order") as "asc" | "desc") ?? "desc",
-    // An insights ranking row links here as `/library?type=...&key=...&value=...` — without
-    // reading them back out, the library page would silently ignore the link.
-    key: params.get("key") ?? "",
-    value: params.get("value") ?? "",
-    valueLabel: params.get("label") ?? "",
-    location: params.get("location") ?? "",
-    lent: params.get("lent") === "true",
-    unscored: params.get("unscored") === "true",
-  };
-}
 
 function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   const params = new URLSearchParams();
@@ -1087,7 +1068,7 @@ export function LibraryPage() {
                 }
               />
             )}
-            <SaveView query={searchParams.toString()} />
+            <SaveView query={shelfRule(searchParams)} />
           </section>
         )}
       </div>

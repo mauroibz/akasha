@@ -1990,7 +1990,8 @@ follow the owner's order, and there are theme presets.
 
 ## Not scheduled
 
-- **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024
+- **Saved views ("smart shelves")** — drawn among the shelves since Sprint 145 (DEC-193); what
+  follows is the original, unscheduled note. **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024
   additions*, *Vinyl I do not own yet* — appearing beside the shelves and opening the library
   filtered. `readability-proposal.md` §3.3.5 and §5.3 row E; **accepted in principle by DEC-139 and
   deliberately not scheduled**, because it needs a `saved_views` table and a migration where

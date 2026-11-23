@@ -87,9 +87,16 @@ function stubApi(
   types: unknown[] = [bookType],
   loans: unknown[] = [],
   pile: unknown[] = [],
+  views: unknown[] = [],
+  matching: unknown = { items: [], total: 0, next_cursor: null },
 ) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/views") && init?.method === "DELETE")
+      return new Response(null, { status: 204 });
+    if (url === "/api/views") return new Response(JSON.stringify(views));
+    if (url.startsWith("/api/entries"))
+      return new Response(JSON.stringify(matching));
     if (url.startsWith("/api/pile")) return new Response(JSON.stringify(pile));
     if (url.startsWith("/api/loans"))
       return new Response(JSON.stringify(loans));
@@ -148,6 +155,67 @@ describe("ShelvesView: the pile is a shelf too (Sprint 144)", () => {
     renderPage();
     await screen.findByRole("link", { name: "Favorites" });
     expect(document.querySelector('[data-shelf-row="pile"]')).toBeNull();
+  });
+});
+
+describe("ShelvesView: shelves that follow a rule (Sprint 145)", () => {
+  const view = { id: 4, name: "The nines", query: "type=book&status=read" };
+  const matching = {
+    total: 14,
+    next_cursor: "more",
+    items: [
+      {
+        id: 31,
+        status: "read",
+        score: 9,
+        item: { id: 31, type: "book", title: "Rayuela", year: 1963 },
+      },
+    ],
+  };
+
+  it("draws a saved view as a shelf: what matches now, opening the library filtered", async () => {
+    stubApi(shelves, [bookType], [], [], [view], matching);
+    renderPage();
+    const row = (await waitFor(() => {
+      const found = document.querySelector('[data-shelf-row="rule-4"]');
+      expect(found).not.toBeNull();
+      return found;
+    })) as HTMLElement;
+    expect(row).toHaveTextContent("Follows a rule");
+    expect(
+      within(row).getByRole("link", { name: "The nines" }),
+    ).toHaveAttribute("href", "/?type=book&status=read");
+    await waitFor(() => expect(row).toHaveTextContent("14 things match now"));
+    expect(
+      within(row).getByRole("link", { name: "Rayuela, 1963, scored 9" }),
+    ).toHaveAttribute("href", "/books/31");
+    // It asks the library what the rule lists now, a few covers' worth.
+    const asked = vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) => String(input))
+      .find((url) => url.startsWith("/api/entries"));
+    expect(asked).toContain("type=book");
+    expect(asked).toContain("status=read");
+    expect(asked).toContain("limit=8");
+  });
+
+  it("stops keeping one, which deletes the rule and no entry", async () => {
+    stubApi(shelves, [bookType], [], [], [view], matching);
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Stop keeping The nines" }),
+    );
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.some(
+            ([input, init]) =>
+              String(input) === "/api/views/4" && init?.method === "DELETE",
+          ),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/no longer kept/)).toBeVisible();
   });
 });
 

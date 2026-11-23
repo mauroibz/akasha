@@ -1,7 +1,7 @@
 # Sprint 145 — Shelves with a rule
 
 **Sprint:** 145
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 56
 **Depends on:** 144
 **Owner:** Mauro
@@ -55,4 +55,41 @@ A rule builder beyond the Library's existing filters.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commit: `HASH`.
+
+Baseline as observed at activation: saved views already exist (Sprint 100): `saved_views`
+keeps the Library's URL query under a name per person, `GET`/`POST`/`DELETE /api/views`, made
+with *Save view* on a filtered Library and reopened only from the command bar.
+
+- **A saved view is drawn as a shelf.** In the Shelves view, after the application's own two:
+  "Follows a rule", the name, "N things match now", the first eight covers, each from one
+  bounded list request at the view's own address. It opens the Library filtered as the rule
+  says. *Stop keeping …* deletes the rule.
+- **Save as a shelf.** The Library's *Save view* is renamed and says where the shelf is. The
+  rule it keeps drops `view=`, so a rule made from any view reopens on the list.
+- The command bar still lists them by name.
+
+Acceptance: 1 by construction and the walkthrough: the shelf holds no members, it lists what
+matches when it is drawn; 2 by construction: the shelf picker reads `/api/shelves`, where a
+rule shelf is not; 3: no migration ran, the existing rows are the shelves; 4: the Library
+already tolerates an address naming a status or shelf that no longer exists.
+
+Verification: Vitest 648 passed; Playwright chromium and heavy-library, full run, 239 passed
+and 2 skipped by design; `make check`. In the running app on a copy of the development
+library: the Library filtered to read books sorted by score, *Save as a shelf* named "Books I
+finished", the toast, then the Shelves view showing it with "9 things match now" and its
+covers, its link carrying `?type=book&status=read&sort=score`.
+
+Deviations:
+
+- **No migration and no `rule` column on `shelves`.** The sprint planned to move saved views
+  into the shelves table. They already are a rule under a name per person, and a shelf's
+  members table has nothing to say about one. Drawing them as shelves gives the owner the
+  same thing with no schema change and nothing to migrate. Two tables remain for the two
+  kinds.
+- A rule shelf cannot be a showcase yet: the `shelf:<id>` family is of the shelves table.
+- At most twelve are drawn, one request each.
+- The rule is whatever the Library's address held, so it includes the sort.
+
+Impact on later sprints: none on 146–148. A `view:<id>` showcase family would be the way to
+place a rule shelf on the Library's front.
