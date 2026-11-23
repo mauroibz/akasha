@@ -7,7 +7,7 @@ name = "book-tracker"
 version = "4.0.0"
 requires-python = ">=3.12,<3.15"
 dependencies = [
-  "alembic>=1.14,<2",
+  "alembic>=1.20.1,<2",
   "anyio>=4.14.2,<5",
   # Transitive via httpx; pinned here so the CA bundle cannot fall behind
   # PYSEC-2026-4320 (Sprint 128, F16).
