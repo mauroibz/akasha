@@ -137,10 +137,11 @@ class HomeService:
 
         return {
             "greeting": self._greeting(today, now, by_status, finished, goals, front),
-            # The Library's first two bands (Sprint 141): not modules, so always read.
-            "now": now,
+            # The Library's two bands: layout items since Sprint 150, so a removed one
+            # is not drawn. What is under way is read either way, for the greeting.
+            "now": now if shown("now") else [],
             "next": self._next(today, front) if shown("next") else [],
-            "lately": self._lately(zone, front),
+            "lately": self._lately(zone, front) if shown("lately") else [],
             "question": self._question() if shown("question") else None,
             "suggested": self._suggested() if shown("suggested") else None,
             "library_years": self._library_years(today, years, finished, goals),

@@ -24,6 +24,9 @@ Sprint 142 adds a third family, a number from the Journal: `insight:<item type>:
 where a section is `scores`, `decade`, or a key the domain declares groupable. It is
 offered for each medium the person holds an entry of, hidden until placed. The registry
 says which keys exist, so nothing here names a medium.
+
+Sprint 150 (DEC-195) makes `now` and `lately` layout items again: the owner wanted to
+move *Lately* and turn it off. They are first and shown by default.
 """
 
 import json
@@ -67,6 +70,10 @@ INSIGHT_DECADE = "decade"
 #: spans on a wide screen (S 3, M 5, L 7 of 12); on a phone every module is full
 #: width and its size only changes how much it shows.
 DEFAULT_LAYOUT: tuple[ModuleLayout, ...] = (
+    # The two bands (Sprint 150, DEC-195): layout items like any other, so they can be
+    # moved and removed; the screen always draws them the full width.
+    {"module": "now", "size": "L", "hidden": False},
+    {"module": "lately", "size": "L", "hidden": False},
     {"module": "next", "size": "L", "hidden": False},
     {"module": "question", "size": "S", "hidden": True},
     {"module": "suggested", "size": "M", "hidden": True},
@@ -208,6 +215,13 @@ class HomeLayoutService:
 
     def hidden(self) -> set[str]:
         return {row["module"] for row in self.read() if row["hidden"]}
+
+    def knows(self, module: str) -> bool:
+        """Whether `module` is something this person can place."""
+        return any(row["module"] == module for row in self.defaults())
+
+    def all(self) -> set[str]:
+        return {row["module"] for row in self.defaults()}
 
     def write(self, modules: list[dict[str, Any]]) -> list[LabelledLayout]:
         shelves = self.shelves()

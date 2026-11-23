@@ -156,6 +156,8 @@ ROUTE_POLICY = {
     # Sprint 131: one row per person, keyed by the requester.
     ("GET", "/api/home/layout"): "private-collection",
     ("PUT", "/api/home/layout"): "private-write",
+    # Sprint 150: one module's payload for the add dialog's preview; the requester's own.
+    ("GET", "/api/home/preview"): "private-collection",
     # Sprint 143: one list per person, keyed by the requester.
     ("GET", "/api/media"): "private-collection",
     ("PUT", "/api/media"): "private-write",

@@ -503,6 +503,12 @@
    ]
   ],
   [
+   "/api/home/preview",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/home/layout",
    [
     "GET"

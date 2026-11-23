@@ -714,6 +714,8 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/home/layout"),
         ("PUT", "/api/home/layout"),
         ("GET", "/api/pile"),
+        # Sprint 150: one module's payload, for Personalize's preview.
+        ("GET", "/api/home/preview"),
         # Sprint 143: the person's media, in their order.
         ("GET", "/api/media"),
         ("PUT", "/api/media"),

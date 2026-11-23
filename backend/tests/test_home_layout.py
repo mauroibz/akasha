@@ -60,9 +60,15 @@ def test_the_default_names_every_module_once() -> None:
     assert [row["module"] for row in DEFAULT_LAYOUT] == list(MODULES)
     # Sprint 141 (DEC-193): what the Library's bands and tabs now say is no longer a
     # module, and only Up next is shown until the person places more.
-    assert list(MODULES) == ["next", "question", "suggested"]
+    # Sprint 150 (DEC-195): what is under way and what happened lately are layout items
+    # again, first and shown; the rest as Sprint 141 left them.
+    assert list(MODULES) == ["now", "lately", "next", "question", "suggested"]
     assert all(row["size"] in {"S", "M", "L"} for row in DEFAULT_LAYOUT)
-    assert [row["module"] for row in DEFAULT_LAYOUT if not row["hidden"]] == ["next"]
+    assert [row["module"] for row in DEFAULT_LAYOUT if not row["hidden"]] == [
+        "now",
+        "lately",
+        "next",
+    ]
 
 
 @pytest.mark.anyio
@@ -128,15 +134,20 @@ async def test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads
         layout = (await client.get("/api/home/layout")).json()["modules"]
         home = await client.get("/api/home")
     assert home.status_code == 200, home.text
-    # What is still a module keeps its order, size and visibility.
-    assert layout[0] == {"module": "suggested", "size": "S", "hidden": False, "label": None}
+    # What is a module keeps its order, size and visibility: since Sprint 150 that is
+    # the two bands again, so a 3.1 layout that hid Lately hides it still.
+    assert layout[0] == {"module": "now", "size": "M", "hidden": False, "label": None}
+    assert layout[1] == {"module": "lately", "size": "S", "hidden": True, "label": None}
+    assert layout[2] == {"module": "suggested", "size": "S", "hidden": False, "label": None}
     # An unknown size falls back to the module's default rather than failing the read.
     next_default = next(row for row in DEFAULT_LAYOUT if row["module"] == "next")
-    assert layout[1] == {**next_default, "label": None}
+    assert layout[3] == {**next_default, "label": None}
     assert [row["module"] for row in layout] == [
+        "now",
+        "lately",
         "suggested",
         "next",
-        *[m for m in _keys() if m not in {"suggested", "next"}],
+        *[m for m in _keys() if m not in {"now", "lately", "suggested", "next"}],
     ]
 
 
@@ -185,8 +196,58 @@ async def test_home_skips_a_hidden_module(tmp_path: Path) -> None:
         body = (await client.get("/api/home")).json()
     assert body["next"] == []
     assert body["suggested"] is None
-    # The bands are not modules: they are read whatever the layout says (Sprint 141).
+
+
+@pytest.mark.anyio
+async def test_a_band_the_person_removed_is_not_drawn_and_the_greeting_still_names_it(
+    tmp_path: Path,
+) -> None:
+    """Sprint 150 (DEC-195): On now and Lately can be turned off like a showcase."""
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "reading")
+        shown = (await client.get("/api/home")).json()
+        hidden = [{**row, "hidden": row["module"] in {"now", "lately"}} for row in _defaults()]
+        put = await client.put("/api/home/layout", json={"modules": hidden})
+        body = (await client.get("/api/home")).json()
+    assert put.status_code == 200, put.text
+    assert [row["item"]["title"] for row in shown["now"]] == ["Rayuela"]
+    assert len(shown["lately"]) == 1
     assert body["now"] == [] and body["lately"] == []
+    # What is under way is still what the greeting names.
+    assert body["greeting"]["active"]["entry"]["item"]["title"] == "Rayuela"
+
+
+@pytest.mark.anyio
+async def test_a_preview_answers_for_one_module_as_if_it_were_shown(tmp_path: Path) -> None:
+    """Sprint 150: what the add dialog draws before anything is added."""
+    async with _client(tmp_path) as (app, client):
+        _held(app, "Rayuela", "book", "reading")
+        shelf = _shelf(app, "Favorites")
+        hidden = [
+            {**row, "hidden": True}
+            for row in (await client.get("/api/home/layout")).json()["modules"]
+        ]
+        await client.put("/api/home/layout", json={"modules": hidden})
+        nothing = (await client.get("/api/home")).json()
+        lately = (await client.get("/api/home/preview", params={"module": "lately"})).json()
+        placed = (await client.get("/api/home/preview", params={"module": f"shelf:{shelf}"})).json()
+        year = (await client.get("/api/home/preview", params={"module": "year:book"})).json()
+        number = await client.get("/api/home/preview", params={"module": "insight:book:scores"})
+        unknown = await client.get("/api/home/preview", params={"module": "shelf:999"})
+        after = (await client.get("/api/home/layout")).json()["modules"]
+    assert nothing["lately"] == [] and nothing["shelf_modules"] == []
+    assert len(lately["lately"]) == 1
+    # Only the one asked for is read.
+    assert lately["now"] == [] and lately["shelf_modules"] == []
+    assert [row["name"] for row in placed["shelf_modules"]] == ["Favorites"]
+    assert placed["lately"] == []
+    assert year["library_years"] == [] or year["library_years"][0]["item_type"] == "book"
+    # A number draws itself from the insights endpoints; its preview has nothing to add.
+    assert number.status_code == 200
+    assert unknown.status_code == 422
+    assert unknown.json()["error"]["code"] == "unknown_module"
+    # Looking is not placing.
+    assert all(row["hidden"] for row in after)
 
 
 def _shelf(app: Any, name: str, user: int = 1) -> int:

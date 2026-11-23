@@ -12,7 +12,7 @@ from book_tracker.api.library import ERRORS, EntryResponse, library_for
 from book_tracker.api.pile import PilePick
 from book_tracker.api.suggestions import SuggestionResponse
 from book_tracker.application.home import HomeService
-from book_tracker.application.home_layout import SHELF, YEAR, HomeLayoutService
+from book_tracker.application.home_layout import SHELF, YEAR, HomeLayoutService, LayoutError
 from book_tracker.application.media import MediaService
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
@@ -203,6 +203,41 @@ def home(
             years=shown(YEAR),
             shelves=shown(SHELF),
             # The bands and Up next are of the media the person keeps in front (Sprint 143).
+            front=media.front(),
+        )
+    )
+
+
+@router.get("/home/preview", response_model=HomeResponse, responses=ERRORS)
+def preview(
+    request: Request,
+    service: Home,
+    layouts: Layouts,
+    media: Media,
+    module: Annotated[str, Query(max_length=120)],
+    tz: Annotated[str | None, Query(max_length=64)] = None,
+) -> HomeResponse:
+    """One module's payload as if it were shown, whatever the layout says (Sprint 150).
+
+    What *Personalize* draws before something is added. Only that module is read, and
+    nothing is stored: looking is not placing. A key that is not something this person
+    can place is refused.
+    """
+    if not layouts.knows(module):
+        raise LayoutError(
+            "unknown_module",
+            "There is nothing by that name to place",
+            status_code=422,
+            details={"module": module},
+        )
+    zone = _zone(request, tz)
+    return HomeResponse.model_validate(
+        service.home(
+            _today(zone),
+            layouts.all() - {module},
+            zone,
+            years=[module[len(YEAR) :]] if module.startswith(YEAR) else [],
+            shelves=[module[len(SHELF) :]] if module.startswith(SHELF) else [],
             front=media.front(),
         )
     )

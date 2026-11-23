@@ -1,7 +1,7 @@
 # Sprint 150 — Personalize
 
 **Sprint:** 150
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 57
 **Depends on:** 149
 **Owner:** Mauro
