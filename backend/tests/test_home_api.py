@@ -132,6 +132,8 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
         "shelves",
         "lent",
         "suggested",
+        "library_years",
+        "shelf_modules",
     }
     assert body["greeting"]["today"] == date.today().isoformat()
     assert body["greeting"]["active"] is None
@@ -157,6 +159,9 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
     assert body["shelves"] == []
     assert body["lent"] == {"total": 0, "loans": []}
     assert body["suggested"] == []
+    # A library with no finish this year and no goal draws nothing (Sprint 138).
+    assert body["library_years"] == []
+    assert body["shelf_modules"] == []
 
 
 @pytest.mark.anyio
@@ -466,6 +471,86 @@ async def test_the_greeting_shows_the_goal_of_the_library_it_names(tmp_path: Pat
     greeting = body["greeting"]
     assert greeting["active"]["entry"]["id"] == anime
     assert greeting["goals"] == [{"item_type": "anime", "target": 20, "count": 0}]
+
+
+def _shelve(app: Any, name: str, entries: list[int], user: int = 1) -> int:
+    with app.state.engine.begin() as connection:
+        shelf = int(
+            connection.execute(
+                text(
+                    "INSERT INTO shelves (user_id, name, slug, created_at, updated_at)"
+                    " VALUES (:user, :name, :slug, 'n', 'n') RETURNING id"
+                ),
+                {"user": user, "name": name, "slug": name.lower()},
+            ).scalar_one()
+        )
+        for entry_id in entries:
+            connection.execute(
+                text("INSERT INTO entry_shelves (entry_id, shelf_id) VALUES (:e, :s)"),
+                {"e": entry_id, "s": shelf},
+            )
+    return shelf
+
+
+@pytest.mark.anyio
+async def test_each_librarys_year_and_a_placed_shelf_read_the_library(tmp_path: Path) -> None:
+    """Sprint 138 (DEC-192): a library's year with and without a goal, and a shelf."""
+    year = date.today().year
+    async with _client(tmp_path) as (app, client):
+        books = [
+            _entry(app, f"Book {n}", "book", "read", date_finished=f"{year}-0{n}-02", cover="c.jpg")
+            for n in (3, 1, 2)
+        ]
+        _entry(app, "Last year", "book", "read", date_finished=f"{year - 1}-05-05")
+        film = _entry(app, "A film", "movie", "watched", date_finished=f"{year}-04-04")
+        _goal(app, "book", 12, "year")
+        _goal(app, "anime", 1, "month")
+        favourite = _shelve(app, "Favorites", [books[0], film])
+        hidden = _shelve(app, "Hidden", [books[1]])
+        layout = (await client.get("/api/home/layout")).json()["modules"]
+        for row in layout:
+            if row["module"] == f"shelf:{favourite}":
+                row["hidden"] = False
+            if row["module"] == "year:series":
+                row["hidden"] = True
+        put = await client.put("/api/home/layout", json={"modules": layout})
+        body = (await client.get("/api/home")).json()
+    assert put.status_code == 200, put.text
+    years = {row["item_type"]: row for row in body["library_years"]}
+    # Registry order; series hidden, so not read; anime has a goal and nothing yet.
+    assert [row["item_type"] for row in body["library_years"]] == ["book", "anime", "movie"]
+    assert years["book"]["total"] == 3
+    assert years["book"]["goal"] == {
+        "item_type": "book",
+        "period": "year",
+        "count": 12,
+        "target": 12,
+        "done": 3,
+    }
+    # In the order finished, each opening its entry.
+    assert [cover["entry_id"] for cover in years["book"]["covers"]] == [
+        books[1],
+        books[2],
+        books[0],
+    ]
+    assert years["book"]["covers"][0]["cover_url"].startswith("/api/items/")
+    assert years["anime"]["total"] == 0 and years["anime"]["goal"]["target"] == 12
+    assert years["movie"]["goal"] is None
+    assert [cover["entry_id"] for cover in years["movie"]["covers"]] == [film]
+    assert body["shelf_modules"] == [
+        {
+            "id": favourite,
+            "name": "Favorites",
+            "slug": "favorites",
+            "entry_count": 2,
+            "covers": body["shelf_modules"][0]["covers"],
+        }
+    ]
+    assert {cover["entry_id"] for cover in body["shelf_modules"][0]["covers"]} == {
+        books[0],
+        film,
+    }
+    assert hidden not in {row["id"] for row in body["shelf_modules"]}
 
 
 @pytest.mark.anyio
