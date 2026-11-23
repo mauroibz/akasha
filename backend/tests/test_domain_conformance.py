@@ -485,6 +485,25 @@ def suppressed_keys_are_normalized(domain: Domain) -> None:
 
 
 @registry_check
+def ranking_reads_fields_this_domain_declares(domain: Domain) -> None:
+    """Sprint 132: the ranked pile reads a series field and taste fields by name.
+
+    A name the domain does not declare reads nothing, and the pile would quietly lose
+    a signal; a taste field must be groupable, since its values are compared as keys.
+    """
+    fields = {spec.name: spec for spec in domain.fields}
+    ranking = domain.ranking
+    if ranking.series_field is not None:
+        series = fields.get(ranking.series_field)
+        assert series is not None, f"{domain.item_type} ranks by an undeclared series field"
+        assert series.multiplicity == "one" and series.type == "text"
+    assert not ranking.series_in_title or ranking.series_field is not None
+    for name in ranking.affinity_fields:
+        assert name in fields, f"{domain.item_type} ranks by undeclared {name}"
+        assert fields[name].groupable, f"{domain.item_type}'s {name} is not groupable"
+
+
+@registry_check
 def list_columns_name_real_columns_or_none(domain: Domain) -> None:
     """Sprint 084: the custom-list connector reads a domain's column
     vocabulary, so a declaration is checked and `None` is deliberate.
@@ -1297,6 +1316,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "enrichment": "enrichment_is_answerable_by_this_domain",
         "progress": "progress_counts_something_this_domain_declares",
         "insight_suppressed_keys": "suppressed_keys_are_normalized",
+        "ranking": "ranking_reads_fields_this_domain_declares",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
