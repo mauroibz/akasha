@@ -13,6 +13,7 @@ from book_tracker.api.pile import PilePick
 from book_tracker.api.suggestions import SuggestionResponse
 from book_tracker.application.home import HomeService
 from book_tracker.application.home_layout import SHELF, YEAR, HomeLayoutService
+from book_tracker.application.media import MediaService
 
 router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
@@ -34,6 +35,13 @@ async def layout_service(user: CurrentUser, request: Request) -> HomeLayoutServi
 
 
 Layouts = Annotated[HomeLayoutService, Depends(layout_service)]
+
+
+async def media_service(user: CurrentUser, request: Request) -> MediaService:
+    return MediaService(request.app.state.engine, user.effective_user_id)
+
+
+Media = Annotated[MediaService, Depends(media_service)]
 
 
 class HomeActive(BaseModel):
@@ -165,6 +173,7 @@ def home(
     request: Request,
     service: Home,
     layouts: Layouts,
+    media: Media,
     tz: Annotated[str | None, Query(max_length=64)] = None,
 ) -> HomeResponse:
     """Every module of Home from stored data; no provider is consulted.
@@ -187,7 +196,15 @@ def home(
         ]
 
     return HomeResponse.model_validate(
-        service.home(today, hidden, zone, years=shown(YEAR), shelves=shown(SHELF))
+        service.home(
+            today,
+            hidden,
+            zone,
+            years=shown(YEAR),
+            shelves=shown(SHELF),
+            # The bands and Up next are of the media the person keeps in front (Sprint 143).
+            front=media.front(),
+        )
     )
 
 

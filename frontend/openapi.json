@@ -3753,6 +3753,100 @@
         "title": "MeResponse",
         "type": "object"
       },
+      "MediaBody": {
+        "properties": {
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/MediumChoice"
+            },
+            "maxItems": 64,
+            "title": "Media",
+            "type": "array"
+          }
+        },
+        "required": [
+          "media"
+        ],
+        "title": "MediaBody",
+        "type": "object"
+      },
+      "MediaResponse": {
+        "properties": {
+          "chosen": {
+            "title": "Chosen",
+            "type": "boolean"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/MediumResponse"
+            },
+            "title": "Media",
+            "type": "array"
+          }
+        },
+        "required": [
+          "media",
+          "chosen"
+        ],
+        "title": "MediaResponse",
+        "type": "object"
+      },
+      "MediumChoice": {
+        "properties": {
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "presence": {
+            "enum": [
+              "front",
+              "kept",
+              "off"
+            ],
+            "title": "Presence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_type",
+          "presence"
+        ],
+        "title": "MediumChoice",
+        "type": "object"
+      },
+      "MediumResponse": {
+        "properties": {
+          "held": {
+            "title": "Held",
+            "type": "boolean"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "presence": {
+            "enum": [
+              "front",
+              "kept",
+              "off"
+            ],
+            "title": "Presence",
+            "type": "string"
+          }
+        },
+        "required": [
+          "item_type",
+          "presence",
+          "label",
+          "held"
+        ],
+        "title": "MediumResponse",
+        "type": "object"
+      },
       "MergeBody": {
         "properties": {
           "drop": {
@@ -11884,6 +11978,132 @@
           }
         },
         "summary": "List Locations"
+      }
+    },
+    "/api/media": {
+      "get": {
+        "description": "This person's media, in their order (Sprint 143).",
+        "operationId": "get_media_api_media_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Media"
+      },
+      "put": {
+        "description": "Replace the list; a medium it does not name is appended, kept if held, else off.",
+        "operationId": "put_media_api_media_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MediaBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MediaResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Media"
       }
     },
     "/api/now": {

@@ -1416,6 +1416,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Media
+     * @description This person's media, in their order (Sprint 143).
+     */
+    get: operations["get_media_api_media_get"];
+    /**
+     * Put Media
+     * @description Replace the list; a medium it does not name is appended, kept if held, else off.
+     */
+    put: operations["put_media_api_media_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/now": {
     parameters: {
       query?: never;
@@ -3034,6 +3058,42 @@ export interface components {
       /** Setup Required */
       setup_required: boolean;
       user: components["schemas"]["UserResponse"] | null;
+    };
+    /** MediaBody */
+    MediaBody: {
+      /** Media */
+      media: components["schemas"]["MediumChoice"][];
+    };
+    /** MediaResponse */
+    MediaResponse: {
+      /** Chosen */
+      chosen: boolean;
+      /** Media */
+      media: components["schemas"]["MediumResponse"][];
+    };
+    /** MediumChoice */
+    MediumChoice: {
+      /** Item Type */
+      item_type: string;
+      /**
+       * Presence
+       * @enum {string}
+       */
+      presence: "front" | "kept" | "off";
+    };
+    /** MediumResponse */
+    MediumResponse: {
+      /** Held */
+      held: boolean;
+      /** Item Type */
+      item_type: string;
+      /** Label */
+      label: string;
+      /**
+       * Presence
+       * @enum {string}
+       */
+      presence: "front" | "kept" | "off";
     };
     /** MergeBody */
     MergeBody: {
@@ -8310,6 +8370,122 @@ export interface operations {
         };
       };
       /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  get_media_api_media_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MediaResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  put_media_api_media_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MediaBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MediaResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
       409: {
         headers: {
           [name: string]: unknown;

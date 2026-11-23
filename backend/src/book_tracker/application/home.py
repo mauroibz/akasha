@@ -11,6 +11,7 @@ from each domain's `StatusSpec` flags; whether a domain can hold a goal comes fr
 `entry_fields`; which domains exist comes from the registry.
 """
 
+import json
 from collections import defaultdict
 from collections.abc import Sequence, Set
 from datetime import UTC, date, datetime, tzinfo
@@ -36,6 +37,9 @@ SUGGESTED = 8
 YEAR_COVERS = 48
 #: Covers on a shelf's module, its members changed last first.
 SHELF_COVERS = 24
+#: How much deeper the timeline and the pile are read when some media are out of the
+#: front, so the band and Up next still fill from what is left.
+FRONT_DEPTH = 8
 #: The status every domain has for what an import left unsorted (technical spec 6.6).
 #: The library hides it by default, so Home's counts do too.
 UNSORTED = "unsorted"
@@ -95,10 +99,13 @@ class HomeService:
         *,
         years: Sequence[str] = (),
         shelves: Sequence[str] = (),
+        front: Set[str] | None = None,
     ) -> dict[str, Any]:
         """Every shown module's payload. `years` and `shelves` are the members of the two
         module families (Sprint 138) the person shows, in their order: item types, and
-        shelf ids as the layout keys carry them."""
+        shelf ids as the layout keys carry them. `front` is the media the person keeps in
+        front (Sprint 143): what is under way, what happened lately, what is next and what
+        the greeting names are theirs alone; `None` is every medium."""
         params = {"user": self.user_id, "unsorted": UNSORTED}
         with self.engine.connect() as connection:
             by_status = connection.execute(
@@ -123,17 +130,17 @@ class HomeService:
 
         goals = GoalService(self.engine, self.user_id)
         # The greeting names what is under way, so this is read even when On now is hidden.
-        now = self.library.now()
+        now = [entry for entry in self.library.now() if _in(front, entry)]
 
         def shown(module: str) -> bool:
             return module not in hidden
 
         return {
-            "greeting": self._greeting(today, now, by_status, finished, goals),
+            "greeting": self._greeting(today, now, by_status, finished, goals, front),
             # The Library's first two bands (Sprint 141): not modules, so always read.
             "now": now,
-            "next": self._next(today) if shown("next") else [],
-            "lately": self._lately(zone),
+            "next": self._next(today, front) if shown("next") else [],
+            "lately": self._lately(zone, front),
             "question": self._question() if shown("question") else None,
             "suggested": self._suggested() if shown("suggested") else None,
             "library_years": self._library_years(today, years, finished, goals),
@@ -232,7 +239,7 @@ class HomeService:
             seed_entry_id=None, item_type=None, limit=SUGGESTED, enriched_only=True
         )
 
-    def _lately(self, zone: tzinfo = UTC) -> list[dict[str, Any]]:
+    def _lately(self, zone: tzinfo = UTC, front: Set[str] | None = None) -> list[dict[str, Any]]:
         """Finishes, score changes and additions, newest first (Sprint 131).
 
         Finishes and changes are the Diary's own timeline. Additions are counted per
@@ -240,8 +247,15 @@ class HomeService:
         the Inbox's unsorted entries are left to the Inbox. The day is the person's
         own (`zone`, Sprint 132): an evening import west of Greenwich is one day.
         """
-        timeline = self.library.timeline(limit=LATELY_LIMIT)["events"]
-        days = self._days_added(zone)
+        # With some media out of the front, read deeper so that what is left still fills
+        # the band: the timeline is across every medium.
+        depth = LATELY_LIMIT if front is None else LATELY_LIMIT * FRONT_DEPTH
+        timeline = [
+            event
+            for event in self.library.timeline(limit=depth)["events"]
+            if _in(front, event["entry"])
+        ][:LATELY_LIMIT]
+        days = self._days_added(zone, front)
         added = self.library.get_entries([entry_id for _n, entry_id, _at in days])
         rows: list[dict[str, Any]] = [
             {
@@ -262,7 +276,9 @@ class HomeService:
         rows.sort(key=lambda row: str(row["at"]), reverse=True)
         return rows[:LATELY_LIMIT]
 
-    def _days_added(self, zone: tzinfo) -> list[tuple[int, int, str]]:
+    def _days_added(
+        self, zone: tzinfo, front: Set[str] | None = None
+    ) -> list[tuple[int, int, str]]:
         """`(count, newest entry id, newest date_added)` per local day, newest first.
 
         SQL counts per UTC hour, which a local day is made of whole in any zone on a
@@ -278,12 +294,16 @@ class HomeService:
                     "  count(*) OVER (PARTITION BY substr(e.date_added, 1, 13)) AS n,"
                     "  row_number() OVER (PARTITION BY substr(e.date_added, 1, 13)"
                     "  ORDER BY e.date_added DESC, e.id DESC) AS place"
-                    " FROM entries e WHERE e.user_id = :user AND e.status != :unsorted"
+                    " FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user AND e.status != :unsorted"
+                    " AND (:every OR i.type IN (SELECT value FROM json_each(:types)))"
                     ") WHERE place = 1 ORDER BY at DESC, entry_id DESC LIMIT :hours"
                 ),
                 {
                     "user": self.user_id,
                     "unsorted": UNSORTED,
+                    "every": front is None,
+                    "types": json.dumps(sorted(front or ())),
                     # A local day is at most 25 UTC hours; one day more than shown.
                     "hours": 25 * (LATELY_LIMIT + 1),
                 },
@@ -319,6 +339,7 @@ class HomeService:
         by_status: Sequence[Any],
         finished: Sequence[Any],
         goals: GoalService,
+        front: Set[str] | None = None,
     ) -> dict[str, Any]:
         planned = {
             (domain.item_type, status.value)
@@ -327,7 +348,7 @@ class HomeService:
             if status.planned
         }
         done = _done_by_type(finished)
-        mine = self._goals(goals)
+        mine = [goal for goal in self._goals(goals) if front is None or goal["item_type"] in front]
         active, goal = _greeting_pair(now, mine)
         return {
             "today": today.isoformat(),
@@ -350,13 +371,14 @@ class HomeService:
         mine = {goal["item_type"]: goal for goal in goals.list_goals()}
         return [mine[item_type] for item_type in DOMAINS if item_type in mine]
 
-    def _next(self, today: date) -> list[dict[str, Any]]:
-        """Five from the pile, every library's ranked together (Sprint 132)."""
+    def _next(self, today: date, front: Set[str] | None = None) -> list[dict[str, Any]]:
+        """Five from the pile, every library's ranked together (Sprint 132); of the media
+        in front only (Sprint 143), read deeper so the five are still five."""
         ranked = rank_pile(
             self.engine,
             self.user_id,
             None,
-            NEXT_LIMIT,
+            NEXT_LIMIT if front is None else NEXT_LIMIT * FRONT_DEPTH,
             today=today,
             embedding_model=self.embedding_model,
         )
@@ -364,7 +386,13 @@ class HomeService:
         return [
             {"entry": entry, "score": pick["score"], "reasons": pick["reasons"]}
             for pick, entry in zip(ranked, entries, strict=True)
-        ]
+            if _in(front, entry)
+        ][:NEXT_LIMIT]
+
+
+def _in(front: Set[str] | None, entry: dict[str, Any]) -> bool:
+    """Whether an entry's medium is in front; every medium is when none are named."""
+    return front is None or entry["item"]["type"] in front
 
 
 def _greeting_pair(

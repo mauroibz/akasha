@@ -515,6 +515,18 @@
    ]
   ],
   [
+   "/api/media",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/media",
+   [
+    "PUT"
+   ]
+  ],
+  [
    "/api/pile",
    [
     "GET"
