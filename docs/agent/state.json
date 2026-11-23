@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 53,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 54,
+  "project_status": "ready",
+  "active_sprint": "130",
+  "active_sprint_file": "docs/sprints/130-home-the-module-grid.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "129",
   "completed_sprints": [
     "001",
@@ -138,5 +138,5 @@
     "129"
   ],
   "started_at": "",
-  "updated_at": "2026-11-21T18:41:04+00:00"
+  "updated_at": "2026-11-22T21:09:28-03:00"
 }

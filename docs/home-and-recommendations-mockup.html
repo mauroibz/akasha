@@ -1,0 +1,578 @@
+<title>Akasha Home and Next</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap">
+<style>
+/* Layout: proposal prose around full-width app frames; the home itself is a dense 12-column module grid in Akasha's Ink/Paper tokens. */
+:root {
+  --bg: #0d0c0a; --fg: #f3efe6; --surface: #16140f; --raised: #1d1a15; --muted: #262219;
+  --muted-fg: #a39b8c; --border: #2c2820; --amber: #fbbf24; --amber-text: #fbbf24; --on-amber: #1c1917;
+  --top: hsl(151 50.2% 57.5%); --high: hsl(81 56.7% 59.2%); --mid: hsl(41 86.6% 62%); --low: hsl(5 81.2% 72.9%);
+  --glow: rgba(251,191,36,.16);
+  --display: "Newsreader", Georgia, "Times New Roman", serif;
+  --text: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #f4f0e6; --fg: #1c1917; --surface: #fbf8f1; --raised: #fffdf8; --muted: #eae3d3;
+  --muted-fg: #625a4e; --border: #e2d9c6; --amber: #e9a23b; --amber-text: #9a4a07; --on-amber: #1c1917;
+  --top: hsl(142 71.8% 26%); --high: hsl(86 78.4% 25%); --mid: hsl(35 91.7% 30%); --low: hsl(6 63.4% 42%);
+  --glow: rgba(233,162,59,.2); color-scheme: light; } }
+:root[data-theme="light"] {
+  --bg: #f4f0e6; --fg: #1c1917; --surface: #fbf8f1; --raised: #fffdf8; --muted: #eae3d3;
+  --muted-fg: #625a4e; --border: #e2d9c6; --amber: #e9a23b; --amber-text: #9a4a07; --on-amber: #1c1917;
+  --top: hsl(142 71.8% 26%); --high: hsl(86 78.4% 25%); --mid: hsl(35 91.7% 30%); --low: hsl(6 63.4% 42%);
+  --glow: rgba(233,162,59,.2); color-scheme: light; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--text); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 40px 80px; }
+.doc { max-width: 1280px; margin: 0 auto; display: grid; gap: 64px; }
+.prose { max-width: 70ch; display: grid; gap: 14px; }
+h1, h2, h3, h4 { font-family: var(--display); font-weight: 500; letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(34px, 5vw, 50px); line-height: 1.05; }
+h2 { font-size: clamp(26px, 3.4vw, 34px); line-height: 1.15; }
+h3 { font-size: 21px; line-height: 1.25; }
+p { margin: 0; }
+code { font-size: .88em; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: var(--amber-text); }
+.lede { font-family: var(--display); font-size: 21px; line-height: 1.45; }
+.note { color: var(--muted-fg); font-size: 14px; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+section { display: grid; gap: 24px; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 32px; }
+@media (max-width: 820px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.callout { border-left: 2px solid var(--amber); padding: 4px 0 4px 16px; color: var(--muted-fg); font-size: 14px; max-width: 70ch; }
+.callout b { color: var(--fg); }
+
+/* ---------- app chrome ---------- */
+.frame-cap { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--muted-fg); }
+.frame-cap b { color: var(--fg); font-weight: 600; }
+.frame { border: 1px solid var(--border); border-radius: 14px; background: var(--bg); overflow: hidden; box-shadow: 0 30px 80px -40px rgba(0,0,0,.6); }
+.nav { display: flex; align-items: center; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted-fg); }
+.nav .mark { width: 20px; height: 20px; margin-right: 10px; flex: none; }
+.nav > span { padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+.nav > span.on { background: var(--muted); color: var(--amber-text); }
+.nav .search { margin-left: auto; flex: 0 1 380px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--muted-fg); overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) { .nav > span:not(.on):not(.search) { display: none; } }
+
+.cover { display: block; width: 100%; aspect-ratio: 2/3; object-fit: cover; border-radius: 3px; background: var(--muted); box-shadow: 0 6px 14px -8px rgba(0,0,0,.7); }
+.sq { aspect-ratio: 1; }
+.score { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 5px; font-size: 11px; font-weight: 600; color: var(--on-amber); font-variant-numeric: tabular-nums; }
+.s9 { background: var(--top); } .s7 { background: var(--high); } .s5 { background: var(--mid); } .s2 { background: var(--low); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); color: var(--fg); background: transparent; white-space: nowrap; }
+.btn.primary { background: var(--amber); color: var(--on-amber); border-color: var(--amber); }
+.btn.sm { height: 26px; padding: 0 10px; font-size: 11px; }
+.typo { aspect-ratio: 2/3; border-radius: 3px; padding: 7px; display: flex; flex-direction: column; justify-content: space-between; font-family: var(--display); font-size: 12px; line-height: 1.1; background: var(--raised); border: 1px dashed var(--border); overflow: hidden; }
+.typo small { font-family: var(--text); font-size: 9px; color: var(--muted-fg); }
+
+/* ---------- the home grid ---------- */
+.home { padding: 16px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; background: var(--bg); }
+.mod { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: grid; gap: 12px; align-content: start; min-width: 0; position: relative; }
+.mod-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mod-h h4 { font-size: 16px; }
+.mod-h .more { font-size: 12px; color: var(--muted-fg); white-space: nowrap; }
+.c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c8 { grid-column: span 8; } .c12 { grid-column: span 12; }
+@media (max-width: 1100px) { .c3 { grid-column: span 6; } .c4, .c5 { grid-column: span 6; } .c7, .c8 { grid-column: span 12; } }
+@media (max-width: 700px) { .home > * { grid-column: span 12 !important; } }
+
+.greetbar { grid-column: span 12; display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; padding: 4px 2px 2px; }
+.greetbar h3 { font-size: 24px; }
+.greetbar h3 em { color: var(--amber-text); }
+.greetbar .facts { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted-fg); }
+.greetbar .facts b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* today */
+.today { display: grid; grid-template-columns: 100px minmax(0, 1fr); gap: 16px; }
+.today .cover { box-shadow: 0 0 0 1px var(--amber), 0 0 40px 4px var(--glow); }
+.today .t { font-family: var(--display); font-size: 20px; line-height: 1.15; }
+.prog { display: grid; gap: 4px; font-size: 12px; color: var(--muted-fg); }
+.track { height: 5px; border-radius: 3px; background: var(--muted); overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--amber); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.also { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 12px; color: var(--muted-fg); border-top: 1px solid var(--border); padding-top: 10px; }
+.also b { color: var(--fg); font-weight: 500; }
+
+/* up next */
+.nextrow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.nextrow > div { display: grid; gap: 5px; font-size: 11px; color: var(--muted-fg); align-content: start; }
+.nextrow .rank { font-size: 10px; font-weight: 600; color: var(--amber-text); letter-spacing: .08em; }
+.nextrow .why { line-height: 1.35; }
+.nextrow .t { color: var(--fg); font-size: 12px; font-weight: 500; line-height: 1.25; }
+
+/* year */
+.months { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 4px; align-items: end; }
+.months > div { display: grid; gap: 3px; align-content: end; min-height: 74px; }
+.months .lbl { font-size: 9px; text-align: center; color: var(--muted-fg); }
+.months .slot { aspect-ratio: 2/3; border: 1px dashed var(--border); border-radius: 2px; }
+.months .slot.due { border-color: var(--amber); }
+.months .cover { border-radius: 2px; box-shadow: none; }
+.months .dotrow { display: flex; gap: 2px; justify-content: center; }
+.months .dotrow i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted-fg); }
+.yearnum { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.yearnum b { font-family: var(--display); font-size: 34px; font-weight: 400; color: var(--amber-text); line-height: 1; }
+.yearnum span { font-size: 13px; color: var(--muted-fg); }
+
+/* domains */
+.doms { grid-column: span 12; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .doms { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .doms { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dom { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: grid; gap: 10px; min-width: 0; }
+.dom .top { display: flex; justify-content: space-between; align-items: baseline; }
+.dom .top b { font-family: var(--display); font-size: 26px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.dom .top span { font-size: 12px; color: var(--muted-fg); }
+.fan { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.stack { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--muted); }
+.stack i { display: block; height: 100%; }
+.stack .a { background: var(--fg); opacity: .8; } .stack .b { background: var(--amber); } .stack .c { background: var(--muted-fg); opacity: .5; } .stack .d { background: var(--low); opacity: .7; }
+.legend { font-size: 11px; color: var(--muted-fg); display: flex; gap: 8px; flex-wrap: wrap; }
+.legend b { color: var(--fg); font-weight: 500; }
+.hist { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; align-items: end; height: 30px; }
+.hist i { display: block; background: var(--muted-fg); opacity: .55; border-radius: 1px; }
+.hist i.hi { background: var(--top); opacity: .9; }
+.dom .foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted-fg); }
+
+/* recently */
+.feed { display: grid; gap: 8px; }
+.feed > div { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 12px; color: var(--muted-fg); }
+.feed b { color: var(--fg); font-weight: 500; }
+.feed .d { font-size: 11px; font-variant-numeric: tabular-nums; }
+.feed .ic { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--muted); font-size: 11px; color: var(--fg); }
+
+/* more like this */
+.mlt { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.mlt > div { display: grid; gap: 5px; font-size: 11px; color: var(--muted-fg); align-content: start; }
+.mlt .t { color: var(--fg); font-size: 12px; font-weight: 500; line-height: 1.25; }
+.seed { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted-fg); }
+.seed img { width: 22px; aspect-ratio: 2/3; border-radius: 2px; object-fit: cover; }
+.seed b { color: var(--fg); font-weight: 500; }
+.attrib { font-size: 10px; color: var(--muted-fg); }
+
+/* tidy */
+.tidy { display: grid; gap: 6px; }
+.tidy > div { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 12px; color: var(--muted-fg); padding: 6px 0; border-bottom: 1px solid var(--border); }
+.tidy > div:last-child { border-bottom: 0; }
+.tidy b { font-family: var(--display); font-size: 22px; font-weight: 400; color: var(--fg); font-variant-numeric: tabular-nums; text-align: right; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--fg); }
+.chip span { color: var(--muted-fg); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.ask { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 12px; align-items: center; }
+.ask .q { font-family: var(--display); font-size: 17px; line-height: 1.25; }
+.edit { position: absolute; top: 10px; right: 12px; font-size: 11px; color: var(--muted-fg); }
+
+/* phone */
+.phones { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+.phone { width: 320px; max-width: 100%; border: 1px solid var(--border); border-radius: 30px; background: var(--bg); overflow: hidden; }
+.phone .bar { display: flex; gap: 10px; align-items: center; padding: 14px 14px 8px; }
+.phone .bar .s { flex: 1; border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 12px; color: var(--muted-fg); }
+.phone .body { padding: 6px 12px 12px; display: grid; gap: 10px; }
+.phone .mod { padding: 12px; }
+.phone .tabs { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); font-size: 10px; color: var(--muted-fg); text-align: center; padding: 10px 4px 14px; }
+.phone .tabs .on { color: var(--amber-text); font-weight: 600; }
+.hscroll { display: grid; grid-auto-flow: column; grid-auto-columns: 64px; gap: 8px; overflow: hidden; }
+.hscroll > div { display: grid; gap: 4px; font-size: 10px; color: var(--muted-fg); }
+.doms2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.doms2 .dom { padding: 10px; gap: 6px; }
+.doms2 .dom .top b { font-size: 22px; }
+.phone-cap { font-size: 13px; color: var(--muted-fg); max-width: 320px; margin-top: 10px; }
+.phone-cap b { color: var(--fg); }
+
+/* edit mode panel */
+.editor { display: grid; gap: 8px; }
+.editor > div { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; }
+.editor .h { color: var(--muted-fg); letter-spacing: 2px; }
+.editor .size { display: flex; gap: 2px; }
+.editor .size span { font-size: 11px; padding: 2px 7px; border-radius: 5px; border: 1px solid var(--border); color: var(--muted-fg); }
+.editor .size span.on { background: var(--muted); color: var(--fg); }
+.tog { width: 30px; height: 18px; border-radius: 9px; background: var(--amber); position: relative; }
+.tog::after { content: ""; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--on-amber); }
+.tog.off { background: var(--muted); }
+.tog.off::after { right: auto; left: 2px; background: var(--muted-fg); }
+.editor .off-row { opacity: .55; }
+
+/* tables */
+.tbl { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+th { font-size: 12px; font-weight: 600; color: var(--muted-fg); background: var(--surface); }
+tr:last-child td { border-bottom: 0; }
+td b { font-weight: 600; }
+
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; align-items: stretch; }
+.pipe > div { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); display: grid; gap: 6px; align-content: start; position: relative; }
+.pipe > div:not(:last-child)::after { content: "→"; position: absolute; right: -12px; top: 18px; color: var(--amber-text); font-size: 14px; z-index: 1; }
+.pipe .k { font-size: 11px; font-weight: 600; letter-spacing: .1em; color: var(--amber-text); }
+.pipe h4 { font-size: 17px; }
+.pipe p { font-size: 13px; color: var(--muted-fg); }
+.pipe .hot { border-color: var(--amber); }
+@media (max-width: 900px) { .pipe { grid-template-columns: minmax(0, 1fr); } .pipe > div:not(:last-child)::after { content: "↓"; right: auto; left: 18px; top: auto; bottom: -15px; } }
+pre.code { margin: 0; overflow-x: auto; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 12.5px; line-height: 1.5; }
+
+/* more like this sheet */
+.sheetwrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 0; }
+@media (max-width: 860px) { .sheetwrap { grid-template-columns: minmax(0, 1fr); } }
+.detail { padding: 22px; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 18px; align-content: start; opacity: .55; }
+.sheet { border-left: 1px solid var(--border); background: var(--surface); padding: 20px; display: grid; gap: 14px; align-content: start; }
+.res { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.res:last-of-type { border-bottom: 0; }
+.res .t { font-family: var(--display); font-size: 16px; line-height: 1.2; }
+.res .why { font-size: 12px; color: var(--muted-fg); }
+.res .state { font-size: 11px; color: var(--muted-fg); }
+.res .state.ok { color: var(--top); }
+.pill { display: inline-flex; font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted-fg); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; font-size: 12px; }
+.seg span { padding: 4px 10px; border-radius: 999px; color: var(--muted-fg); }
+.seg span.on { background: var(--muted); color: var(--fg); }
+
+.sprints { display: grid; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.sprints > div { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 18px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.sprints > div:last-child { border-bottom: 0; }
+.sprints .n { font-size: 12px; font-weight: 600; color: var(--amber-text); letter-spacing: .06em; }
+.sprints p { color: var(--muted-fg); font-size: 14px; }
+.sprints b { color: var(--fg); font-weight: 600; }
+.sprints .grp { background: var(--surface); padding: 8px 18px; font-size: 11px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--muted-fg); display: block; }
+@media (max-width: 560px) { .sprints > div { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+</style>
+
+<main class="doc">
+
+<header class="prose">
+  <div class="eyebrow">Akasha · proposal, second pass · 22 November 2026</div>
+  <h1>Home, as a desk you work at</h1>
+  <p class="lede">The first pass spent a whole screen on one book. This one keeps the idea and fills the screen: the top half is what you are likely to touch today, the bottom half is your whole library at a glance, and every block is a module you can move, resize or hide.</p>
+  <p class="note">Numbers, covers and titles come from your library as of tonight. Recommendation titles are examples of the shape of a result, marked as such.</p>
+</header>
+
+<!-- ============ HOME ============ -->
+<section>
+  <div class="frame-cap"><span><b>Home</b> · desktop, Ink · <code>/</code></span><span>Every block below is a module · <b>Edit home</b> rearranges them</span></div>
+  <div class="frame">
+    <div class="nav">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V10a8 8 0 0 1 16 0v11"/><circle cx="12" cy="11" r="2" fill="#fbbf24" stroke="none"/></svg>
+      <span class="on">Home</span><span>Library</span><span>Shelves</span><span>Diary</span><span>Insights</span>
+      <span class="search">Search your library or add something new  ⌘K</span>
+    </div>
+    <div class="home">
+      <div class="greetbar">
+        <h3>Sunday. Day 32 of <em>Designing Data-Intensive Applications</em>.</h3>
+        <div class="facts"><span><b>345</b> entries</span><span><b>2</b> of 24 books in 2026</span><span><b>41</b> on the pile</span><span>Edit home</span></div>
+      </div>
+
+      <!-- Today -->
+      <div class="mod c5">
+        <div class="mod-h"><h4>On now</h4><span class="more">1 book · 0 series · 0 anime</span></div>
+        <div class="today">
+          <img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+          <div style="display:grid;gap:10px;align-content:start">
+            <div class="t">Designing Data-Intensive Applications</div>
+            <div class="note" style="font-size:12px">Kleppmann · added 21 Oct · no progress logged</div>
+            <div class="prog"><div class="track"><i style="width:0%"></i></div><span>No chapters logged yet</span></div>
+            <div class="acts"><span class="btn primary">+ Chapter</span><span class="btn">Finished</span><span class="btn">Set aside</span></div>
+          </div>
+        </div>
+        <div class="also"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span>Last on screen: <b>Maul – Shadow Lord</b>, a 9, a month ago.</span><span class="btn sm">More like this</span></div>
+      </div>
+
+      <!-- Up next -->
+      <div class="mod c7">
+        <div class="mod-h"><h4>Up next, from your pile</h4><span class="more">order is a placeholder until sprint 132 · 41 →</span></div>
+        <div class="nextrow">
+          <div><span class="rank">1</span><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="t">Mistborn: The Final Empire</span><span class="why">Starts a trilogy; all three on the pile</span><span class="btn sm primary">Start</span></div>
+          <div><span class="rank">2</span><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="t">Proyecto Hail Mary</span><span class="why">Andy Weir · since Sep</span><span class="btn sm">Start</span></div>
+          <div><span class="rank">3</span><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="t">La mano izquierda de la oscuridad</span><span class="why">Le Guin · since Sep</span><span class="btn sm">Start</span></div>
+          <div><span class="rank">4</span><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="t">El problema de los tres cuerpos</span><span class="why">Liu Cixin · since Sep</span><span class="btn sm">Start</span></div>
+          <div><span class="rank">5</span><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="t">El secreto</span><span class="why">Donna Tartt · since Sep</span><span class="btn sm">Start</span></div>
+        </div>
+      </div>
+
+      <!-- Year -->
+      <div class="mod c7">
+        <div class="mod-h"><h4>2026</h4><span class="more">Diary →</span></div>
+        <div class="yearnum"><b>2 / 24</b><span>books · two a month · December needs two to catch up on the pace</span></div>
+        <div class="months">
+          <div><span class="slot"></span><span class="lbl">J</span></div>
+          <div><span class="slot"></span><span class="lbl">F</span></div>
+          <div><span class="slot"></span><span class="lbl">M</span></div>
+          <div><span class="slot"></span><span class="lbl">A</span></div>
+          <div><span class="slot"></span><span class="lbl">M</span></div>
+          <div><span class="slot"></span><span class="lbl">J</span></div>
+          <div><span class="slot"></span><span class="lbl">J</span></div>
+          <div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="lbl">A</span></div>
+          <div><span class="slot"></span><span class="lbl">S</span></div>
+          <div><span class="dotrow"><i></i><i></i></span><span class="slot"></span><span class="lbl">O</span></div>
+          <div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span class="lbl">N</span></div>
+          <div><span class="slot due"></span><span class="lbl">D</span></div>
+        </div>
+        <span class="note" style="font-size:12px">Dots are other libraries: two series finished in October.</span>
+      </div>
+
+      <!-- Recently -->
+      <div class="mod c5">
+        <div class="mod-h"><h4>Lately</h4><span class="more">All activity →</span></div>
+        <div class="feed">
+          <div><span class="ic">✓</span><span>Finished <b>Pálido fuego</b></span><span class="d"><span class="score s7">7</span> 6 Nov</span></div>
+          <div><span class="ic">↓</span><span><b>A Clash of Kings</b> 8 → 6, <b>Juego de Gerald</b> 8 → 7, one more</span><span class="d">25 Oct</span></div>
+          <div><span class="ic">✓</span><span>Finished <b>Maul – Shadow Lord</b> and <b>The Clone Wars</b></span><span class="d"><span class="score s9">9</span> 21 Oct</span></div>
+          <div><span class="ic">+</span><span>Added <b>Why Nations Fail</b></span><span class="d">2 Nov</span></div>
+        </div>
+      </div>
+
+      <!-- Domains overview -->
+      <div class="doms">
+        <div class="dom">
+          <div class="top"><b>105</b><span>Books</span></div>
+          <div class="fan"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div>
+          <div class="stack"><i class="a" style="width:54%"></i><i class="b" style="width:1%"></i><i class="c" style="width:39%"></i><i class="d" style="width:6%"></i></div>
+          <div class="legend"><span><b>57</b> read</span><span><b>1</b> reading</span><span><b>41</b> pile</span><span><b>6</b> dropped</span></div>
+          <div class="hist"><i style="height:2%"></i><i style="height:27%"></i><i style="height:13%"></i><i style="height:7%"></i><i style="height:67%"></i><i style="height:100%"></i><i style="height:67%"></i><i style="height:53%"></i><i class="hi" style="height:7%"></i><i class="hi" style="height:20%"></i></div>
+          <div class="foot"><span>avg 6.1</span><span>11 without cover</span></div>
+        </div>
+        <div class="dom">
+          <div class="top"><b>81</b><span>Anime</span></div>
+          <div class="fan"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div>
+          <div class="stack"><i class="a" style="width:91%"></i><i class="c" style="width:1.5%"></i><i class="d" style="width:7.5%"></i></div>
+          <div class="legend"><span><b>74</b> done</span><span><b>1</b> plan</span><span><b>6</b> dropped</span></div>
+          <div class="hist"><i style="height:11%"></i><i style="height:11%"></i><i style="height:11%"></i><i style="height:42%"></i><i style="height:58%"></i><i style="height:100%"></i><i style="height:53%"></i><i style="height:63%"></i><i class="hi" style="height:47%"></i><i class="hi" style="height:16%"></i></div>
+          <div class="foot"><span>avg 6.3</span><span>last: Aug 2025</span></div>
+        </div>
+        <div class="dom">
+          <div class="top"><b>148</b><span>Albums</span></div>
+          <div class="fan"><img class="cover sq" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover sq" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover sq" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div>
+          <div class="stack"><i class="a" style="width:100%"></i></div>
+          <div class="legend"><span><b>148</b> owned</span><span><b>35</b> scored</span></div>
+          <div class="hist"><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:44%"></i><i style="height:33%"></i><i style="height:89%"></i><i style="height:67%"></i><i class="hi" style="height:100%"></i><i class="hi" style="height:56%"></i></div>
+          <div class="foot"><span>avg 7.8</span><span>21 without cover</span></div>
+        </div>
+        <div class="dom">
+          <div class="top"><b>4</b><span>Movies</span></div>
+          <div class="fan"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><div class="typo" style="border-style:dashed;justify-content:center;text-align:center">+<small>add</small></div></div>
+          <div class="stack"><i class="a" style="width:100%"></i></div>
+          <div class="legend"><span><b>4</b> watched</span></div>
+          <div class="hist"><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:100%"></i><i style="height:2%"></i><i style="height:100%"></i><i style="height:100%"></i><i class="hi" style="height:100%"></i><i class="hi" style="height:2%"></i></div>
+          <div class="foot"><span>avg 7.3</span><span>no watchlist yet</span></div>
+        </div>
+        <div class="dom">
+          <div class="top"><b>3</b><span>Series</span></div>
+          <div class="fan"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div>
+          <div class="stack"><i class="a" style="width:100%"></i></div>
+          <div class="legend"><span><b>3</b> completed</span></div>
+          <div class="hist"><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:2%"></i><i style="height:100%"></i><i style="height:2%"></i><i class="hi" style="height:100%"></i><i class="hi" style="height:100%"></i></div>
+          <div class="foot"><span>avg 8.7</span><span>Bojack, a 10</span></div>
+        </div>
+      </div>
+
+      <!-- More like this -->
+      <div class="mod c6">
+        <div class="mod-h"><h4>More like this</h4><span class="more">3 seeds · refreshed weekly →</span></div>
+        <div class="seed"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><span>Because you gave <b>Maul – Shadow Lord</b> a 9 · <span class="pill">TMDB</span></span></div>
+        <div class="mlt">
+          <div><div class="typo">Star Wars: The Bad Batch<small>series · 2021</small></div><span class="t">The Bad Batch</span><span>Same creator</span></div>
+          <div><div class="typo">Andor<small>series · 2022</small></div><span class="t">Andor</span><span>TMDB recommends</span></div>
+          <div><div class="typo">Tales of the Jedi<small>series · 2022</small></div><span class="t">Tales of the Jedi</span><span>Same creator</span></div>
+          <div><div class="typo">Arcane<small>series · 2021</small></div><span class="t">Arcane</span><span>TMDB recommends</span></div>
+        </div>
+        <span class="attrib">Example titles. This product uses the TMDB API but is not endorsed or certified by TMDB.</span>
+      </div>
+
+      <!-- Tidy -->
+      <div class="mod c3">
+        <div class="mod-h"><h4>Tidy up</h4><span class="more">5 min →</span></div>
+        <div class="tidy">
+          <div><b>12</b><span>possible duplicate pairs</span><span class="btn sm">Review</span></div>
+          <div><b>32</b><span>without a cover: 21 albums, 11 books</span><span class="btn sm">Find</span></div>
+          <div><b>3</b><span>finished but not scored</span><span class="btn sm">Score</span></div>
+        </div>
+      </div>
+
+      <!-- Play / shelves -->
+      <div class="mod c3">
+        <div class="mod-h"><h4>One question</h4><span class="more">Play →</span></div>
+        <div class="ask"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><div style="display:grid;gap:8px"><span class="q">Is <em>Pet Sematary</em> still a 9?</span><div class="acts"><span class="btn sm">Still a 9</span><span class="btn sm">Change</span></div></div></div>
+        <div class="mod-h" style="margin-top:4px"><h4>Shelves</h4><span class="more">11 →</span></div>
+        <div class="chips"><span class="chip">novela<span>11</span></span><span class="chip">distopía<span>5</span></span><span class="chip">fantástico<span>5</span></span><span class="chip">ciencia ficción<span>4</span></span><span class="chip">humor<span>2</span></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="split">
+    <div class="prose">
+      <h3>What changed from the first pass</h3>
+      <ul class="plain">
+        <li><b>The top half is for today.</b> <em>On now</em> carries every domain you are in the middle of, with the actions you'd take (log a chapter, finish, set aside). <em>Up next</em> is the ranked pile, five deep, one tap to start.</li>
+        <li><b>The bottom half is the library.</b> One tile per domain: the count, how it splits by status, your score curve, your three best covers, and what's missing. Each tile opens the Library filtered to it.</li>
+        <li><b>The line survives as the year module:</b> twelve months, your finished covers in place, dashed slots where the goal still needs something, December marked.</li>
+        <li><b>Everything is a module.</b> The home is a grid of twelve columns. Modules come in sizes, and the layout is stored per user on the server, so it follows you to the phone.</li>
+      </ul>
+    </div>
+    <div class="prose">
+      <h3>The modules</h3>
+      <div class="tbl"><table style="min-width:0">
+        <thead><tr><th>Module</th><th>Reads from</th></tr></thead>
+        <tbody>
+          <tr><td><b>On now</b></td><td>Entries in progress, across domains</td></tr>
+          <tr><td><b>Up next</b></td><td>The ranked pile (sprint 132)</td></tr>
+          <tr><td><b>Year</b></td><td>Goals and the Diary</td></tr>
+          <tr><td><b>Lately</b></td><td>The Diary timeline: finishes, score events, additions</td></tr>
+          <tr><td><b>Library tiles</b></td><td>One per domain in the registry; counts and score curve</td></tr>
+          <tr><td><b>More like this</b></td><td>Stored suggestions, never live calls</td></tr>
+          <tr><td><b>Tidy up</b></td><td>Duplicates, missing covers, unscored</td></tr>
+          <tr><td><b>One question</b></td><td>Play: rescore, rank, gaps</td></tr>
+          <tr><td><b>Shelves, Lent out</b></td><td>Shelves and loans; hidden when empty</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PHONE + EDIT ============ -->
+<section>
+  <div class="prose">
+    <h2>On the phone, and editing</h2>
+    <p>On a phone the same modules stack in the same order, each at its compact size: horizontal rows of covers instead of grids, library tiles two across. <em>Edit home</em> lists the modules: drag to reorder, pick a size, switch one off. Hiding is per user, and a module with nothing to show (no loans, no goal) hides itself until it has something.</p>
+  </div>
+  <div class="phones">
+    <div>
+      <div class="phone">
+        <div class="bar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 21V10a8 8 0 0 1 16 0v11"/><circle cx="12" cy="11" r="2" fill="#fbbf24" stroke="none"/></svg><span class="s">Search or add</span></div>
+        <div class="body">
+          <div class="mod"><div class="today" style="grid-template-columns:72px minmax(0,1fr);gap:12px"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""><div style="display:grid;gap:8px;align-content:start"><span class="eyebrow" style="letter-spacing:.2em">Day 32</span><span class="t" style="font-size:16px">Designing Data-Intensive Applications</span><div class="acts"><span class="btn sm primary">+ Chapter</span><span class="btn sm">Finished</span></div></div></div></div>
+          <div class="mod"><div class="mod-h"><h4>Up next</h4><span class="more">41 →</span></div>
+            <div class="hscroll"><div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">Mistborn</div><div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">Hail Mary</div><div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">La mano…</div><div><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">Tres cuerpos</div></div></div>
+          <div class="mod"><div class="mod-h"><h4>2026 · 2 / 24</h4><span class="more">Diary →</span></div>
+            <div class="months" style="gap:3px"><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><span class="slot"></span></div><div style="min-height:0"><img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></div><div style="min-height:0"><span class="slot due"></span></div></div></div>
+          <div class="doms2">
+            <div class="dom"><div class="top"><b>105</b><span>Books</span></div><div class="stack"><i class="a" style="width:54%"></i><i class="b" style="width:1%"></i><i class="c" style="width:39%"></i><i class="d" style="width:6%"></i></div><div class="foot"><span>avg 6.1</span><span>41 pile</span></div></div>
+            <div class="dom"><div class="top"><b>81</b><span>Anime</span></div><div class="stack"><i class="a" style="width:91%"></i><i class="c" style="width:1.5%"></i><i class="d" style="width:7.5%"></i></div><div class="foot"><span>avg 6.3</span><span>1 plan</span></div></div>
+            <div class="dom"><div class="top"><b>148</b><span>Albums</span></div><div class="stack"><i class="a" style="width:100%"></i></div><div class="foot"><span>avg 7.8</span><span>35 scored</span></div></div>
+            <div class="dom"><div class="top"><b>7</b><span>Screen</span></div><div class="stack"><i class="a" style="width:100%"></i></div><div class="foot"><span>4 movies</span><span>3 series</span></div></div>
+          </div>
+        </div>
+        <div class="tabs"><span class="on">Home</span><span>Library</span><span>Add</span><span>Shelves</span><span>Diary</span></div>
+      </div>
+      <p class="phone-cap"><b>Phone, first screen.</b> Today on top, the library underneath, then Lately, More like this and Tidy up below the fold.</p>
+    </div>
+    <div style="flex:1 1 340px;max-width:460px">
+      <div class="frame" style="padding:16px;display:grid;gap:12px">
+        <div class="mod-h"><h4>Edit home</h4><span class="btn sm primary">Done</span></div>
+        <div class="editor">
+          <div><span class="h">⋮⋮</span><span>On now</span><span class="size"><span>S</span><span class="on">M</span><span>L</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>Up next</span><span class="size"><span>S</span><span>M</span><span class="on">L</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>Year</span><span class="size"><span>S</span><span>M</span><span class="on">L</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>Lately</span><span class="size"><span>S</span><span class="on">M</span><span>L</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>Library tiles</span><span class="size"><span class="on">Full</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>More like this</span><span class="size"><span>S</span><span class="on">M</span><span>L</span></span><span class="tog"></span></div>
+          <div><span class="h">⋮⋮</span><span>Tidy up</span><span class="size"><span class="on">S</span><span>M</span></span><span class="tog"></span></div>
+          <div class="off-row"><span class="h">⋮⋮</span><span>Lent out <span class="note" style="font-size:11px">· nothing lent</span></span><span class="size"><span class="on">S</span></span><span class="tog off"></span></div>
+        </div>
+        <p class="note" style="font-size:12px">Sizes are column spans: S 3, M 5–6, L 7–8 of 12. On a phone every size is full width; size only changes how much each module shows.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RECS ============ -->
+<section>
+  <div class="prose">
+    <div class="eyebrow">Recommendations</div>
+    <h2>Pick first, then enrich</h2>
+    <p class="lede">A source chooses a handful of candidates. Only then do we spend provider calls, and only on those candidates. Nothing crawls a provider to find something to suggest.</p>
+    <p>This is the order you asked for, and it keeps every provider inside its limits. Today's enrichment job already works this way for items you add. Recommendations add one step in front of it.</p>
+  </div>
+
+  <div class="pipe">
+    <div><span class="k">SEED</span><h4>What to start from</h4><p>One item, when you press <em>More like this</em>. Or your profile: top scores, recent finishes, the pile, what you dismissed.</p></div>
+    <div class="hot"><span class="k">SELECT</span><h4>A source picks</h4><p>Per domain. TMDB's <code>/recommendations</code> for movies and series first. Later, a model call. One request yields a short list of titles with ids and a reason.</p></div>
+    <div><span class="k">STORE</span><h4>Suggestions table</h4><p>Title, ids, reason, source, seed, display fields. Home and pages read only from here, never from the network.</p></div>
+    <div class="hot"><span class="k">ENRICH</span><h4>Providers fill in</h4><p>Only the top few, or one you open or mark <em>Want</em>. They go through the domain's own resolve (Wikidata, TVmaze, AniList, Open Library), under the existing budgets.</p></div>
+    <div><span class="k">ANSWER</span><h4>Your feedback</h4><p><em>Want</em> adds it to the pile. <em>Not for me</em> and <em>Seen it</em> are stored and shape the next round.</p></div>
+  </div>
+
+  <div class="split">
+    <div class="prose">
+      <h3>The shape in code</h3>
+      <p>A domain declares its sources the way it declares enrichment today, so the shared layers never branch on the item type (technical spec 6.6). Sources share one interface whether they call TMDB, a language model or an embedding index. Which provider sits behind a source is configuration.</p>
+    </div>
+<pre class="code"># domains/movie/__init__.py
+recommendation = RecommendationSpec(
+    sources=("tmdb",),            # later: "model"
+    resolve=resolve_candidate,    # candidate -> item, via the domain's providers
+)
+
+# shared: application/recommend.py
+class RecommendationSource(Protocol):
+    name: str
+    def select(self, seed: Seed, profile: TasteProfile,
+               limit: int) -> list[Candidate]: ...
+
+Candidate(title, year, creator, external_ids,
+          reason, source_score, display)</pre>
+  </div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Source</th><th>What it selects from</th><th>Domains</th><th>Cost and limits</th><th>When</th></tr></thead>
+    <tbody>
+      <tr><td><b>Rank the pile</b></td><td>Your own planned entries, scored against the profile</td><td>All</td><td>None; local</td><td>Quick win, sprint 132</td></tr>
+      <tr><td><b>TMDB</b></td><td><code>/movie/{id}/recommendations</code>, <code>/tv/{id}/recommendations</code> on your token</td><td>Movies, series</td><td>One request per seed. Needs a DEC amending DEC-103: attribution shown, cached data refreshed within TMDB's window</td><td>First domain, sprint 134</td></tr>
+      <tr><td><b>Language model</b></td><td>A compact profile (titles, scores, dismissals) in; titles, creators and a reason out</td><td>All, and across domains</td><td>One call per round. Configured as any endpoint that speaks the OpenAI API: a hosted model, or a local one on your 3080 so nothing leaves the house</td><td>Sprint 135</td></tr>
+      <tr><td><b>Embeddings</b></td><td>Similarity between your items' stored text (subjects, genres, synopsis), computed once per item</td><td>All</td><td>One embedding per item; can run locally. Selects only from what is already known, so it re-ranks the pile and the model's candidates rather than finding new things</td><td>Sprint 136</td></tr>
+    </tbody>
+  </table></div>
+  <p class="callout"><b>A guard against made-up titles.</b> A model can name a book that doesn't exist. Its candidates count only once the domain's resolve finds them in a provider; anything that doesn't resolve is dropped and never shown.</p>
+</section>
+
+<!-- ============ MORE LIKE THIS ============ -->
+<section>
+  <div class="prose">
+    <h2>More like this</h2>
+    <p>A button on every item's page and on cards in <em>On now</em> and <em>Lately</em>. Pressing it queues one job for that seed. Results stream into a side sheet as they arrive, through the event stream the app already has. They're stored, so pressing it again shows the last round with a <em>Refresh</em>.</p>
+  </div>
+  <div class="frame">
+    <div class="nav"><svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V10a8 8 0 0 1 16 0v11"/><circle cx="12" cy="11" r="2" fill="#fbbf24" stroke="none"/></svg><span>Home</span><span class="on">Library</span><span>Shelves</span><span>Diary</span><span>Insights</span><span class="search">Search or add ⌘K</span></div>
+    <div class="sheetwrap">
+      <div class="detail">
+        <img class="cover" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">
+        <div style="display:grid;gap:10px;align-content:start"><h3>Star Wars: Maul – Shadow Lord</h3><span class="note">Series · Dave Filoni · finished 21 Oct</span><span class="score s9" style="width:28px;height:28px;font-size:14px">9</span><span class="btn primary" style="justify-self:start">More like this</span></div>
+      </div>
+      <div class="sheet">
+        <div class="mod-h"><h4 style="font-size:20px">More like Maul – Shadow Lord</h4><span class="seg"><span class="on">TMDB</span><span>Model</span></span></div>
+        <p class="note" style="font-size:12px">6 picked by TMDB in one request · 2 enriched so far · example titles</p>
+        <div class="res"><div class="typo">The Bad Batch<small>2021</small></div><div><div class="t">Star Wars: The Bad Batch</div><div class="why">Same creator · 3 seasons</div><div class="state ok">Found on Wikidata and TVmaze</div></div><div class="acts"><span class="btn sm primary">Want</span><span class="btn sm">Not for me</span></div></div>
+        <div class="res"><div class="typo">Andor<small>2022</small></div><div><div class="t">Andor</div><div class="why">TMDB: often watched together</div><div class="state ok">Found on Wikidata and TVmaze</div></div><div class="acts"><span class="btn sm primary">Want</span><span class="btn sm">Seen it</span></div></div>
+        <div class="res"><div class="typo">Tales of the Jedi<small>2022</small></div><div><div class="t">Tales of the Jedi</div><div class="why">Same creator · 6 episodes</div><div class="state">Enriches when you open it</div></div><div class="acts"><span class="btn sm primary">Want</span><span class="btn sm">Not for me</span></div></div>
+        <div class="res"><div class="typo">Arcane<small>2021</small></div><div><div class="t">Arcane</div><div class="why">TMDB: often watched together</div><div class="state">Enriches when you open it</div></div><div class="acts"><span class="btn sm primary">Want</span><span class="btn sm">Not for me</span></div></div>
+        <p class="attrib">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PLAN ============ -->
+<section>
+  <div class="prose">
+    <h2>The plan</h2>
+    <p>Seven sprints, each one shippable on its own. Home first, because recommendations need somewhere to show up. Then the pile ranking as the quick win. Then the recommendation infrastructure, proven with one domain before it grows.</p>
+  </div>
+  <div class="sprints">
+    <span class="grp">Home</span>
+    <div><span class="n">SPRINT 130</span><p><b>Module grid and the core four.</b> <code>GET /api/home</code> assembles each module's data in one read from existing services. The page at <code>/</code> with On now, Up next (pile in date order until 132), Year, Library tiles and the greeting line. The Library moves to <code>/library</code>.</p></div>
+    <div><span class="n">SPRINT 131</span><p><b>The rest, and Edit home.</b> Lately, Tidy up, One question, Shelves, Lent out. Module sizes, order and visibility stored per user (migration). The phone stack. Walkthrough on your library at 390 and 1440 px.</p></div>
+    <span class="grp">Quick win</span>
+    <div><span class="n">SPRINT 132</span><p><b>Rank the pile.</b> A DEC reversing the recommendations non-goal. A taste profile from scores, score history, rank, shelves, creators and series. Up next ranked with a one-line reason. <em>Something else</em> walks down the list. No network.</p></div>
+    <span class="grp">Recommendations</span>
+    <div><span class="n">SPRINT 133</span><p><b>The infrastructure.</b> The <code>RecommendationSource</code> interface and the per-domain <code>RecommendationSpec</code> in the registry. A <code>suggestions</code> table with seed, source, reason and answer. A <code>recommend</code> job kind with per-source budgets. Endpoints for <em>More like this</em> and for answers. A recorded fake source proves it end to end.</p></div>
+    <div><span class="n">SPRINT 134</span><p><b>TMDB, movies and series.</b> A DEC amending DEC-103. Selection from <code>/recommendations</code>, resolve through Wikidata and TVmaze. The <em>More like this</em> button and sheet, and the Home module. Tested against recorded TMDB responses, not mocks.</p></div>
+    <div><span class="n">SPRINT 135</span><p><b>The model source.</b> An OpenAI-compatible endpoint in configuration, local or hosted. Prompt built from the profile; candidates resolved by each domain's search; unresolved ones dropped. Off until configured.</p></div>
+    <div><span class="n">SPRINT 136</span><p><b>Embeddings.</b> One vector per item from stored text. Similarity re-ranks the pile and the model's candidates, and gives <em>More like this</em> an offline answer from your own library.</p></div>
+  </div>
+  <div class="prose">
+    <h3>Decided and still open</h3>
+    <ul class="plain">
+      <li><b>Decided:</b> a modular home; reverse the non-goal; the pile ranking as the quick win; recommendations per domain, select then enrich; TMDB first; <em>More like this</em> as a manual trigger.</li>
+      <li><b>Open, for sprint 134:</b> TMDB's terms ask for its attribution on screen and for cached data to be refreshed within their window. The mock shows the attribution line under each TMDB result.</li>
+      <li><b>Open, for sprint 135:</b> hosted or local model. A local model on your 3080 keeps your titles and scores in the house, but only works while that machine is on. A hosted one always answers.</li>
+    </ul>
+  </div>
+</section>
+
+</main>

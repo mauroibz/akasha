@@ -1,0 +1,56 @@
+# Sprint 136 — Embeddings
+
+**Sprint:** 136
+**Status:** planned
+**Roadmap revision:** 54
+**Depends on:** 135
+**Owner:** Mauro
+
+## Objective
+
+With an embedding endpoint configured, items carry a vector of their stored text; the pile
+ranking and the candidates of other sources are re-ranked by similarity to what the person rates
+highly, and *More like this* has a *From your library* segment that needs no network beyond the
+embedding endpoint.
+
+## Required context
+
+- DEC-183 point 7; Sprints 132–135 Outcomes; `application/ranking.py`,
+  `domain/recommendations.py`, the enrichment pipeline (where an item's text becomes known).
+
+## Deliverables
+
+1. Configuration: `AKASHA_RECS_EMBEDDINGS_URL`, `AKASHA_RECS_EMBEDDINGS_MODEL`, optional key.
+2. Migration `0038_item_embeddings`: `item_embeddings(item_id PK → items, model, dims, vector
+   BLOB, text_hash, created_at)`. The text is title, creator, year, and the domain's declared
+   descriptive fields (subjects, genres, synopsis) in a fixed order.
+3. An `embed_items` job that embeds items missing a vector or whose text hash changed, batched,
+   under a budget; triggered after enrichment and by a maintenance pass.
+4. A `library` recommendation source: cosine similarity in Python over stored vectors (numpy if
+   already a dependency, otherwise plain floats; a 10,000-item library must answer under 300 ms).
+5. The ranked pile gains a similarity signal ("Close to what you scored 9: …"); other sources'
+   candidates, once enriched, are re-ranked by it.
+6. Recordings from a real embedding endpoint (the same local server as Sprint 135 if it serves
+   embeddings).
+
+## Acceptance criteria
+
+1. With recorded vectors, *From your library* returns the nearest planned entries to the seed
+   (tested).
+2. Without configuration, ranking falls back to Sprint 132's signals unchanged (tested).
+3. Changing an item's text re-embeds it once (tested).
+4. Migration up/down clean.
+
+## Verification
+
+Per DEC-167; a live pass with the real endpoint and a walkthrough of the segment and of *Up next*
+with the similarity signal. Then, because this closes the line, `make test` and the full
+Playwright suite before any release.
+
+## Explicit non-scope
+
+A vector database; cross-user similarity.
+
+## Outcome
+
+_Not started._

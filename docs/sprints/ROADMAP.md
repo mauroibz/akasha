@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 51
+**Plan revision:** 54
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** none. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
@@ -1897,6 +1897,28 @@ ways out; one sprint closes them and documents the deployment.
 - **[129 — Security follow-ups](129-security-follow-ups.md)** (**completed**): the security event
   log, a dependency audit in CI, the last linear regex, a 30-day public session default
   (DEC-181).
+
+## Home and recommendations — the 3.0 line
+
+The owner asked on 2026-11-22 for a home that shows what they were up to, are doing and will do
+next, and is also an overview of the library; and for recommendations that select before they
+enrich, per domain, TMDB first, with a manual *More like this*. The second mockup was approved
+whole, recorded as **DEC-183**; the design is
+[`../home-and-recommendations-proposal.md`](../home-and-recommendations-proposal.md).
+
+- **[130 — Home: the module grid](130-home-the-module-grid.md)**: `/` is Home, the library moves
+  to `/library`; `GET /api/home`; On now, Up next, Year, library tiles.
+- **[131 — Home: the remaining modules, and Edit home](131-home-the-rest-and-edit.md)**: Lately,
+  Tidy up, One question, Shelves, Lent out; a stored per-user layout.
+- **[132 — The ranked pile](132-the-ranked-pile.md)**: recommendations leave the non-goals; the
+  pile ranked locally with a reason each.
+- **[133 — Recommendation infrastructure](133-recommendation-infrastructure.md)**: sources per
+  domain, suggestions storage, a budgeted `recommend` job, endpoints.
+- **[134 — TMDB, and More like this](134-tmdb-and-more-like-this.md)**: the first real source,
+  the side sheet, the Home module.
+- **[135 — The model source](135-the-model-source.md)**: any OpenAI-compatible endpoint, off
+  until configured.
+- **[136 — Embeddings](136-embeddings.md)**: similarity re-ranking and *From your library*.
 
 ## Not scheduled
 

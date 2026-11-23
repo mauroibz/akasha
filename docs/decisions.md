@@ -7195,3 +7195,36 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      focus. The inbox badge keeps a focus refetch.
 - Consequences: migration 0035 (`entry_shelves(shelf_id)`, `entries(item_id)`); backup
   manifests gain `database_digest`; the container CMD gains `--timeout-graceful-shutdown 10`.
+
+## DEC-183 — Home as a desk, and recommendations that select before they enrich (Sprints 130–136)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: the owner asked for a home that shows what they were up to, are doing and will do
+  next, and that is also an overview of the library; and for a recommendation engine. A first
+  mockup was rejected ("too much wasted space and focuses too much on a small subset"); the second,
+  a dense module grid with a select-then-enrich recommendation pipeline, was approved whole:
+  "Love all of it. Build it all." The design is
+  [`home-and-recommendations-proposal.md`](home-and-recommendations-proposal.md).
+- Decision: `FINAL_SPRINT` 129 → 136, plan revision 54.
+  1. **`/` is Home; the library moves to `/library`.** A `/` URL carrying library query
+     parameters redirects to `/library` with them, so saved links keep working.
+  2. **Home reads stored data only**, through one `GET /api/home`. Its layout (order, size,
+     hidden) is stored per user; unknown module keys are ignored on read.
+  3. **Recommendations stop being a non-goal** (product spec §1). The first, network-free form is
+     the ranked pile (Sprint 132).
+  4. **Select, then enrich.** A source selects candidates in one request; providers are spent
+     only on selected candidates, through the domain's own resolve and the existing budgets.
+     Nothing crawls a provider to choose what to suggest.
+  5. **Per domain, through the registry.** A domain declares `RecommendationSpec(sources=…,
+     resolve=…)`; the shared layers never branch on the item type. Which provider backs a
+     source is configuration.
+  6. **TMDB is the first source** (movies and series). This amends DEC-103 for recommendations
+     only: suggestion rows from TMDB carry TMDB's attribution wherever they are shown and are
+     dropped or refreshed within TMDB's six-month cache window. DEC-103's poster choice is not
+     reopened.
+  7. **Model and embedding sources are off until configured**, through any OpenAI-compatible
+     endpoint, local or hosted. A model candidate is shown only after the domain resolves it.
+- Consequences: new tables for the home layout and for suggestions; a `recommend` job kind; the
+  product spec's non-goals and the technical spec gain the recommendation contract as each sprint
+  lands.
