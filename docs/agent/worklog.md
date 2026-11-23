@@ -6942,3 +6942,36 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   covers; at 1440 about one cover row stays empty above the busiest month. The goal reason is
   the second reason on every book (only the first is shown on Home).
 - Next: Sprint 133, recommendation infrastructure.
+
+## 2026-11-23 — Sprint 133 (complete)
+- Done: recommendation pipeline (`ffb263d`): `domain/recommendations.py`, `Domain.recommendation`,
+  `app/recommendations.py` (empty `SOURCE_FACTORIES`), migration 0037, `recommend` and
+  `enrich_suggestion` jobs, five endpoints, `AKASHA_RECOMMEND_DAILY_LIMITS`, test-only fake
+  source. Cover read off the loop (`273b88c`); cover test (`37c48b2`); reuse of earlier
+  resolutions and one row per work in the list (`afc9f42`); docs and DEC-188 (`0fe6311`).
+  Prerequisite: the documented-route check lacked `/api/home`, `/api/home/layout`, `/api/pile`
+  since Sprint 130 and failed (`9734b03`).
+- Verified: `tests/test_recommendations.py` 28; regression over touched modules 634
+  (conformance, repositories, cached add, refile, library API, app shape, migrations, security
+  migrations, settings, home, layout, isolation, events, jobs, enrichment, enrichment pipeline,
+  domain, prune, quota, ranking, ownership, robustness); `make check`. Running a subset with
+  `-p no:logging` breaks tests that use `caplog` (an error, not a failure).
+- API pass (no screen changed): scratchpad `api_pass_133.py` runs a real uvicorn server on
+  8733 with the live job runner, the fake source registered, films declaring it, Cinemeta
+  replayed from recordings, `recommend_daily_limits={"fake": 3}`. Observed: 202 queued; round
+  `done` in 1.8 s; seven stored (the seed and a repeated Suspiria dropped), the first three
+  enriched (Suspiria 1977, La Ciénaga as item "The Swamp", Suspiria 2018 via title search),
+  four pending; 8 Cinemeta requests, none for the pending four; pressing again returned the same
+  round; *Want* on Suspiria made a `watchlist` entry; *Want* on a pending one 409; *Not for me*
+  on Stalker kept it out of the refreshed round; enrich on Rashomon queued a job and left it
+  pending (no recording, so the replay refused); the fourth round that day `over_budget` with
+  "fake has answered its 3 rounds for today; it answers again tomorrow (UTC)"; the event stream
+  carried `recommend` running/enriching then succeeded/done, and the `enrich_suggestion` job.
+- Observed and fixed: a refreshed round spent three requests re-finding films already found,
+  and `GET /api/suggestions` listed them twice.
+- Observed, left: the round lists a candidate under the source's title ("La Ciénaga") while
+  its item is the provider's ("The Swamp"); the sheet (134) chooses which to show. A
+  `selecting` state usually falls between two stream polls and is not seen. Tests must set the
+  enricher's `cover_client` to None or a replay, or covers are fetched from the live poster host
+  (the first run did; fixed before commit).
+- Next: Sprint 134, TMDB and *More like this*.

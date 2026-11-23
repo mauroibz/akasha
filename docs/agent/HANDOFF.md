@@ -2,25 +2,32 @@
 
 ## Where the project stands
 
-**2026-11-23, Sprint 132 closed.** On branch `home-and-recommendations` (local, not pushed):
-Home has every module of the approved design but *More like this* (134), and *Up next* is the
-pile ranked locally with a reason each (`application/ranking.py`, `GET /api/pile`, DEC-186).
-A goal's picks in the Diary are the same ranking within one library. `/api/home?tz=` makes
-today and Lately's days the person's. DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT`
-136). **Sprint 133 is next and `ready`**: recommendation infrastructure with a fake source.
+**2026-11-23, Sprint 133 closed.** On branch `home-and-recommendations` (local, not pushed):
+Home has every module but *More like this* (134); *Up next* is the locally ranked pile
+(DEC-186). The recommendation pipeline exists end to end (DEC-188, technical spec 6.7): a
+domain declares `RecommendationSpec(sources, resolve, enrich_top)`, sources come from
+`SOURCE_FACTORIES` in `app/recommendations.py`, the `recommend` job selects once, stores,
+and resolves the top three under the provider budgets, and five endpoints read and answer
+suggestions (migration 0037). **No production domain declares a source and the registry is
+empty**; only the test-only fake source exercises it. DEC-183 is the plan (Sprints 130–136,
+`FINAL_SPRINT` 136). **Sprint 134 is next and `ready`**: TMDB, the sheet, the Home module.
 
-Things to know for 133:
+Things to know for 134:
 
-- `Domain.ranking: RankingSpec` exists; `RecommendationSpec` goes beside it, and the
-  conformance suite's `test_the_suite_covers_every_field_of_the_contract` demands a check for
-  each new `Domain` field.
-- A pile reason is `{signal, text}`; `PileReason.signal` in `api/pile.py` is a closed Literal.
-- Nothing stores a dismissal of a pile entry (DEC-186 point 5).
-- `/api/home` is at about 119 ms median of its 150 ms budget on 10,000 entries.
-- Walkthrough: `scripts/walkthrough.py --keep`, then the scratchpad seeder `seed_132.py` (if
-  the scratchpad survived), vite on 5180 with `AKASHA_E2E_BACKEND`; give the browser context a
-  `timezoneId` to see Lately's local days. e2e stubs `/api/home` by pathname (`isHome` in
-  `e2e/console.ts`), since the URL now carries `?tz=`.
+- Read the "Notes from Sprint 133" in its sprint file: the `tmdb` factory returns the adapter
+  or `NotConfigured`; nothing publishes yet which domains have a configured source; under
+  `AKASHA_AUTH=on` the cover route refuses an item the person has no entry on, so a
+  suggestion's art needs a decision; there is no scheduled pass yet for pruning old TMDB rows.
+- Drive rounds in tests as `tests/test_recommendations.py` does: stop the runner, replace
+  `app.state.providers` in place, register the source on `app.state.recommendation_sources`,
+  monkeypatch the domain's `recommendation`, set the enricher's `cover_client` to None or a
+  replay (otherwise covers are fetched live), then claim and process jobs.
+- A round's progress on `/api/events` is the `recommend` job's progress (`round_id`, `status`).
+- Albums have no `planned` status, which a `RecommendationSpec` requires (135 decides).
+- `/api/home` is at about 119 ms median of its 150 ms budget on 10,000 entries; a Home module
+  reading suggestions adds to it.
+- Walkthrough: `scripts/walkthrough.py --keep`, vite on 5180 with `AKASHA_E2E_BACKEND`; the
+  Sprint 133 API pass is scratchpad `api_pass_133.py` (if it survived).
 - `accessibility.spec.ts` *the add dialog over the library* fails about one run in four on the
   base commit too; rerun alone before suspecting a change.
 
@@ -100,7 +107,7 @@ Waiting on the owner:
 
 ## Next session
 
-Sprint 132 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
+Sprint 134 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
 ../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
 fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
 owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e

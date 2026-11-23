@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 54,
-  "project_status": "in_progress",
-  "active_sprint": "133",
-  "active_sprint_file": "docs/sprints/133-recommendation-infrastructure.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "132",
+  "project_status": "ready",
+  "active_sprint": "134",
+  "active_sprint_file": "docs/sprints/134-tmdb-and-more-like-this.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "133",
   "completed_sprints": [
     "001",
     "002",
@@ -138,8 +138,9 @@
     "129",
     "130",
     "131",
-    "132"
+    "132",
+    "133"
   ],
-  "started_at": "2026-11-23T01:02:26-03:00",
-  "updated_at": "2026-11-23T01:02:26-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T01:22:46-03:00"
 }
