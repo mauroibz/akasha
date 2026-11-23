@@ -1,7 +1,7 @@
 # Sprint 132 — The ranked pile
 
 **Sprint:** 132
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 54
 **Depends on:** 131
 **Owner:** Mauro
@@ -15,8 +15,9 @@ specific reason, computed locally with no network. Home's *Up next* and the goal
 
 - DEC-183 point 3; product spec §1 (non-goals) — this sprint removes *Recommendations* from it.
 - `application/goals.py` (`picks`: favourite creator, longest waiting), `api/goals.py`,
-  `application/home.py` (`next`), each domain's `FieldSpec`s (`series`, genres/subjects,
-  creators) in `domains/*/__init__.py`, the score history tables (Sprint 114).
+  `application/home.py` (`next`; Home shows 3, 4 or 5 picks by *Up next*'s size, DEC-185),
+  each domain's `FieldSpec`s (`series`, genres/subjects, creators) in `domains/*/__init__.py`,
+  the score history tables (Sprint 114).
 
 ## Deliverables
 

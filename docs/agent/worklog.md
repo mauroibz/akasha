@@ -6880,3 +6880,33 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   the goal shown is for another library. `heavy-library` probes failed once per run under
   parallel Playwright load, passed alone (DEC-114 class).
 - Next: Sprint 131, the remaining modules and Edit home.
+
+## 2026-11-22 — Sprint 131 (complete)
+- Done: `/api/home` sections Lately, Tidy up, One question, Shelves, Lent out; migration 0036
+  and `GET`/`PUT /api/home/layout`; `unscored` library filter (`8a4a151`). Greeting names one
+  library (`451d3cb`). On now's actions on one line at 390 (`7970a69`). Modules, row packing and
+  *Edit home* (`e9dbcdd`). Walkthrough fixes: per-library unscored links (`da08275`), "still a 9"
+  in Lately (`9b072b2`). DEC-185.
+- Verified: backend 152 (home, layout, isolation, batching, duplicates, chores, migrations,
+  security migrations); `/api/home` 126–133 ms on 10k (was 213 ms until duplicate pairs read
+  plain rows); `npx vitest related` 389; `make check`; Playwright home 16, library/auth/chores
+  54 total, accessibility 105 + 1 pre-existing flake (below). Migration: a copy of the
+  walkthrough library 0036 → 0035 → head, counts unchanged, integrity ok, no FK violations.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by a scratchpad script (347 generic
+  entries, score changes, shelves, loans, a duplicate pair, book and anime goals with the anime
+  touched last); vite 5180; scripted passes at 1440 and 390, Ink and Paper. Observed: greeting
+  "Day 32 of" the book beside "14 of 24 books" though the anime was touched later; year 714 px
+  beside Lately 506 px; all nine modules 358 px at 390, scroll width 0; On now's pills on one
+  line at 390; *Edit home* (three ArrowUps on Tidy up, Up next to M, Shelves hidden) stored,
+  survived a reload, `shelves` null in the payload; drag of Lent out to the top stored; Reset
+  equal to defaults; "Still a 7" moved One question to the next old score; Tidy up links opened
+  "1 left", "42 left", "7 of 82 anime", "3 of 106 book"; a shelf chip opened its shelf. Console:
+  only the auth-off `/api/auth/me` 404.
+- Observed and fixed: Tidy up's 11 unscored opened as 3 books (the library opens one domain);
+  a kept score read "9 → 9" in Lately.
+- Observed, left: a module alone in its row stretches to twelve columns (Lately alone after
+  moving Tidy up looks sparse; it is the arrangement chosen). Lately's additions group by the
+  stored UTC day, so an evening import can split across two rows. `accessibility.spec.ts` *the
+  add dialog over the library* fails about one run in four on a contrast probe inside the add
+  dialog, on the base commit too.
+- Next: Sprint 132, the ranked pile.

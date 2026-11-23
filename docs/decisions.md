@@ -7258,3 +7258,59 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      `+N` under the month.
 - Consequences: Sprint 131's stored layout names the module keys `now`, `next`, `year` and
   `libraries` from `features/home/layout.ts`.
+
+## DEC-185 — Home's remaining modules and Edit home: choices the sprint file left open (Sprint 131)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: Sprint 131 added Lately, Tidy up, One question, Shelves and Lent out to Home, a
+  layout stored per person (migration 0036) and *Edit home* (DEC-183). The sprint file and the
+  proposal left several details open, and one line of the sprint file did not match the code.
+- Decision:
+  1. **Sizes are spans, and rows are packed.** S 3, M 5, L 7 of twelve columns (the proposal's
+     ranges); the library tiles always take the row. Modules fill rows in the stored order; a
+     module that does not fit starts the next row, and a row's spare columns are shared out
+     from its last module back, so no row ends in a gap. The default order puts the year (L)
+     beside Lately (M), which answers Sprint 130's short, wide year. On a phone every module is
+     full width and its size changes how much it shows: On now 1/3/6 entries beneath the first,
+     Up next 3/4/5, Lately 4/8/10 (so `/api/home` reads ten, and the default M shows the eight
+     the sprint asked for), Shelves 4/6/8, Lent out 3/4/5. The year, Tidy up and One question
+     show the same at every size.
+  2. **Tidy up's unscored count opens the library, one link per library.** The sprint file named
+     "finished-unscored queries behind `/deck`"; there are none — `/deck` holds the inbox,
+     covers and duplicates decks. Rather than build a scoring deck, `GET /api/entries` gained
+     `unscored=true` and the library a *No score yet* chip. The library always opens one
+     domain, so a count across libraries opened as one library's share (the walkthrough's 11
+     opened as 3 books); `tidy` carries `unscored_by_type` and the module links each library
+     to its own filtered view, so the number shown is the number that opens.
+  3. **One question is an old score first, then a gap.** The first card the revisit deck would
+     deal ("Still a 9" writes the same `score` + `score_reason: time` the deck writes, so it
+     rests a year; *Change* opens the deck), else the first entry `/gaps` lists, asked through
+     the detail page's own `OneQuestion` in place. A rank question is left to Insights' Play: it
+     needs two entries and a tie, which is not one tap.
+  4. **Lately groups additions by day.** An import of three hundred is one row ("Added X and
+     299 more"), not eight; days are the stored `date_added`'s, which is UTC. Finishes and score
+     changes are the Diary timeline's; a score kept (previous equals score) reads "still a 9".
+  5. **Shelves in use are ordered by their members' last update.** A membership has no
+     timestamp (Sprint 074), so the members' own `updated_at` is the nearest signal of a shelf
+     in use. Empty shelves are left out.
+  6. **The greeting names one library** (Sprint 130's walkthrough): the first goal in registry
+     order whose library has something under way names that library's entry touched last,
+     beside that goal; else the entry touched last beside its own library's goal. `goals` keeps
+     its list shape and holds at most one.
+  7. **The layout API carries its defaults.** `GET`/`PUT /api/home/layout` answer `{modules,
+     defaults}`, so *Reset* restores the server's default and the client's copy is only a
+     fallback while the layout loads. A hidden module is not read by `/api/home`; `now` still
+     is, for the greeting.
+  8. **Drag without a library.** Pointer events on a handle, which serve a mouse and a finger
+     alike; the arrow keys on the focused handle move it, announced in a live region. The tier
+     board moves its covers with its own taps and keys and adds no dependency either. Each
+     change is stored at once; saves run one at a time (a mutation scope) and each move builds
+     on the last one made, so a quick run of edits is stored as the last of them.
+  9. **Duplicate pairs are found from plain rows.** Reading every entry through the ORM cost
+     more than the query and pushed `/api/home` to 213 ms on 10,000 entries; one finder over
+     plain rows now serves the deck and Home's count, and the median is 126–133 ms.
+- Consequences: a module added later (Sprint 134's *More like this*) is a key in
+  `application/home_layout.py`'s `DEFAULT_LAYOUT`, in `features/home/layout.ts` (`MODULES`,
+  `moduleLabels`, `fallbackLayout`), and a case in `HomePage`'s `hasContent`; a stored layout
+  that predates it gets it appended at the end, at its default size.

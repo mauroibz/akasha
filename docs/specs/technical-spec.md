@@ -730,21 +730,46 @@ The product-spec route list is authoritative, with these refinements:
 - Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
-- `GET /api/home` (Sprint 130, DEC-183) is Home's one read, from stored data only — no
-  provider is consulted, and a test fails if one is. Five sections:
-  `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, the first entry of `/now` with
-  `day`, 1 on its `date_started` and `null` without one; `entries`, every entry but `unsorted`;
-  `pile`, entries in a status their domain declares `planned`; `goals`, per domain with a goal
-  in registry order, `{item_type, target, count}` for the current year); `now`, `/now`'s
-  entries; `next`, up to five `{entry, reason, creator, mean_score, since}` in each domain's
-  goal-picks order with the domains taken in turn (a placeholder until Sprint 132), for every
-  domain declaring a `planned` status; `year`, twelve `{month, count, counts, covers}` for the
-  current year by `date_finished` (at most 24 `covers` a month, each `{entry_id, item_id,
-  item_type, title, cover_url, score}`) and each goal's `{item_type, period, count, target,
-  done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry, in registry
-  order: `count`, `status_counts` per status in declared order, `scores` (ten bins),
-  `mean_score`, up to three best-scored `covers` and `without_cover`. Answers in under 150 ms
-  on a 10,000-entry library (measured 117 ms median in its test).
+- `GET /api/home` (Sprints 130–131, DEC-183–185) is Home's one read, from stored data only — no
+  provider is consulted, and a test fails if one is. Ten sections:
+  `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, an entry under way with `day`, 1 on
+  its `date_started` and `null` without one; `entries`, every entry but `unsorted`; `pile`,
+  entries in a status their domain declares `planned`; `goals`, at most one `{item_type, target,
+  count}` for the current year — `active` and that goal are of one library: the first goal in
+  registry order whose library has something under way names that library's entry touched last;
+  without one, the entry touched last beside its own library's goal; with nothing under way, the
+  lead goal); `now`, `/now`'s entries; `next`, up to five `{entry, reason, creator, mean_score,
+  since}` in each domain's goal-picks order with the domains taken in turn (a placeholder until
+  Sprint 132), for every domain declaring a `planned` status; `year`, twelve `{month, count,
+  counts, covers}` for the current year by `date_finished` (at most 24 `covers` a month, each
+  `{entry_id, item_id, item_type, title, cover_url, score}`) and each goal's `{item_type, period,
+  count, target, done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry,
+  in registry order: `count`, `status_counts` per status in declared order, `scores` (ten bins),
+  `mean_score`, up to three best-scored `covers` and `without_cover`; `lately`, up to ten
+  `{kind: finished|score|added, at, entry, score, previous, count}` newest first — finishes and
+  score changes are `/diary/timeline`'s, additions are one row per day of `date_added` (its
+  newest entry, `count` in all), the Inbox's `unsorted` entries left out; `tidy`, `{duplicates,
+  without_cover, unscored, unscored_by_type}` — the duplicate pairs `/duplicates` lists, entries
+  without a cover (the covers deck's filter), and entries in a declared `finished` status with
+  no score, in all and per domain in registry order; `question`, `{kind: revisit|gap, entry,
+  scored_at}` — the first card `/revisit` would deal, else the first entry `/gaps` lists, else
+  `null`; `shelves`, up to eight `{id, name, slug, entry_count}` holding something, the one whose
+  members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
+  the five open loans out longest, each `{id, person, lent_on, entry}`. A module the person hid
+  is not read: `year`, `lately`, `tidy`, `question`, `shelves` and `lent` are `null`, `next` and
+  `domains` empty (`now` is still read, for the greeting). Answers in under 150 ms on a
+  10,000-entry library (126–133 ms median in its test after Sprint 131).
+- `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
+  S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
+  `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
+  `libraries`, `tidy`, `question`, `shelves`, `lent` (`application/home_layout.py`). A read is
+  lenient — an unknown key, a malformed row or unreadable JSON is dropped, an unknown size falls
+  back to the module's default, and every module not named is appended with its default — and
+  carries `defaults`, what *Reset* restores. A write is strict: an unknown module, a size other
+  than S/M/L, or a module named twice is a 422 and nothing is stored. A downgrade past 0036
+  drops the stored layouts.
+- `GET /api/entries` takes `unscored=true` (Sprint 131): only entries with no score; part of
+  the cursor's filter key, and of the totals and facets.
 - `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
   most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
   month with per-domain counts (Sprint 098).

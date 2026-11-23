@@ -813,16 +813,28 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — Home** (Sprint 130, DEC-183). The screen Akasha opens on: a 12-column grid of
-modules over one `GET /api/home` that reads stored data only. The greeting names the day,
-"Day N of" the entry most recently touched among those under way (when it has a start date)
-and the library's totals; *On now* holds what is under way with *+N* progress, *Finished*
-(the finish sheet) and *Set aside* (back to the domain's planned status); *Up next* holds five
-from the pile, each with why, and *Start* (or *Finished* where a domain has no under-way
-status); *Year* draws twelve months of covers and, from this month on, an empty slot for each
-thing the lead goal still needs, never marking a past month short; one tile per library
-opens `/library?type=…`. Below 720 px every module is full width in the same order. An empty
-library sees a first-run message. Sprint 131 adds the rest of the modules and *Edit home*.
+**`/` — Home** (Sprints 130–131, DEC-183–185). The screen Akasha opens on: a 12-column grid of
+modules over one `GET /api/home` that reads stored data only. The greeting names the day, "Day
+N of" an entry under way (when it has a start date) and the library's totals; what it names and
+the goal beside it are always of one library — the first goal's library with something under
+way, else the entry touched last beside its own library's goal. *On now* holds what is under
+way with *+N* progress, *Finished* (the finish sheet) and *Set aside* (back to the domain's
+planned status); *Up next* holds picks from the pile, each with why, and *Start* (or
+*Finished* where a domain has no under-way status); *Year* draws twelve months of covers and,
+from this month on, an empty slot for each thing the lead goal still needs, never marking a
+past month short; *Lately* lists finishes, score changes (a score kept reads "still a 9") and
+additions (a day's additions as one row), newest first; one tile per library opens
+`/library?type=…`; *Tidy up* counts duplicate pairs (the duplicates deck), entries without a
+cover (the covers deck) and finished entries with no score (the library filtered to them, one
+link per library); *One question* asks an old score again ("Still a 9" keeps it, *Change* opens
+the revisit deck) or else one gap of an entry, answered in place; *Shelves* shows the shelves
+in use with counts; *Lent out* shows open loans, longest out first. A module with nothing to
+show is hidden until it has something. *Edit home* lists the modules: drag a handle (or focus
+it and use the arrow keys) to reorder, S/M/L, a switch to hide, *Reset*; each change is stored
+per person on the server at once. On a wide screen sizes are column spans (S 3, M 5, L 7; the
+library tiles always take the row) and each row's spare columns are shared out so no row ends
+in a gap; below 720 px every module is full width in the same order and its size only changes
+how much it shows. An empty library sees a first-run message.
 
 **`/library` — The library** (at `/` until Sprint 130; a `/` address carrying library
 parameters redirects here with them). The primary screen and the one to get right. Since Sprint 029 it is

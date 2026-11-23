@@ -35,6 +35,11 @@ each. Home shows the latest suggestions.
    enrichment state, and *Want*, *Not for me*, *Seen it*; opening a pending one enriches it.
    Pressing it again shows the last round with *Refresh*.
 5. Home's *More like this* module: the newest unanswered suggestions across domains, from storage.
+   A new module key (DEC-185 consequences): `DEFAULT_LAYOUT` in `application/home_layout.py`,
+   `MODULES`/`moduleLabels`/`fallbackLayout` in `features/home/layout.ts`, a `hasContent` case
+   in `HomePage`, a `/api/home` section skipped when hidden, and the e2e console's default
+   layout stub. Lately's rows (`features/home/Lately.tsx`) are not cards: the button goes on its
+   entry rows only if it fits the one-line row.
 6. Recorded real TMDB responses under `backend/tests/fixtures/providers/` (token stripped).
 
 ## Acceptance criteria

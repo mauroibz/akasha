@@ -1912,6 +1912,8 @@ whole, recorded as **DEC-183**; the design is
   Import left the phone's bar; see the sprint's Outcome.]
 - **[131 — Home: the remaining modules, and Edit home](131-home-the-rest-and-edit.md)**: Lately,
   Tidy up, One question, Shelves, Lent out; a stored per-user layout.
+  [Closed 2026-11-22 (DEC-185). Six criteria met; migration 0036; `/api/home` 126–133 ms median
+  on 10,000 entries; Sprint 130's three walkthrough findings fixed; see the sprint's Outcome.]
 - **[132 — The ranked pile](132-the-ranked-pile.md)**: recommendations leave the non-goals; the
   pile ranked locally with a reason each.
 - **[133 — Recommendation infrastructure](133-recommendation-infrastructure.md)**: sources per

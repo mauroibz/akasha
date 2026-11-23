@@ -1,7 +1,7 @@
 # Sprint 131 — Home: the remaining modules, and Edit home
 
 **Sprint:** 131
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 54
 **Depends on:** 130
 **Owner:** Mauro
@@ -70,4 +70,68 @@ Drag-and-drop library: prefer what the tier board already uses over adding a dep
 
 ## Outcome
 
-_Not started._
+Completed 2026-11-22. Home carries every module of the approved design except *More like this*
+(Sprint 134), and each person reorders, resizes and hides them, stored on the server. The three
+things Sprint 130's walkthrough left are fixed. Choices the plan left open are DEC-185.
+
+**Delivered**
+
+- `GET /api/home` gains `lately`, `tidy`, `question`, `shelves`, `lent` and skips a hidden
+  module (`8a4a151`); `GET`/`PUT /api/home/layout` over `home_layouts`, migration
+  `0036_home_layouts` (`8a4a151`); `GET /api/entries?unscored=true` (`8a4a151`).
+- The five modules, *Edit home* (drag by pointer events on a handle, arrow keys, S/M/L, hide,
+  Reset), row packing, sizes changing how much shows (`e9dbcdd`).
+- Sprint 130's findings: Year beside Lately at 7 and 5 (default layout, `e9dbcdd`); On now's
+  actions on one line at 390 px (`7970a69`); the greeting names one library (`451d3cb`).
+- Found in this sprint's walkthrough and fixed: Tidy up's unscored count across libraries opened
+  as one library's share (`da08275`); a kept score read "9 → 9" in Lately (`9b072b2`).
+
+**Acceptance criteria**
+
+1. Each new module renders from stored data and links to what resolves it — backend
+   `test_the_remaining_modules_read_the_library`, `test_one_question_asks_an_old_score_again_before_a_gap`,
+   `test_tidy_ups_unscored_count_is_what_its_library_link_lists`; Vitest `modules.test.tsx`
+   (each module's links); walkthrough clicked every Tidy up link (1 pair → duplicates deck
+   "1 left"; 42 → covers deck "42 left"; 7 anime and 3 books → library "7 of 82", "3 of 106"),
+   a shelf and Lent out, and answered One question in place.
+2. One user's layout does not change another's — `test_one_persons_layout_does_not_change_anothers`
+   (auth on, two sessions, and 401 without one); isolation policy table updated.
+3. A stored layout naming a module that no longer exists still loads —
+   `test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads` (unknown key, a
+   non-object row, an unknown size) and `..._that_is_not_json_reads_as_the_default`; `/api/home`
+   answers 200 beside it.
+4. Keyboard reordering; axe with the panel open — Vitest `EditHome.test.tsx` (arrow keys, focus
+   kept, live announcement, two presses before the parent re-renders); Playwright *Edit home
+   reorders with the keyboard…* and *Edit home has no serious axe violations* at 390 and 1440.
+5. At 390 px every size is full width — Playwright measures every module's width equal at
+   390 px; walkthrough: all nine modules 358 px wide at 390, scroll width 0 in Ink and Paper;
+   size tests for On now, Up next, Lately, Shelves.
+6. The migration upgrades and downgrades cleanly — `test_0036_upgrades_and_downgrades_on_a_real_shaped_library`
+   (two people, entries, a goal; foreign key and cascade checked); and a copy of the
+   walkthrough's 347-entry library downgraded to 0035 and upgraded to head with every count
+   unchanged (items 347, entries 347, shelves 4, loans 3, score events 275, goals 2),
+   `integrity_check` ok and no foreign-key violations at each step.
+
+**Tests run** (DEC-167): backend `test_home_api`, `test_home_layout`, `test_isolation`,
+`test_library_batching`, `test_duplicates`, `test_chores`, `test_migrations`,
+`test_security_migrations` — 152 passed; `/api/home` budget test 126–133 ms median (it reached
+213 ms before duplicate pairs moved to plain rows). `npx vitest related` over the sprint's
+frontend diff — 52 files, 389 passed. `make check` green. Playwright `home` (16), `library`,
+`auth`, `chores` — 54 passed; `accessibility` 105 passed, 1 failed: *the add dialog over the
+library* fails intermittently on a contrast probe inside the add dialog, and fails the same way
+on the base commit with this sprint's changes stashed (1 of 4 runs), so it is not this sprint's.
+
+**Walkthrough**: `scripts/walkthrough.py --keep`, seeded by a scratchpad script (347 generic
+entries over five domains, score changes, shelves, loans, a duplicate pair, a book and an anime
+goal with the anime touched last), vite on 5180. Recorded in the worklog.
+
+**Deviations**
+
+- The sprint file named "finished-unscored queries behind `/deck`"; there are none. Tidy up's
+  third count opens the library through a new `unscored` filter, per library (DEC-185 §2).
+- Lately reads ten rows, not eight, so its sizes differ; the default size shows eight.
+- Commit tags follow `CONTRIBUTING.md` (`[ADD]`, `[FIX]`) rather than the sprint file's
+  `[FEAT]`/`[DB]`, which that file does not define. The backend sections and the layout storage
+  went in one `[ADD]` (`8a4a151`), and the frontend modules and *Edit home* in one (`e9dbcdd`),
+  because both `HomePage` and `/api/home` carry the two together; `da08275` also carries
+  Lately's ten-row read.

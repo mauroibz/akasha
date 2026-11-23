@@ -2,24 +2,27 @@
 
 ## Where the project stands
 
-**2026-11-22, Sprint 130 closed.** On branch `home-and-recommendations` (local, not pushed):
-`/` is Home and the library is `/library`. Home reads one `GET /api/home` (stored data only):
-greeting, On now, Up next, the year, one tile per library. DEC-183 is the plan (Sprints
-130–136, `FINAL_SPRINT` 136); DEC-184 records Sprint 130's open choices. **Sprint 131 is
-next and `ready`**: Lately, Tidy up, One question, Shelves, Lent out, and *Edit home* with a
-stored layout (migration 0036). No migration in 130.
+**2026-11-22, Sprint 131 closed.** On branch `home-and-recommendations` (local, not pushed):
+Home has every module of the approved design but *More like this* (134): On now, Up next, the
+year, Lately, library tiles, Tidy up, One question, Shelves, Lent out, and *Edit home* (drag or
+arrow keys, S/M/L, hide, Reset) with the layout stored per person (`home_layouts`, migration
+0036, `GET`/`PUT /api/home/layout`). DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT`
+136); DEC-184 and DEC-185 record the choices 130 and 131 made. **Sprint 132 is next and
+`ready`**: the pile ranked locally with a reason each.
 
-Things to know for 131:
+Things to know for 132:
 
-- Module keys and spans are in `frontend/src/features/home/layout.ts`; `HomePage` renders them
-  in order. Year spans 12 until Lately sits beside it.
-- `e2e/console.ts` stubs an empty `/api/home` for every spec; `e2e/home.spec.ts` stubs a full
-  one and is the place for edit/reorder/hide tests.
-- Walkthrough: `scripts/walkthrough.py --keep` then seed a realistic library; Sprint 130's
-  seeder lives only in the session scratchpad (generic titles, covers copied from local files);
-  write a fresh one rather than looking for it.
-- `heavy-library` Playwright probes fail intermittently under parallel load; rerun the project
-  alone before suspecting a change.
+- `application/home.py` `_next` is the placeholder 132 replaces; Home shows 3, 4 or 5 picks by
+  *Up next*'s size (`features/home/UpNext.tsx`).
+- `/api/home` must stay under 150 ms on 10,000 entries (`test_home_answers_inside_its_budget…`);
+  it is at 126–133 ms, so a ranking that reads the whole pile has little room.
+- Adding a Home module (134) touches `application/home_layout.py`, `features/home/layout.ts`,
+  `HomePage`'s `hasContent`, and the e2e console's default layout stub (DEC-185).
+- Walkthrough: `scripts/walkthrough.py --keep`, then the scratchpad seeder `seed_131.py` (if the
+  scratchpad survived; otherwise write one), vite on 5180 with `AKASHA_E2E_BACKEND`.
+- `accessibility.spec.ts` *the add dialog over the library* fails about one run in four on the
+  base commit too (contrast probe inside the add dialog); `heavy-library` probes likewise
+  under parallel load. Rerun alone before suspecting a change.
 
 ## Earlier state (release 2.9.0)
 
@@ -97,7 +100,7 @@ Waiting on the owner:
 
 ## Next session
 
-Sprint 131 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
+Sprint 132 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
 ../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
 fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
 owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e
