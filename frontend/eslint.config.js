@@ -40,7 +40,7 @@ export default tseslint.config(
   {
     // Technical spec section 8 and DEC-023: virtual rows carry no enter, exit
     // or layout animation. Sort and filter changes crossfade the container, in
-    // HomePage. This is a rule with a history: rows unmount as they scroll out
+    // LibraryPage. This is a rule with a history: rows unmount as they scroll out
     // and would re-animate on every return.
     files: ["src/features/library/VirtualLibrary.tsx"],
     rules: {
@@ -51,7 +51,7 @@ export default tseslint.config(
             {
               group: ["motion", "motion/*"],
               message:
-                "Virtualized rows are never animated (technical spec section 8, DEC-023). Animate the list container in HomePage instead.",
+                "Virtualized rows are never animated (technical spec section 8, DEC-023). Animate the list container in LibraryPage instead.",
             },
           ],
         },

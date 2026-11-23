@@ -107,6 +107,7 @@ function Sheet({
       });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.now });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.home });
       void queryClient.invalidateQueries({
         queryKey: queryKeys.scoreHistory(entry.id),
       });

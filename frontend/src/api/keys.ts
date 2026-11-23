@@ -30,6 +30,8 @@ export const queryKeys = {
    * lesson). Refreshed by the strip's own writes.
    */
   now: ["now"] as const,
+  /** Home's one read (Sprint 130); any write Home makes invalidates it. */
+  home: ["home"] as const,
   diary: (year: number | undefined) => ["diary", year ?? "current"] as const,
   coverCandidates: (itemId: number) => ["cover-candidates", itemId] as const,
   itemTypes: ["item-types"] as const,
