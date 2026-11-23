@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # unmetered and never blocked. 900 rather than Google's real ~1000 is deliberate
     # headroom, because their quota resets on Pacific time and the counter uses UTC.
     provider_daily_limits: dict[str, int] = Field(default_factory=lambda: {"googlebooks": 900})
+    # Daily rounds per recommendation source (Sprint 133), as JSON in
+    # AKASHA_RECOMMEND_DAILY_LIMITS: `{"tmdb": 200}`. A round asks its source once,
+    # so this bounds requests to the source itself; resolving candidates spends the
+    # provider budgets above. A source absent here is counted and never stopped.
+    recommend_daily_limits: dict[str, int] = Field(default_factory=dict)
     # Per-file cap on attachments (DEC-048). Configuration rather than code, like the
     # provider budgets above: 25 MB admits an epub, a PDF scan or a comic issue while
     # refusing the audiobook and video rips that would turn this into a media server.

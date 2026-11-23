@@ -413,6 +413,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/entries/{entry_id}/more-like-this": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * More Like This
+     * @description A round seeded by one entry: queued, or the last one under a day old.
+     */
+    post: operations["more_like_this_api_entries__entry_id__more_like_this_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/entries/{entry_id}/refile": {
     parameters: {
       query?: never;
@@ -1626,6 +1646,80 @@ export interface paths {
     patch: operations["rename_shelf_api_shelves__shelf_id__patch"];
     trace?: never;
   };
+  "/api/suggestion-rounds/{round_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Suggestion Round */
+    get: operations["suggestion_round_api_suggestion_rounds__round_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Suggestions
+     * @description Unanswered suggestions worth showing, newest first; stored data only.
+     */
+    get: operations["suggestions_api_suggestions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/suggestions/{suggestion_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Answer */
+    patch: operations["answer_api_suggestions__suggestion_id__patch"];
+    trace?: never;
+  };
+  "/api/suggestions/{suggestion_id}/enrich": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enrich Suggestion
+     * @description Find a pending suggestion in its providers now; 200 when there is nothing to do.
+     */
+    post: operations["enrich_suggestion_api_suggestions__suggestion_id__enrich_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/users": {
     parameters: {
       query?: never;
@@ -1716,6 +1810,11 @@ export interface components {
       item_id?: number | null;
       /** Record Id */
       record_id: number;
+    };
+    /** AnswerBody */
+    AnswerBody: {
+      /** Answer */
+      answer: ("want" | "not_for_me" | "seen") | null;
     };
     /** AttachmentList */
     AttachmentList: {
@@ -1938,6 +2037,12 @@ export interface components {
       b: components["schemas"]["EntryResponse"];
       /** Reason */
       reason: string;
+    };
+    /** EnrichResponse */
+    EnrichResponse: {
+      /** Job Id */
+      job_id: string | null;
+      suggestion: components["schemas"]["SuggestionResponse"];
     };
     /** EntryCreateBody */
     EntryCreateBody: {
@@ -3191,6 +3296,36 @@ export interface components {
       /** Total */
       total: number;
     };
+    /** RoundResponse */
+    RoundResponse: {
+      /** Created At */
+      created_at: string;
+      /** Error */
+      error: string | null;
+      /** Finished At */
+      finished_at: string | null;
+      /** Id */
+      id: number;
+      item_type: components["schemas"]["ItemTypeName"];
+      /** Seed Entry Id */
+      seed_entry_id: number | null;
+      /** Source */
+      source: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status:
+        | "queued"
+        | "selecting"
+        | "enriching"
+        | "done"
+        | "failed"
+        | "over_budget"
+        | "not_configured";
+      /** Suggestions */
+      suggestions: components["schemas"]["SuggestionResponse"][];
+    };
     /**
      * RowSearchBody
      * @description The edited text a re-search should query, either half optional.
@@ -3463,6 +3598,58 @@ export interface components {
     SuggestionKeyBody: {
       /** Key */
       key: string;
+    };
+    /**
+     * SuggestionReason
+     * @description Why the source chose it, in the ranked pile's shape: the signal is the source.
+     */
+    SuggestionReason: {
+      /** Signal */
+      signal: string;
+      /** Text */
+      text: string;
+    };
+    /** SuggestionResponse */
+    SuggestionResponse: {
+      /** Answer */
+      answer: ("want" | "not_for_me" | "seen") | null;
+      /** Answered At */
+      answered_at: string | null;
+      /** Created At */
+      created_at: string;
+      /** Creator */
+      creator: string | null;
+      /** Display */
+      display: {
+        [key: string]: unknown;
+      };
+      /**
+       * Enrichment
+       * @enum {string}
+       */
+      enrichment: "pending" | "enriched" | "unresolved";
+      /** Entry Id */
+      entry_id: number | null;
+      /** External Ids */
+      external_ids: {
+        [key: string]: string;
+      };
+      /** Id */
+      id: number;
+      /** Item Id */
+      item_id: number | null;
+      item_type: components["schemas"]["ItemTypeName"];
+      reason: components["schemas"]["SuggestionReason"] | null;
+      /** Round Id */
+      round_id: number;
+      /** Source */
+      source: string;
+      /** Source Score */
+      source_score: number | null;
+      /** Title */
+      title: string;
+      /** Year */
+      year: number | null;
     };
     /**
      * TimelineEvent
@@ -5144,6 +5331,65 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["ErrorResponse"];
         };
+      };
+    };
+  };
+  more_like_this_api_entries__entry_id__more_like_this_post: {
+    parameters: {
+      query?: {
+        source?: string | null;
+        refresh?: boolean;
+      };
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoundResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not a source of this library */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -8782,6 +9028,253 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ShelfResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  suggestion_round_api_suggestion_rounds__round_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        round_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoundResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  suggestions_api_suggestions_get: {
+    parameters: {
+      query?: {
+        seed_entry_id?: number | null;
+        item_type?: components["schemas"]["ItemTypeName"] | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuggestionResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  answer_api_suggestions__suggestion_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        suggestion_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnswerBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuggestionResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  enrich_suggestion_api_suggestions__suggestion_id__enrich_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        suggestion_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EnrichResponse"];
+        };
+      };
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EnrichResponse"];
         };
       };
       /** @description Unauthorized */

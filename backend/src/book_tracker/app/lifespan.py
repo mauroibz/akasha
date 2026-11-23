@@ -23,8 +23,17 @@ from book_tracker.api.auth import (
     has_credentialed_user,
 )
 from book_tracker.app.providers import build_provider_catalog
+from book_tracker.app.recommendations import build_source_registry
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.import_search import ImportSearchHandler
+from book_tracker.application.recommendations import (
+    ENRICH_SUGGESTION_JOB,
+    RECOMMEND_JOB,
+    EnrichSuggestionHandler,
+    RecommendHandler,
+    SuggestionEnricher,
+    budget_key,
+)
 from book_tracker.backup import BackupError, create_backup, database_digest, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -314,9 +323,40 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             rate_limiter=rate_limiter,
             quota=app.state.provider_quota,
         )
+        # Recommendations (Sprint 133): sources by name from configuration; a round's
+        # own request is counted per source, and resolving its candidates spends the
+        # provider budgets above.
+        app.state.recommendation_sources = build_source_registry(configured, provider_client)
+        suggestion_enricher = SuggestionEnricher(
+            app.state.engine,
+            app.state.providers,
+            quota=app.state.provider_quota,
+            rate_limiter=rate_limiter,
+            cover_client=provider_client,
+            data_dir=configured.data_dir,
+        )
+        recommend_handler = RecommendHandler(
+            app.state.engine,
+            app.state.recommendation_sources,
+            suggestion_enricher,
+            round_quota=ProviderQuota(
+                app.state.engine,
+                limits={
+                    budget_key(name): limit
+                    for name, limit in configured.recommend_daily_limits.items()
+                },
+            ),
+        )
         job_runner = JobRunner(
             app.state.engine,
-            {"enrich_item": enrichment_handler, "search_import_rows": search_handler},
+            {
+                "enrich_item": enrichment_handler,
+                "search_import_rows": search_handler,
+                RECOMMEND_JOB: recommend_handler,
+                ENRICH_SUGGESTION_JOB: EnrichSuggestionHandler(
+                    app.state.engine, suggestion_enricher
+                ),
+            },
             rate_limiter=rate_limiter,
             data_dir=configured.data_dir,
         )

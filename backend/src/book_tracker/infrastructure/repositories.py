@@ -375,6 +375,118 @@ class DomainRepository:
                 )
             )
 
+    def _find_or_create_item(
+        self,
+        session: Session,
+        *,
+        now: str,
+        title: str,
+        subtitle: str | None,
+        year: int | None,
+        metadata: Mapping[str, Any],
+        identifiers: Sequence[Identifier],
+        sources: Sequence[SourceIdentity],
+        creator_sort: str | None,
+        item_type: str,
+    ) -> int:
+        """The shared item these identities name, created when none does."""
+        exact = self._exact_ids(session, identifiers, sources)
+        decision = decide_match(exact, set())
+        if decision.kind is MatchKind.IDENTITY_CONFLICT:
+            raise IdentityConflict(decision)
+        if decision.item_id is not None:
+            return decision.item_id
+        item = ItemRow(
+            type=item_type,
+            title=title,
+            subtitle=subtitle,
+            year=year,
+            cover_path=None,
+            identifiers=json.dumps({value.kind: value.normalized_value for value in identifiers}),
+            metadata_json=json.dumps(dict(metadata), ensure_ascii=False),
+            # A source that knows the sort name seeds the owner's value, so the
+            # heuristic never runs on a name somebody already answered — the
+            # same rule Calibre's `authors.sort` follows (DEC-051, DEC-052).
+            creator_sort_override=(creator_sort or None),
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(item)
+        session.flush()
+        item_id = item.id
+        session.add_all(
+            ItemIdentifierRow(
+                item_id=item_id,
+                kind=value.kind,
+                normalized_value=value.normalized_value,
+                value=value.value,
+                created_at=now,
+                updated_at=now,
+            )
+            for value in identifiers
+        )
+        session.add_all(
+            ItemSourceRow(
+                item_id=item_id,
+                source=value.source,
+                source_id=value.source_id,
+                is_primary=int(value.is_primary),
+                created_at=now,
+                updated_at=now,
+            )
+            for value in sources
+        )
+        return item_id
+
+    def cache_item(
+        self,
+        *,
+        title: str,
+        subtitle: str | None,
+        year: int | None,
+        metadata: Mapping[str, Any],
+        identifiers: Sequence[Identifier],
+        sources: Sequence[SourceIdentity],
+        creator_sort: str | None,
+        item_type: str,
+    ) -> int:
+        """A record in the shared cache with no entry for anyone (Sprint 133).
+
+        A resolved suggestion lives here until someone wants it: the same cache an
+        add fills, so wanting it later is an entry on an item already known, and an
+        item a person already holds is found rather than duplicated.
+        """
+        with self._write() as session:
+            return self._find_or_create_item(
+                session,
+                now=_now(),
+                title=title,
+                subtitle=subtitle,
+                year=year,
+                metadata=metadata,
+                identifiers=identifiers,
+                sources=sources,
+                creator_sort=creator_sort,
+                item_type=item_type,
+            )
+
+    def create_entry_for_item(self, item_id: int, status: str) -> EntryResult:
+        """This person's entry on a cached item, or the one they already have."""
+        with self._write() as session:
+            if session.get(ItemRow, item_id) is None:
+                raise LookupError(item_id)
+            existing = session.scalar(
+                select(EntryRow).where(
+                    EntryRow.user_id == self.user_id, EntryRow.item_id == item_id
+                )
+            )
+            if existing is not None:
+                return EntryResult(item_id, existing.id, True)
+            entry = _entry_row(user_id=self.user_id, item_id=item_id, status=status, now=_now())
+            session.add(entry)
+            session.flush()
+            return EntryResult(item_id, entry.id, False)
+
     def create_cached_entry(
         self,
         *,
@@ -395,56 +507,19 @@ class DomainRepository:
         formats: Sequence[str] = (),
     ) -> EntryResult:
         with self._write() as session:
-            exact = self._exact_ids(session, identifiers, sources)
-            decision = decide_match(exact, set())
-            if decision.kind is MatchKind.IDENTITY_CONFLICT:
-                raise IdentityConflict(decision)
             now = _now()
-            if decision.item_id is None:
-                item = ItemRow(
-                    type=item_type,
-                    title=title,
-                    subtitle=subtitle,
-                    year=year,
-                    cover_path=None,
-                    identifiers=json.dumps(
-                        {value.kind: value.normalized_value for value in identifiers}
-                    ),
-                    metadata_json=json.dumps(dict(metadata), ensure_ascii=False),
-                    # A source that knows the sort name seeds the owner's value, so the
-                    # heuristic never runs on a name somebody already answered — the
-                    # same rule Calibre's `authors.sort` follows (DEC-051, DEC-052).
-                    creator_sort_override=(creator_sort or None),
-                    created_at=now,
-                    updated_at=now,
-                )
-                session.add(item)
-                session.flush()
-                item_id = item.id
-                session.add_all(
-                    ItemIdentifierRow(
-                        item_id=item_id,
-                        kind=value.kind,
-                        normalized_value=value.normalized_value,
-                        value=value.value,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    for value in identifiers
-                )
-                session.add_all(
-                    ItemSourceRow(
-                        item_id=item_id,
-                        source=value.source,
-                        source_id=value.source_id,
-                        is_primary=int(value.is_primary),
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    for value in sources
-                )
-            else:
-                item_id = decision.item_id
+            item_id = self._find_or_create_item(
+                session,
+                now=now,
+                title=title,
+                subtitle=subtitle,
+                year=year,
+                metadata=metadata,
+                identifiers=identifiers,
+                sources=sources,
+                creator_sort=creator_sort,
+                item_type=item_type,
+            )
             existing = session.scalar(
                 select(EntryRow).where(
                     EntryRow.user_id == self.user_id, EntryRow.item_id == item_id

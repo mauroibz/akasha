@@ -714,6 +714,12 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/home/layout"),
         ("PUT", "/api/home/layout"),
         ("GET", "/api/pile"),
+        # Sprint 133: recommendation rounds and their suggestions.
+        ("POST", "/api/entries/{entry_id}/more-like-this"),
+        ("GET", "/api/suggestions"),
+        ("GET", "/api/suggestion-rounds/{round_id}"),
+        ("POST", "/api/suggestions/{suggestion_id}/enrich"),
+        ("PATCH", "/api/suggestions/{suggestion_id}"),
         ("DELETE", "/api/import/batches/{batch_id}"),
         ("GET", "/api/importers"),
         ("POST", "/api/import/detect"),

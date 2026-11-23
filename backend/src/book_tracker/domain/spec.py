@@ -19,6 +19,7 @@ from typing import Any, Literal
 from urllib.parse import SplitResult, urlsplit
 
 from book_tracker.domain.providers import IdentityStrategy
+from book_tracker.domain.recommendations import RecommendationSpec
 
 FieldType = Literal["text", "long_text", "number", "rows"]
 Multiplicity = Literal["one", "many"]
@@ -423,6 +424,11 @@ class Domain:
     insight_suppressed_keys: frozenset[str] = frozenset()
     #: Which fields the ranked pile reads for series and for taste (Sprint 132).
     ranking: RankingSpec = RankingSpec()
+    #: Which recommendation sources may suggest this domain's things and how a
+    #: candidate is found in its providers (Sprint 133, DEC-183 point 5), or `None`
+    #: for a domain nothing suggests yet. Declaring one needs a `planned` status:
+    #: that is where *Want* puts a suggestion.
+    recommendation: RecommendationSpec | None = None
 
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)

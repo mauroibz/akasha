@@ -158,6 +158,13 @@ ROUTE_POLICY = {
     ("PUT", "/api/home/layout"): "private-write",
     # Sprint 132: ranks the requester's own pile from their own scores and goals.
     ("GET", "/api/pile"): "private-collection",
+    # Sprint 133: a round is seeded by the requester's own entry; rounds and
+    # suggestions are read and answered by their owner only, anyone else gets 404.
+    ("POST", "/api/entries/{entry_id}/more-like-this"): "private-id",
+    ("GET", "/api/suggestions"): "private-collection",
+    ("GET", "/api/suggestion-rounds/{round_id}"): "private-id",
+    ("POST", "/api/suggestions/{suggestion_id}/enrich"): "private-id",
+    ("PATCH", "/api/suggestions/{suggestion_id}"): "private-id",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;

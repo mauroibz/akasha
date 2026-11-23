@@ -521,6 +521,36 @@
    ]
   ],
   [
+   "/api/entries/{entry_id}/more-like-this",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/suggestions",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/suggestion-rounds/{round_id}",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/suggestions/{suggestion_id}/enrich",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/suggestions/{suggestion_id}",
+   [
+    "PATCH"
+   ]
+  ],
+  [
    "/api/search/resolve",
    [
     "GET"
