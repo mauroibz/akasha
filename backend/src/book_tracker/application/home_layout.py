@@ -38,7 +38,7 @@ class ModuleLayout(TypedDict):
 
 
 class LabelledLayout(ModuleLayout):
-    #: What *Edit home* calls a family member ("Books this year", a shelf's name);
+    #: What *Edit home* calls a family member ("Books this year", "Shelf: Favorites");
     #: `None` for a fixed module, which the client names itself.
     label: str | None
 
@@ -94,7 +94,7 @@ def defaults(shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
                 for key, label in year_members()
             )
     rows.extend(
-        LabelledLayout(module=f"{SHELF}{shelf_id}", size="M", hidden=True, label=name)
+        LabelledLayout(module=f"{SHELF}{shelf_id}", size="M", hidden=True, label=f"Shelf: {name}")
         for shelf_id, name in shelves
     )
     return rows

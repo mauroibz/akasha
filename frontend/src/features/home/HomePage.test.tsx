@@ -145,7 +145,12 @@ describe("HomePage", () => {
       ],
     };
     serve(home, [
-      { module: "shelf:3", size: "M", hidden: false, label: "Favorites" },
+      {
+        module: "shelf:3",
+        size: "M",
+        hidden: false,
+        label: "Shelf: Favorites",
+      },
       {
         module: "year:movie",
         size: "M",

@@ -133,7 +133,12 @@ describe("EditHome", () => {
             hidden: false,
             label: "Books this year",
           },
-          { module: "shelf:3", size: "M", hidden: true, label: "Favorites" },
+          {
+            module: "shelf:3",
+            size: "M",
+            hidden: true,
+            label: "Shelf: Favorites",
+          },
         ]}
       />,
     );
@@ -141,14 +146,21 @@ describe("EditHome", () => {
       screen.getByRole("switch", { name: "Show Books this year" }),
     ).toHaveAttribute("aria-checked", "true");
     const user = userEvent.setup();
-    await user.click(screen.getByRole("switch", { name: "Show Favorites" }));
+    await user.click(
+      screen.getByRole("switch", { name: "Show Shelf: Favorites" }),
+    );
     expect(onChange).toHaveBeenLastCalledWith(
       expect.arrayContaining([
-        { module: "shelf:3", size: "M", hidden: false, label: "Favorites" },
+        {
+          module: "shelf:3",
+          size: "M",
+          hidden: false,
+          label: "Shelf: Favorites",
+        },
       ]),
     );
     expect(
-      screen.getByRole("group", { name: "Size of Favorites" }),
+      screen.getByRole("group", { name: "Size of Shelf: Favorites" }),
     ).toBeVisible();
   });
 

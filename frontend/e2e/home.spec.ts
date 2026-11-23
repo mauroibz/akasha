@@ -591,7 +591,7 @@ const familyLayout = [
   ...defaults.slice(0, 4),
   { module: "year:book", size: "M", hidden: false, label: "Books this year" },
   { module: "year:anime", size: "M", hidden: false, label: "Anime this year" },
-  { module: "shelf:3", size: "M", hidden: false, label: "Favorites" },
+  { module: "shelf:3", size: "M", hidden: false, label: "Shelf: Favorites" },
   ...defaults.slice(4),
 ];
 

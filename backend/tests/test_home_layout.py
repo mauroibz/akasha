@@ -216,7 +216,7 @@ async def test_each_library_has_a_year_and_each_shelf_a_hidden_module(tmp_path: 
         "module": f"shelf:{shelf}",
         "size": "M",
         "hidden": True,
-        "label": "Favorites",
+        "label": "Shelf: Favorites",
     }
     assert layout["defaults"] == layout["modules"]
     # The libraries' years follow Lately, so the year and Lately keep their row.
@@ -243,7 +243,7 @@ async def test_a_family_layout_round_trips_and_a_deleted_shelf_drops_out(tmp_pat
     assert [row["module"] for row in put.json()["modules"][:4]] == [s["module"] for s in saved]
     assert after[:3] == [
         {"module": "year:movie", "size": "L", "hidden": False, "label": "Movies this year"},
-        {"module": f"shelf:{kept}", "size": "L", "hidden": False, "label": "Favorites"},
+        {"module": f"shelf:{kept}", "size": "L", "hidden": False, "label": "Shelf: Favorites"},
         {"module": "year:book", "size": "S", "hidden": True, "label": "Books this year"},
     ]
     assert f"shelf:{gone}" not in {row["module"] for row in after}
