@@ -1,7 +1,7 @@
 # Sprint 147 — Every day
 
 **Sprint:** 147
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 146
 **Owner:** Mauro

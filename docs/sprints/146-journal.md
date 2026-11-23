@@ -1,7 +1,7 @@
 # Sprint 146 — Journal
 
 **Sprint:** 146
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 145
 **Owner:** Mauro
@@ -56,7 +56,7 @@ The *Every day* widget (147).
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commit: `HASH`.
+Completed 2026-11-23 (DEC-193). Commit: `27a30f0`.
 
 - **`/journal`.** `pages/JournalPage.tsx`: the header, the widget, *Timeline*, *Patterns*.
   `DiaryPage` and `InsightsPage` take `embedded` and are drawn inside it without their frame,

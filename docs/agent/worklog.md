@@ -7248,3 +7248,12 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Deviations: no migration; saved views stay in their own table. The line now has two
   migrations planned (0039 done, lit days to come), not three.
 - Next: Sprint 146, the Journal.
+
+## 2026-11-23 — Sprint 146: the Journal (complete)
+
+- Done: `/journal` with its widget switcher (Play, Goal), the Diary and Insights embedded,
+  redirects, two-place navigation.
+- Verified: see the sprint's Outcome.
+- Note for e2e: the goal's band and invitation are behind the *Goal* tab; a spec that opens
+  `/diary` for them clicks it first.
+- Next: Sprint 147, every day.

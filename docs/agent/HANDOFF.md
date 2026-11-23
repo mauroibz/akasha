@@ -5,8 +5,8 @@
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
 all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange), 143
-(your media), 144 (shelves as a view) and 145 (shelves with a rule) are complete; **Sprint 146
-(the Journal) is next**. Migration **0039** is
+(your media), 144 (shelves as a view), 145 (shelves with a rule) and 146 (the Journal) are
+complete; **Sprint 147 (every day) is next**. Migration **0039** is
 new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 
@@ -42,6 +42,9 @@ What 143 left: `/api/media` and `features/media/` (`useMedia`, `useShownItemType
 
 What 144 left: shelves are `/?view=shelves` (`features/shelves/ShelvesView.tsx`); DEC-194
 records what was not built from DEC-193 point 5 and why.
+
+What 146 left: `/journal` (`pages/JournalPage.tsx`); a widget is an entry in its `widgets`
+list, drawn by `features/journal/JournalWidgets.tsx`.
 
 ## Earlier state (release 3.1.0)
 

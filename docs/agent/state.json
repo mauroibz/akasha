@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "146",
-  "active_sprint_file": "docs/sprints/146-journal.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "145",
+  "project_status": "ready",
+  "active_sprint": "147",
+  "active_sprint_file": "docs/sprints/147-every-day.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "146",
   "completed_sprints": [
     "001",
     "002",
@@ -151,8 +151,9 @@
     "142",
     "143",
     "144",
-    "145"
+    "145",
+    "146"
   ],
-  "started_at": "2026-11-23T14:12:15-03:00",
-  "updated_at": "2026-11-23T14:12:15-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T14:23:42-03:00"
 }
