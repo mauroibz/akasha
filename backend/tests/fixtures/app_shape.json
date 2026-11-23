@@ -497,6 +497,12 @@
    ]
   ],
   [
+   "/api/home",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/search/resolve",
    [
     "GET"

@@ -151,6 +151,8 @@ ROUTE_POLICY = {
     ("DELETE", "/api/goals/{item_type}"): "private-write",
     ("GET", "/api/goals/{item_type}/progress"): "private-collection",
     ("GET", "/api/goals/{item_type}/picks"): "private-collection",
+    # Sprint 130: Home reads the requester's own entries and goals only.
+    ("GET", "/api/home"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;

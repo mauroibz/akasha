@@ -153,11 +153,25 @@ class GoalService:
         total orders (ties break on entry id), so the same library gives the same picks.
         """
         self._supported(item_type)
+        chosen = self.pick_reasons(item_type, limit=limit)
+        entries = LibraryService(self.engine, self.user_id).get_entries(
+            [pick["entry_id"] for pick in chosen]
+        )
+        return [_with_entry(pick, entry) for pick, entry in zip(chosen, entries, strict=True)]
+
+    def pick_reasons(self, item_type: str, *, limit: int) -> list[dict[str, Any]]:
+        """`picks` without the entries: ids and reasons, for any domain with a pile.
+
+        Home reads this for every domain (Sprint 130), including one whose entries
+        record no finish date and so can hold no goal.
+        """
         planned = [status.value for status in DOMAINS[item_type].statuses if status.planned]
         if not planned:
             return []
         marks = ", ".join(f":status{index}" for index in range(len(planned)))
-        params: dict[str, Any] = {"user": self.user_id, "type": item_type}
+        # Each source gives at most `limit` picks and loses at most `limit` rows to
+        # the other's, so twice `limit` rows of each is every row the merge can read.
+        params: dict[str, Any] = {"user": self.user_id, "type": item_type, "fetch": 2 * limit}
         params.update({f"status{index}": value for index, value in enumerate(planned)})
         with self.engine.connect() as connection:
             favourites = connection.execute(
@@ -172,7 +186,7 @@ class GoalService:
                     "      HAVING count(*) >= :ratings AND avg(e2.score) >= :mean) fav "
                     "  ON fav.creator = i.creator_primary_normalized "
                     f"WHERE e.user_id = :user AND i.type = :type AND e.status IN ({marks}) "
-                    "ORDER BY fav.mean DESC, e.id ASC"
+                    "ORDER BY fav.mean DESC, e.id ASC LIMIT :fetch"
                 ),
                 {**params, "ratings": CREATOR_RATINGS, "mean": CREATOR_MEAN},
             ).all()
@@ -180,7 +194,7 @@ class GoalService:
                 text(
                     "SELECT e.id, e.date_added FROM entries e JOIN items i ON i.id = e.item_id "
                     f"WHERE e.user_id = :user AND i.type = :type AND e.status IN ({marks}) "
-                    "ORDER BY e.date_added ASC, e.id ASC"
+                    "ORDER BY e.date_added ASC, e.id ASC LIMIT :fetch"
                 ),
                 params,
             ).all()
@@ -206,17 +220,17 @@ class GoalService:
                     pick = source.pop(0)
                     seen.add(pick["entry_id"])
                     chosen.append(pick)
-        library = LibraryService(self.engine, self.user_id)
-        return [
-            {
-                "entry": library.get_entry(pick["entry_id"]),
-                "reason": pick["reason"],
-                "creator": pick.get("creator"),
-                "mean_score": pick.get("mean_score"),
-                "since": pick.get("since"),
-            }
-            for pick in chosen
-        ]
+        return chosen
+
+
+def _with_entry(pick: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "entry": entry,
+        "reason": pick["reason"],
+        "creator": pick.get("creator"),
+        "mean_score": pick.get("mean_score"),
+        "since": pick.get("since"),
+    }
 
 
 def _goal(row: Any) -> dict[str, Any]:

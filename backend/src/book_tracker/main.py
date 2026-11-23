@@ -16,6 +16,7 @@ from book_tracker.api.auth import users_router
 from book_tracker.api.events import router as events_router
 from book_tracker.api.export import router as export_router
 from book_tracker.api.goals import router as goals_router
+from book_tracker.api.home import router as home_router
 from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
@@ -132,6 +133,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(users_router, responses=auth_responses)
     app.include_router(library_router, responses=auth_responses)
     app.include_router(goals_router, responses=auth_responses)
+    app.include_router(home_router, responses=auth_responses)
     app.include_router(providers_router, responses=auth_responses)
     app.include_router(imports_router, responses=auth_responses)
     app.include_router(catalog_router, responses=auth_responses)

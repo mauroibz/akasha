@@ -664,6 +664,28 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/home": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Home
+     * @description Every module of Home from stored data; no provider is consulted.
+     *
+     *     Today is resolved per request, so a server running across midnight moves on.
+     */
+    get: operations["home_api_home_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/import/batches/{batch_id}": {
     parameters: {
       query?: never;
@@ -2222,6 +2244,134 @@ export interface components {
       period: "month" | "year";
       /** Suggest */
       suggest: boolean;
+    };
+    /**
+     * HomeActive
+     * @description The entry most recently touched among those under way.
+     */
+    HomeActive: {
+      /** Day */
+      day: number | null;
+      entry: components["schemas"]["EntryResponse"];
+    };
+    /** HomeCover */
+    HomeCover: {
+      /** Cover Url */
+      cover_url: string | null;
+      /** Entry Id */
+      entry_id: number;
+      /** Item Id */
+      item_id: number;
+      /** Item Type */
+      item_type: string;
+      /** Score */
+      score: number | null;
+      /** Title */
+      title: string;
+    };
+    /** HomeDomainTile */
+    HomeDomainTile: {
+      /** Count */
+      count: number;
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
+      /** Item Type */
+      item_type: string;
+      /** Mean Score */
+      mean_score: number | null;
+      /** Scores */
+      scores: number[];
+      /** Status Counts */
+      status_counts: {
+        [key: string]: number;
+      };
+      /** Without Cover */
+      without_cover: number;
+    };
+    /** HomeGoalCount */
+    HomeGoalCount: {
+      /** Count */
+      count: number;
+      /** Item Type */
+      item_type: string;
+      /** Target */
+      target: number;
+    };
+    /** HomeGreeting */
+    HomeGreeting: {
+      active: components["schemas"]["HomeActive"] | null;
+      /** Entries */
+      entries: number;
+      /** Goals */
+      goals: components["schemas"]["HomeGoalCount"][];
+      /** Pile */
+      pile: number;
+      /** Today */
+      today: string;
+    };
+    /** HomeMonth */
+    HomeMonth: {
+      /** Count */
+      count: number;
+      /** Counts */
+      counts: {
+        [key: string]: number;
+      };
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
+      /** Month */
+      month: number;
+    };
+    /** HomeNext */
+    HomeNext: {
+      /** Creator */
+      creator?: string | null;
+      entry: components["schemas"]["EntryResponse"];
+      /** Mean Score */
+      mean_score?: number | null;
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: "creator" | "waiting";
+      /** Since */
+      since?: string | null;
+    };
+    /** HomeResponse */
+    HomeResponse: {
+      /** Domains */
+      domains: components["schemas"]["HomeDomainTile"][];
+      greeting: components["schemas"]["HomeGreeting"];
+      /** Next */
+      next: components["schemas"]["HomeNext"][];
+      /** Now */
+      now: components["schemas"]["EntryResponse"][];
+      year: components["schemas"]["HomeYear"];
+    };
+    /** HomeYear */
+    HomeYear: {
+      /** Goals */
+      goals: components["schemas"]["HomeYearGoal"][];
+      /** Months */
+      months: components["schemas"]["HomeMonth"][];
+      /** Year */
+      year: number;
+    };
+    /** HomeYearGoal */
+    HomeYearGoal: {
+      /** Count */
+      count: number;
+      /** Done */
+      done: number;
+      /** Item Type */
+      item_type: string;
+      /**
+       * Period
+       * @enum {string}
+       */
+      period: "month" | "year";
+      /** Target */
+      target: number;
     };
     /**
      * ImportBrowseResponse
@@ -5562,6 +5712,62 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  home_api_home_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Unprocessable Entity */

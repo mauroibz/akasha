@@ -1002,6 +1002,10 @@ class LibraryService:
         with Session(self.engine) as session:
             return self._entry_dict(session, self._entry(session, entry_id))
 
+    def get_entries(self, entry_ids: Sequence[int]) -> list[dict[str, Any]]:
+        """Several entries in the order asked, in one batch (Home, Sprint 130)."""
+        return self._get_entries(entry_ids)
+
     def _get_entries(self, entry_ids: Sequence[int]) -> list[dict[str, Any]]:
         """`get_entry` for many ids: one session and one batch, not one of each per id."""
         with Session(self.engine) as session:

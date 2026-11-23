@@ -1857,6 +1857,405 @@
         "title": "GoalResponse",
         "type": "object"
       },
+      "HomeActive": {
+        "description": "The entry most recently touched among those under way.",
+        "properties": {
+          "day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          }
+        },
+        "required": [
+          "entry",
+          "day"
+        ],
+        "title": "HomeActive",
+        "type": "object"
+      },
+      "HomeCover": {
+        "properties": {
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "item_id",
+          "item_type",
+          "title",
+          "cover_url",
+          "score"
+        ],
+        "title": "HomeCover",
+        "type": "object"
+      },
+      "HomeDomainTile": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "mean_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Score"
+          },
+          "scores": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 10,
+            "title": "Scores",
+            "type": "array"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Status Counts",
+            "type": "object"
+          },
+          "without_cover": {
+            "title": "Without Cover",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "count",
+          "status_counts",
+          "scores",
+          "mean_score",
+          "covers",
+          "without_cover"
+        ],
+        "title": "HomeDomainTile",
+        "type": "object"
+      },
+      "HomeGoalCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "target",
+          "count"
+        ],
+        "title": "HomeGoalCount",
+        "type": "object"
+      },
+      "HomeGreeting": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeActive"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/HomeGoalCount"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "pile": {
+            "title": "Pile",
+            "type": "integer"
+          },
+          "today": {
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "today",
+          "active",
+          "entries",
+          "pile",
+          "goals"
+        ],
+        "title": "HomeGreeting",
+        "type": "object"
+      },
+      "HomeMonth": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "count",
+          "counts",
+          "covers"
+        ],
+        "title": "HomeMonth",
+        "type": "object"
+      },
+      "HomeNext": {
+        "properties": {
+          "creator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "mean_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Score"
+          },
+          "reason": {
+            "enum": [
+              "creator",
+              "waiting"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "required": [
+          "entry",
+          "reason"
+        ],
+        "title": "HomeNext",
+        "type": "object"
+      },
+      "HomeResponse": {
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/HomeDomainTile"
+            },
+            "title": "Domains",
+            "type": "array"
+          },
+          "greeting": {
+            "$ref": "#/components/schemas/HomeGreeting"
+          },
+          "next": {
+            "items": {
+              "$ref": "#/components/schemas/HomeNext"
+            },
+            "title": "Next",
+            "type": "array"
+          },
+          "now": {
+            "items": {
+              "$ref": "#/components/schemas/EntryResponse"
+            },
+            "title": "Now",
+            "type": "array"
+          },
+          "year": {
+            "$ref": "#/components/schemas/HomeYear"
+          }
+        },
+        "required": [
+          "greeting",
+          "now",
+          "next",
+          "year",
+          "domains"
+        ],
+        "title": "HomeResponse",
+        "type": "object"
+      },
+      "HomeYear": {
+        "properties": {
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/HomeYearGoal"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/HomeMonth"
+            },
+            "maxItems": 12,
+            "minItems": 12,
+            "title": "Months",
+            "type": "array"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "months",
+          "goals"
+        ],
+        "title": "HomeYear",
+        "type": "object"
+      },
+      "HomeYearGoal": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "period": {
+            "enum": [
+              "month",
+              "year"
+            ],
+            "title": "Period",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "period",
+          "count",
+          "target",
+          "done"
+        ],
+        "title": "HomeYearGoal",
+        "type": "object"
+      },
       "ImportBrowseResponse": {
         "description": "One level of a browsable connector's source. Relative names only.",
         "properties": {
@@ -7752,6 +8151,65 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/home": {
+      "get": {
+        "description": "Every module of Home from stored data; no provider is consulted.\n\nToday is resolved per request, so a server running across midnight moves on.",
+        "operationId": "home_api_home_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Home"
       }
     },
     "/api/import/batches/{batch_id}": {
