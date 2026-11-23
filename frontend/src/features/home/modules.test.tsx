@@ -29,6 +29,27 @@ describe("Lately", () => {
     );
   });
 
+  it("says a score kept is still that score, not a change to itself", () => {
+    renderWithRouter(
+      <Lately
+        rows={[
+          {
+            kind: "score",
+            at: "2026-11-23T10:00:00Z",
+            entry: entry(70, "Pet Sematary", "book", { status: "read" }),
+            score: 9,
+            previous: 9,
+            count: 1,
+          },
+        ]}
+        size="M"
+      />,
+    );
+    expect(screen.getByRole("listitem")).toHaveTextContent(
+      /Pet Sematary still a 9/,
+    );
+  });
+
   it("shows fewer rows at a smaller size", () => {
     const rows = Array.from({ length: 8 }, (_, index) => ({
       kind: "finished" as const,

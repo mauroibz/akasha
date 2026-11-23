@@ -2,6 +2,7 @@ import { ArrowDownUp, Check, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import type { HomeLatelyRow, ModuleSize } from "@/api/home";
+import { scoreArticle } from "@/features/rescore/rescore";
 import { scoreChipClass } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -80,9 +81,15 @@ export function Lately({
                 ) : row.kind === "score" ? (
                   <>
                     {title}{" "}
-                    <span className="tabular-nums">
-                      {row.previous ?? "–"} → {row.score ?? "–"}
-                    </span>
+                    {row.score !== null && row.previous === row.score ? (
+                      // A score looked at again and kept (One question, the
+                      // revisit deck): not a change to itself.
+                      <>still {scoreArticle(row.score)}</>
+                    ) : (
+                      <span className="tabular-nums">
+                        {row.previous ?? "–"} → {row.score ?? "–"}
+                      </span>
+                    )}
                   </>
                 ) : (
                   <>
