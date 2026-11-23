@@ -7738,3 +7738,32 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   width and no filters" is answered by the shared cover and width (Sprint 139) and the link,
   not by one screen. If the owner wants the Library's controls on the shelf's own page, that
   reverses Sprint 105 and is a small sprint.
+
+## DEC-195 — The owner's first look at the 4.0 line: the Journal's two gaps, and Personalize (Sprints 149–150)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-193 (the line), DEC-185 (the stored layout), Sprint 141 (the bands
+  stopped being modules), Sprint 142 (Arrange), Sprint 147 (Every day).
+- **Context:** the owner ran the branch and said: the Goal widget does not let them choose
+  which medium a goal is for; lighting a day with nothing under way offers nothing, and it
+  should offer a search that finds what they mean, new items included; *Arrange* should be
+  called *Edit* or *Personalize*; its functionality is liked and its UX is not: too much
+  scrolling, and it is hard to tell what is a control and what is on the page, the theme
+  included. "What if we had a more standard widget UI? Blank squares with a + for adding new
+  ones, on click you show a list and preview of what you are adding." The general layout
+  should be configurable too: move *Lately* and turn it on or off. "Overall we are good."
+- **Decision:**
+  1. The Goal widget chooses the medium first, among the media a goal can count.
+  2. The day's question gains a search: the library as it is typed, and the web on request,
+     where adding a result makes the entry and chooses it. Still one step; the search is
+     behind *Something else* until wanted.
+  3. *Arrange* becomes **Personalize**. On the page there are only the things placed, each
+     with its handle, and one dashed square with a plus. The plus opens a dialog: what can be
+     added on one side, a real preview of the chosen one on the other, then *Add*. *Your
+     media*, *Theme*, *Reset* and *Done* live in one bar at the top of the front, the first
+     two as dialogs, not in the page.
+  4. *On now* and *Lately* are layout items again, movable and removable like a showcase and
+     always full width. This reverses Sprint 141's "the bands are not theirs to hide".
+- **Consequences:** Sprints 149 and 150. `GET /api/home/preview` for the dialog's preview. A
+  layout stored before Sprint 141 that hid *On now* or *Lately* hides them again.

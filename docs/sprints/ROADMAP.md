@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 56
+**Plan revision:** 57
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Sprints 139–148, the owner's 2026-11-23 line (DEC-193, amended by DEC-194), are completed; see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** 149 (DEC-195); see "The owner's first look at the 4.0 line" below. Sprints 139–148, the owner's 2026-11-23 line (DEC-193, amended by DEC-194), are completed; see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -1994,6 +1994,15 @@ bar rather than being the input, and the Library keeps its own field in its stic
 *Lent out* keep their pages (144, DEC-194); saved views are drawn as shelves without a schema
 change (145); *Every day* counts the media kept in front and offers what is under way (147).
 Two migrations, 0039 and 0040. Not released: the version surfaces read 3.1.0.
+
+## The owner's first look at the 4.0 line
+
+Recorded as **DEC-195**, from running the branch on 2026-11-23.
+
+- **[149 — The Journal's two gaps](149-journal-gaps.md)**: a goal for a chosen medium; a day
+  lit for anything found by search, new items included.
+- **[150 — Personalize](150-personalize.md)**: Arrange renamed and redrawn as a widget editor
+  with a plus square, an add dialog with a preview, and *On now* and *Lately* movable.
 
 ## Not scheduled
 
