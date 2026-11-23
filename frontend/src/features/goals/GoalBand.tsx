@@ -16,9 +16,11 @@ import { CoverImage } from "@/components/CoverImage";
 import { Button } from "@/components/ui/button";
 import {
   goalSentence,
+  slotCover,
   slotsFor,
   yearPassed,
   type Slot,
+  type SlotCover,
 } from "@/features/goals/goals";
 import { Prose } from "@/features/insights/sections";
 import { cn } from "@/lib/utils";
@@ -111,7 +113,13 @@ export function GoalBand({
           </div>
         </div>
         {slots ? (
-          <Slots slots={slots} year={year} plural={plural} target={target} />
+          <Slots
+            slots={slots.map((slot) => ({
+              ...slot,
+              entry: slot.entry && slotCover(slot.entry),
+            }))}
+            label={`${slots.filter((slot) => slot.entry).length} of ${target} ${plural} in ${year}`}
+          />
         ) : (
           <Bar
             total={progress.data.total}
@@ -126,34 +134,32 @@ export function GoalBand({
   );
 }
 
-/** A slot per thing aimed at, the year's covers standing in them in order. */
-function Slots({
+/**
+ * A slot per thing aimed at, the year's covers standing in them in order. Shared by
+ * the Diary's band and Home's year per library (Sprint 138); `className` sets the
+ * columns and width where they differ.
+ */
+export function Slots({
   slots,
-  year,
-  plural,
-  target,
+  label,
+  className = "grid w-full grid-cols-6 gap-2 sm:gap-3 lg:w-[26rem]",
 }: {
-  slots: Slot<LibraryEntry>[];
-  year: number;
-  plural: string;
-  target: number;
+  slots: Slot<SlotCover>[];
+  label: string;
+  className?: string;
 }) {
-  const filled = slots.filter((slot) => slot.entry).length;
   return (
-    <ol
-      aria-label={`${filled} of ${target} ${plural} in ${year}`}
-      className="grid w-full grid-cols-6 gap-2 sm:gap-3 lg:w-[26rem]"
-    >
+    <ol aria-label={label} className={className}>
       {slots.map((slot, index) =>
         slot.entry ? (
           <li key={index} data-slot="filled">
             <Link
               to={`/books/${slot.entry.id}`}
-              aria-label={slot.entry.item.title}
+              aria-label={slot.entry.title}
               className="block rounded-[2px_5px_5px_2px] focus-ring"
             >
               <CoverImage
-                src={slot.entry.item.cover_url ?? null}
+                src={slot.entry.cover_url}
                 alt=""
                 className="aspect-[2/3] w-full rounded-[2px_5px_5px_2px] object-cover shadow-[inset_3px_0_0_rgba(0,0,0,0.18),0_8px_14px_-8px_rgba(28,25,23,0.5)]"
               />
@@ -176,19 +182,21 @@ function Slots({
 }
 
 /** Above 24: one bar, and a mark where today falls in the year (mockup 3C). */
-function Bar({
+export function Bar({
   total,
   target,
   passed,
   label,
+  className = "w-full lg:w-[26rem]",
 }: {
   total: number;
   target: number;
   passed: number;
   label: string;
+  className?: string;
 }) {
   return (
-    <div className="w-full lg:w-[26rem]">
+    <div className={className}>
       <div
         role="img"
         aria-label={label}

@@ -24,6 +24,31 @@ export function isModuleKey(key: string): key is ModuleKey {
   return (MODULES as readonly string[]).includes(key);
 }
 
+/**
+ * A member of a module family (Sprint 138, DEC-192): a library's year,
+ * `year:<item type>`, or a shelf, `shelf:<shelf id>`. The server lists the members
+ * that exist, each with its own label.
+ */
+export type FamilyKey = `year:${string}` | `shelf:${string}`;
+export type HomeKey = ModuleKey | FamilyKey;
+
+export function isFamilyKey(key: string): key is FamilyKey {
+  return /^(year|shelf):.+/.test(key);
+}
+
+export function isHomeKey(key: string): key is HomeKey {
+  return isModuleKey(key) || isFamilyKey(key);
+}
+
+/** What *Edit home* calls a module: a family member's label from the server. */
+export function labelOf(row: {
+  module: string;
+  label?: string | null;
+}): string {
+  if (isModuleKey(row.module)) return moduleLabels[row.module];
+  return row.label ?? row.module;
+}
+
 export const moduleLabels: Record<ModuleKey, string> = {
   now: "On now",
   next: "Up next",
@@ -66,10 +91,10 @@ export const sizeSpan: Record<ModuleSize, number> = { S: 3, M: 5, L: 7 };
  * the last one back, so no row ends in a gap: a year with nothing beside it takes the
  * whole row, three small modules take four columns each.
  */
-export function packRows(
-  modules: ReadonlyArray<{ key: ModuleKey; size: ModuleSize }>,
-): Array<{ key: ModuleKey; size: ModuleSize; span: number }> {
-  const placed: Array<{ key: ModuleKey; size: ModuleSize; span: number }> = [];
+export function packRows<K extends string>(
+  modules: ReadonlyArray<{ key: K; size: ModuleSize }>,
+): Array<{ key: K; size: ModuleSize; span: number }> {
+  const placed: Array<{ key: K; size: ModuleSize; span: number }> = [];
   let row: typeof placed = [];
   let used = 0;
   const close = () => {
@@ -85,7 +110,7 @@ export function packRows(
     used = 0;
   };
   for (const { key, size } of modules) {
-    const span = fullWidth.has(key) ? 12 : sizeSpan[size];
+    const span = isModuleKey(key) && fullWidth.has(key) ? 12 : sizeSpan[size];
     if (used + span > 12) close();
     row.push({ key, size, span });
     used += span;

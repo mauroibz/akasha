@@ -20,11 +20,15 @@ import { EditHome } from "./EditHome";
 import { GreetingBar } from "./GreetingBar";
 import {
   fallbackLayout,
+  isHomeKey,
   isModuleKey,
   packRows,
   spanClass,
+  type HomeKey,
   type ModuleKey,
 } from "./layout";
+import { LibraryYear } from "./LibraryYear";
+import { ShelfModule } from "./ShelfModule";
 import { Lately } from "./Lately";
 import { LentOut } from "./LentOut";
 import { LibraryTiles } from "./LibraryTiles";
@@ -87,8 +91,20 @@ function useLayout() {
   };
 }
 
+/** A shown library's year, or a placed shelf, from the payload (Sprint 138). */
+function familyData(key: string, home: Home) {
+  if (key.startsWith("year:"))
+    return (home.library_years ?? []).find(
+      (row) => `year:${row.item_type}` === key,
+    );
+  if (key.startsWith("shelf:"))
+    return (home.shelf_modules ?? []).find((row) => `shelf:${row.id}` === key);
+  return undefined;
+}
+
 /** Whether a module has anything to show; one with nothing is hidden until it has. */
-function hasContent(key: ModuleKey, home: Home): boolean {
+function hasContent(key: HomeKey, home: Home): boolean {
+  if (!isModuleKey(key)) return familyData(key, home) !== undefined;
   switch (key) {
     case "year":
       return home.year !== null;
@@ -222,9 +238,24 @@ export function HomePage() {
         />
       ),
     };
+    const today = localDate(data.greeting.today);
+    const render = (key: HomeKey, size: ModuleSize): React.ReactNode => {
+      if (isModuleKey(key)) return modules[key](size);
+      const year = (data.library_years ?? []).find(
+        (row) => `year:${row.item_type}` === key,
+      );
+      if (year)
+        return (
+          <LibraryYear year={year} types={types} size={size} today={today} />
+        );
+      const shelf = (data.shelf_modules ?? []).find(
+        (row) => `shelf:${row.id}` === key,
+      );
+      return shelf ? <ShelfModule shelf={shelf} size={size} /> : null;
+    };
     const placed = packRows(
       layout.modules.flatMap((row) =>
-        isModuleKey(row.module) && !row.hidden && hasContent(row.module, data)
+        isHomeKey(row.module) && !row.hidden && hasContent(row.module, data)
           ? [{ key: row.module, size: row.size }]
           : [],
       ),
@@ -243,7 +274,7 @@ export function HomePage() {
               data-module={key}
               className={`min-w-0 ${spanClass[span]} [&>section]:h-full`}
             >
-              {modules[key](size)}
+              {render(key, size)}
             </div>
           ))}
         </div>

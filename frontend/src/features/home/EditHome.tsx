@@ -11,17 +11,13 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-import { fullWidth, isModuleKey, moduleLabels } from "./layout";
+import { fullWidth, isModuleKey, labelOf as nameOf } from "./layout";
 
 const sizes: Array<{ value: ModuleSize; label: string }> = [
   { value: "S", label: "Small" },
   { value: "M", label: "Medium" },
   { value: "L", label: "Large" },
 ];
-
-function labelOf(module: string): string {
-  return isModuleKey(module) ? moduleLabels[module] : module;
-}
 
 function moved(
   layout: ModuleLayout[],
@@ -64,6 +60,8 @@ export function EditHome({
   const [preview, setPreview] = useState<ModuleLayout[] | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const shown = preview ?? layout;
+  const labelOf = (module: string) =>
+    nameOf(layout.find((row) => row.module === module) ?? { module });
   // What the last change made, before the parent has rendered it back: two arrow
   // presses in quick succession must move twice, not twice from the same place.
   // Taken from the prop only when the prop itself changes, so a render of this

@@ -509,6 +509,134 @@ for (const width of [390, 1440]) {
   });
 }
 
+const familyHome = {
+  ...home,
+  library_years: [
+    {
+      item_type: "book",
+      year: 2026,
+      total: 2,
+      goal: {
+        item_type: "book",
+        period: "year",
+        count: 12,
+        target: 12,
+        done: 2,
+      },
+      covers: [
+        {
+          entry_id: 24,
+          item_id: 24,
+          item_type: "book",
+          title: "Rayuela",
+          cover_url: null,
+          score: 9,
+        },
+        {
+          entry_id: 25,
+          item_id: 25,
+          item_type: "book",
+          title: "Ficciones",
+          cover_url: null,
+          score: 8,
+        },
+      ],
+    },
+    {
+      item_type: "anime",
+      year: 2026,
+      total: 1,
+      goal: null,
+      covers: [
+        {
+          entry_id: 26,
+          item_id: 26,
+          item_type: "anime",
+          title: "Seven Samurai",
+          cover_url: null,
+          score: 10,
+        },
+      ],
+    },
+  ],
+  shelf_modules: [
+    {
+      id: 3,
+      name: "Favorites",
+      slug: "favorites",
+      entry_count: 2,
+      covers: [
+        {
+          entry_id: 24,
+          item_id: 24,
+          item_type: "book",
+          title: "Rayuela",
+          cover_url: null,
+          score: 9,
+        },
+        {
+          entry_id: 26,
+          item_id: 26,
+          item_type: "anime",
+          title: "Seven Samurai",
+          cover_url: null,
+          score: 10,
+        },
+      ],
+    },
+  ],
+};
+
+const familyLayout = [
+  ...defaults.slice(0, 4),
+  { module: "year:book", size: "M", hidden: false, label: "Books this year" },
+  { module: "year:anime", size: "M", hidden: false, label: "Anime this year" },
+  { module: "shelf:3", size: "M", hidden: false, label: "Favorites" },
+  ...defaults.slice(4),
+];
+
+for (const width of [390, 1440]) {
+  test(`a library's year and a shelf sit on Home at ${width}px (DEC-192)`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await stubHome(page);
+    await page.route(isHome, (route) => route.fulfill({ json: familyHome }));
+    await page.route("**/api/home/layout", (route) =>
+      route.fulfill({
+        json: { modules: familyLayout, defaults: familyLayout },
+      }),
+    );
+    await page.goto("/");
+    const books = page.getByRole("region", { name: "Your 2026 books" });
+    await expect(books).toBeVisible();
+    await expect(
+      books.getByRole("list", { name: "2 of 12 books in 2026" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Your 2026 anime" }),
+    ).toBeVisible();
+    const shelf = page.getByRole("region", { name: "Favorites" });
+    await expect(
+      shelf.getByRole("link", { name: "2 on the shelf →" }),
+    ).toHaveAttribute("href", "/shelves/favorites");
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBe(0);
+    const results = await new AxeBuilder({ page })
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      results.violations
+        .filter((v) => v.impact === "serious" || v.impact === "critical")
+        .map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(" ")}`),
+    ).toEqual([]);
+  });
+}
+
 test("an empty library gets the first-run message", async ({ page }) => {
   await page.goto("/");
   await expect(

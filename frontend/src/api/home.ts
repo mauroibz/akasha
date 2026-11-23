@@ -12,6 +12,8 @@ export type HomeYearGoal = Schemas["HomeYearGoal"];
 export type HomeDomainTile = Schemas["HomeDomainTile"];
 export type HomeTidy = Schemas["HomeTidy"];
 export type HomeShelf = Schemas["HomeShelf"];
+export type HomeLibraryYear = Schemas["HomeLibraryYear"];
+export type HomeShelfModule = Schemas["HomeShelfModule"];
 
 /** The schema's entries, read as the library's own entry shape. */
 export type PileReason = Schemas["PileReason"];
@@ -54,6 +56,10 @@ export interface Home {
   lent: HomeLent | null;
   /** *More like this* (Sprint 134): found, unanswered suggestions, newest first. */
   suggested?: Suggestion[] | null;
+  /** The libraries' years the person shows (Sprint 138); absent from an older server. */
+  library_years?: HomeLibraryYear[];
+  /** The shelves placed on Home (Sprint 138). */
+  shelf_modules?: HomeShelfModule[];
 }
 
 /** The person's own zone, so Home's today and Lately's days are theirs (Sprint 132). */
