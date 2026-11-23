@@ -7,6 +7,7 @@ domain's resolve runs against recorded Cinemeta responses, never a mock of itsel
 
 from __future__ import annotations
 
+import io
 import re
 import sqlite3
 from collections.abc import AsyncIterator, Iterator
@@ -18,6 +19,7 @@ from typing import Any
 
 import httpx
 import pytest
+from PIL import Image
 from recommendation_fake import FakeSource
 from recordings import recording, replay
 from sqlalchemy import text
@@ -540,6 +542,40 @@ async def test_want_adds_a_planned_entry(tmp_path: Path, films_suggested: None) 
     assert pending.status_code == 409
     assert pending.json()["error"]["code"] == "suggestion_not_resolved"
     assert body["suggestions"][0]["id"] not in {row["id"] for row in shown}
+
+
+def _jpeg() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (400, 600), (30, 30, 120)).save(buffer, "JPEG")
+    return buffer.getvalue()
+
+
+@pytest.mark.anyio
+async def test_a_resolved_suggestion_brings_its_cover_to_the_wanted_entry(
+    tmp_path: Path, films_suggested: None
+) -> None:
+    posters = replay(
+        {
+            f"/poster/medium/{imdb}/img": (200, _jpeg(), {"content-type": "image/jpeg"})
+            for imdb in ("tt0076786", "tt0240419", "tt1034415")
+        }
+    )
+    async with (
+        _app(tmp_path) as (app, client, _cinemeta, _fake),
+        httpx.AsyncClient(transport=posters) as cover_client,
+    ):
+        app.state.job_runner.handlers[RECOMMEND_JOB].enricher.cover_client = cover_client
+        entry_id = _seed_film(app)
+        round_id = (await client.post(f"/api/entries/{entry_id}/more-like-this")).json()["id"]
+        await _run_jobs(app)
+        first = (await client.get(f"/api/suggestion-rounds/{round_id}")).json()["suggestions"][0]
+        wanted = (
+            await client.patch(f"/api/suggestions/{first['id']}", json={"answer": "want"})
+        ).json()
+        entry = (await client.get(f"/api/entries/{wanted['entry_id']}")).json()
+        cover = await client.get(entry["item"]["cover_url"])
+    assert cover.status_code == 200
+    assert cover.headers["content-type"] == "image/jpeg"
 
 
 @pytest.mark.anyio
