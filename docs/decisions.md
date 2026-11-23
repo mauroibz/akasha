@@ -7557,3 +7557,75 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
 - **Consequences:** the live check against Claude is the owner's: export `ANTHROPIC_API_KEY`
   and run `scripts/record_model_fixtures.py`, then one *Model* round in the app. Sprint 136's
   `library` source can declare `resolved_only=False` and reuse the segment as is.
+
+## DEC-191 — Embeddings: choices the sprint file left open (Sprint 136)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 7, DEC-187 (hosted, by key; embeddings Gemini and
+  OpenAI-compatible only), DEC-188 (the pipeline), DEC-186 (the pile's signals), DEC-190 (the
+  model source). Recorded by the session under the coordinator's instruction to build the line
+  autonomously.
+- **Context:** Sprint 136 gave items a vector of their stored text and used it three ways: a
+  `library` source, a pile signal, and the order of other sources' found picks. The sprint file
+  named the configuration, the table and the acceptance criteria; these details were open, and
+  the walkthrough found one defect.
+- **Decision:**
+  1. **Configuration mirrors the model's.** `AKASHA_RECS_EMBEDDINGS_PROVIDER` defaults to
+     `gemini` (blank is the default; `anthropic` is refused by the type), so a `GEMINI_API_KEY`
+     already set turns embeddings on and an OpenAI key alone does not. The key falls back to
+     the provider's usual variable. Plain HTTP over the shared client, no SDK, 30 s a request.
+  2. **No numpy.** It is not a dependency, so cosine is `math.sumprod` over unit-length float32
+     vectors read with `array`. Measured on the workstation: 10,000 vectors in about 120 ms at
+     768 dimensions and 230 ms at 1,536. Gemini is therefore asked for 768
+     (`outputDimensionality`; `gemini-embedding-001` is trained to be cut short). The
+     OpenAI-compatible adapter sends only `model` and `input`, because a `dimensions` or
+     `encoding_format` some compatible servers (Voyage) refuse; `text-embedding-3-small` stays at
+     1,536, inside the budget.
+  3. **A vector's `model` is the client's identity**: `gemini:<model>@768`,
+     `openai:<model>@<url>`. Vectors of another identity are never read, and changing the model
+     embeds everything again.
+  4. **The text is declared by the domain** as `RankingSpec.text_fields` (books subjects then
+     description; films genres then description; series and anime genres then synopsis; albums
+     nothing), after the title, `By` the creators and the work's first year; 2,000 characters at
+     most. A conformance check holds the names to declared text fields.
+  5. **The job.** `embed_items` takes 32 texts a request and eight requests a job, then queues a
+     follow-up; each request is counted under `embeddings` against
+     `AKASHA_PROVIDER_DAILY_LIMITS` (default 1,000 a day). A spent budget ends the job as
+     succeeded, saying so; a refusing endpoint fails it with the reason (retried by the runner's
+     backoff). At most one job waits.
+  6. **Triggers.** After an enrichment that filled something and after a suggestion's item was
+     cached (hooks on both handlers); the hourly housekeeping pass hashes every text (an edit);
+     and, from the walkthrough, a **one-minute sweep** for any held item with no vector of the
+     current model. The walkthrough's library had no vectors at all: an add from search fills its
+     metadata at once and queues no enrichment, and the hourly pass had already run at start-up.
+     The job runner gained `sweeps=[(sweep, every)]`, cadences of their own on the idle pass.
+  7. **The library source keeps the person's entries.** It declares `from_library`; storing then
+     skips the already-in-the-library filter (it still drops *not for me*). Its candidates carry
+     the new `Candidate.item_id` and are stored `enriched` with no provider asked. It suggests
+     entries waiting in a `planned` status or the spec's `want_status` (an album's wishlist). A
+     seed without a vector is embedded for its round, one request. The reason is "Waiting since
+     Nov 2026": the walkthrough showed "Close to Rayuela; on your list since …" on every row under
+     a sheet titled "More like Rayuela". The sheet opens each entry (*Open*, *Not for me*) instead
+     of *Want*, *Look up* or *Seen it*; Home's module never shows them.
+  8. ***Want* on an item already held records the answer and adds nothing**, as wanting twice
+     already did; a 409 was tried and broke that idempotence.
+  9. **The pile's `similarity` is relative to the pile.** Models spread cosines differently, so
+     no fixed threshold: up to ten entries scored above the person's mean in that library give a
+     mean vector; each waiting entry with a vector is lifted `2.0 × (s − median) / (max −
+     median)`, nothing below a third of the way, at least three embedded, fifty at most. The
+     reason names the scored work it is nearest: "Close to what you scored 9: Rayuela". Callers
+     pass the configured model (`rank_pile(embedding_model=…)`), so without one no vector is read
+     and the order is Sprint 132's exactly, even with vectors stored.
+  10. **Other sources' picks** are reordered when a round is read, not when stored: found picks
+      with a vector take the places found picks held, in order of likeness to the seed; a pending
+      pick keeps the source's place. Home's list keeps its newest-first order.
+  11. **Fixtures are unrecorded** (DEC-187 point 4): no Gemini or OpenAI key was present. The
+      replies are written in each API's documented shape for six books, their exact texts listed
+      in `embedding_fixtures.json`, the vectors fabricated from topic directions so that the
+      expected order holds; `scripts/record_embedding_fixtures.py` records real ones and prints
+      the order a real model gives.
+- **Consequences:** the live check is the owner's: export `GEMINI_API_KEY` (or an
+  OpenAI-compatible key with `AKASHA_RECS_EMBEDDINGS_PROVIDER=openai`) and run
+  `scripts/record_embedding_fixtures.py`, then open *From your library* in the app. The first
+  start with a key embeds the whole library over the following minutes (32 items a request).

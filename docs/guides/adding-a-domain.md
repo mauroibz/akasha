@@ -658,6 +658,7 @@ writing any of it, stop — you are about to duplicate something:
 | Backup and restore | nightly, verified, with a tested restore |
 | Covers | validated, resized, stored locally, never re-fetched while a page renders |
 | The ranked pile | *Up next* and a goal's picks, with reasons, for any domain with a `planned` status; declare `RankingSpec(series_field=…, series_in_title=…, affinity_fields=(…))` to add a series and a taste signal from your own fields (Sprint 132, DEC-186) |
+| Embeddings | with an endpoint configured, a vector of each item's title, creator and first year, plus the text fields you declare in `RankingSpec(text_fields=("genres", "synopsis"))`, in that order (Sprint 136); they feed *From your library*, the pile's similarity and the order of a round's found picks. Declare `"library"` in `RecommendationSpec.sources` to offer *From your library* |
 | Suggestions | *More like this*, stored rounds, enrichment under the provider budgets and *Want* / *Not for me* / *Seen it*, once you declare `RecommendationSpec` (§6b; Sprint 133, DEC-188) |
 
 ---

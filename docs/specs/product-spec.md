@@ -54,7 +54,13 @@ save — takes under 20 seconds and never requires leaving the keyboard.
   only source for books, anime and albums, the second for films and series. The sheet's source
   segment is a choice. A model's picks are shown only once the library's own providers found
   them, so an invented title is never shown; it is sent titles, creators, years and scores and
-  nothing else, and Settings says so. *Want* on an album puts it on the wishlist
+  nothing else, and Settings says so. *Want* on an album puts it on the wishlist. Since Sprint
+  136, with a hosted embedding endpoint (Gemini or any OpenAI-compatible one; the Claude API has
+  none, so a Claude key alone leaves it off and changes nothing else) every library's sheet has
+  *From your library*: the person's own waiting entries nearest the one they opened, each
+  opened rather than wanted; *Up next* may say "Close to what you scored 9: …"; and other
+  sources' found picks are listed in order of likeness. What is sent is each item's title,
+  creator, year, subjects or genres and description, never anything about the person
 - Mobile app (responsive web is enough)
 
 ---
@@ -836,7 +842,9 @@ way with *+N* progress, *Finished* (the finish sheet) and *Set aside* (back to t
 planned status); *Up next* holds the pile ranked by what the person is most likely to want next
 (Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
 under way or finished, a creator or a subject they score above their own average, how long it
-has waited, a library short of its goal, and pushed down for a while when set aside — each pick
+has waited, a library short of its goal, and pushed down for a while when set aside; with
+embeddings configured (Sprint 136), also what stands closest to what they scored highest, from
+vectors already stored — each pick
 with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you gave book 1
 a 9"), and *Start* (or *Finished* where a domain has no under-way status); a goal's picks in the
 Diary are the same ranking within that library; *Year* draws twelve months of covers, as large as the height its row gives it allows, and,
