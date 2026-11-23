@@ -112,6 +112,30 @@ test("the segment chooses the model, which shows only what was found", async ({
   ).toEqual([]);
 });
 
+test("From your library lists your own waiting entries to open", async ({
+  page,
+}) => {
+  const state = await stubSuggestions(page, { library: true });
+  await page.goto("/books/7");
+  await page.getByRole("button", { name: "More like Seven Samurai" }).click();
+  const sheet = page.getByRole("dialog", { name: "More like Seven Samurai" });
+  await sheet.getByRole("radio", { name: "From your library" }).click();
+  const list = sheet.getByRole("list", { name: "Suggestions" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(sheet.getByText("2 on your list, nearest first")).toBeVisible();
+  await expect(sheet.getByText(/Gemini · gemini-embedding-001/)).toBeVisible();
+  await expect(list.getByText("On your list", { exact: true })).toHaveCount(2);
+  await expect(list.getByRole("button", { name: /^Want/ })).toHaveCount(0);
+  await expect(list.getByRole("button", { name: /^Seen/ })).toHaveCount(0);
+  await expect(sheet.getByText(ATTRIBUTION)).toHaveCount(0);
+  expect(state.requests).toContain(
+    "POST /api/entries/7/more-like-this?source=library",
+  );
+  await list.getByRole("link", { name: "Open Ran (1985)" }).click();
+  await expect(page).toHaveURL(/\/books\/41$/);
+  await expect(sheet).toHaveCount(0);
+});
+
 test("without a model key, the Model segment says how and asks nothing", async ({
   page,
 }) => {

@@ -45,9 +45,25 @@ export const MODEL_SOURCE = {
   },
 };
 
+/** *From your library* (Sprint 136): your own waiting entries, by embeddings. */
+export const LIBRARY_SOURCE = {
+  name: "library",
+  label: "From your library",
+  configured: true,
+  hint: null,
+  from_library: true,
+  about: {
+    provider: "gemini",
+    provider_label: "Gemini",
+    model: "gemini-embedding-001",
+    sends:
+      "Each item's title, creator, year, subjects or genres and description; nothing about you, your scores or your notes.",
+  },
+};
+
 export function movieType(
   configured: boolean,
-  { model }: { model?: boolean } = {},
+  { model, library }: { model?: boolean; library?: boolean } = {},
 ) {
   return {
     id: "movie",
@@ -83,6 +99,7 @@ export function movieType(
                   : "The model source is not configured. Set AKASHA_RECS_MODEL_KEY (or ANTHROPIC_API_KEY for the default provider, Claude) in the server's environment and restart.",
               },
             ]),
+        ...(library ? [LIBRARY_SOURCE] : []),
       ],
       attribution: { fake: ATTRIBUTION },
     },
@@ -229,9 +246,47 @@ function modelRound() {
   };
 }
 
+/** A library round (Sprint 136): two of your own waiting films, nearest first. */
+function libraryRound() {
+  const rows: Array<[number, string, number, number]> = [
+    [301, "Ran", 1985, 41],
+    [302, "Throne of Blood", 1957, 42],
+  ];
+  return {
+    id: 9,
+    item_type: "movie",
+    seed_entry_id: 7,
+    source: "library",
+    status: "done",
+    error: null,
+    created_at: "2026-11-23T10:00:00Z",
+    finished_at: "2026-11-23T10:00:00Z",
+    suggestions: rows.map(([id, title, year, entryId]) => ({
+      ...suggestion(0, true),
+      id,
+      round_id: 9,
+      source: "library",
+      title,
+      year,
+      external_ids: {},
+      reason: {
+        signal: "library",
+        text: "Close to Seven Samurai; on your list since Mar 2024",
+      },
+      item_id: id,
+      entry_id: entryId,
+      cover_url: pixelCover,
+    })),
+  };
+}
+
 export async function stubSuggestions(
   page: Page,
-  { configured = true, model }: { configured?: boolean; model?: boolean } = {},
+  {
+    configured = true,
+    model,
+    library,
+  }: { configured?: boolean; model?: boolean; library?: boolean } = {},
 ): Promise<SuggestState> {
   const state: SuggestState = {
     requests: [],
@@ -245,7 +300,7 @@ export async function stubSuggestions(
       state.requests.push(`${request.method()} ${url.pathname}${url.search}`);
   });
   await page.route("**/api/item-types", (route) =>
-    route.fulfill({ json: [movieType(configured, { model })] }),
+    route.fulfill({ json: [movieType(configured, { model, library })] }),
   );
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: film }),
@@ -260,11 +315,16 @@ export async function stubSuggestions(
   await page.route("**/api/entries/7/more-like-this*", (route) => {
     if (route.request().url().includes("source=model"))
       return route.fulfill({ status: 202, json: modelRound() });
+    if (route.request().url().includes("source=library"))
+      return route.fulfill({ status: 202, json: libraryRound() });
     if (state.phase === "idle") state.phase = "queued";
     return route.fulfill({ status: 202, json: round(state) });
   });
   await page.route("**/api/suggestion-rounds/8", (route) =>
     route.fulfill({ json: modelRound() }),
+  );
+  await page.route("**/api/suggestion-rounds/9", (route) =>
+    route.fulfill({ json: libraryRound() }),
   );
   await page.route("**/api/suggestion-rounds/7", (route) =>
     route.fulfill({ json: round(state) }),
