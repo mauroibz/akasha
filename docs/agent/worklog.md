@@ -7311,3 +7311,21 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   `e2e/home.spec.ts`); the command that ran it piped its output, which hid the exit status.
   Fixed in the commit after the close, and `make check` rerun green. Run `make check` on its
   own line.
+
+## 2026-11-23 — Release v4.0.0
+
+- Done: on the owner's word ("ship it, release it and update my zima install"), with the
+  default layout kept (On now, then Lately, at the top). Version surfaces to 4.0.0, release
+  notes, PR #43 merged (`21602cb`), tag `v4.0.0`, image published by `release.yml`. CI green on
+  the first run (audit, checks, container, e2e).
+- Gates on the release tree: `make check`; `make test` (backend 2,231, Vitest 766); every
+  Playwright project 249 passed, 2 skipped by design; `make audit`; `make build`;
+  `make smoke-container`.
+- Not done: **the board is still on 3.1.0.** This machine's SSH key is refused at
+  192.168.100.240 for `ibz`, and the session was not allowed to try other accounts. No
+  rehearsal on a copy of the board's library either, for the same reason; a copy of the
+  development library migrated 0038 to 0040 with counts unchanged. The upgrade writes its own
+  pre-migration backup.
+- Next: the board, once the owner gives access or runs it: back up `.env` and
+  `compose.generated.yaml` as `*.bak-3.1.0`, a fresh nightly, `git checkout v4.0.0`,
+  `AKASHA_VERSION=4.0.0`, render, pull, up; then check revision 0040, counts, integrity.

@@ -2,12 +2,11 @@
 
 ## Where the project stands
 
-**2026-11-23, the 4.0 line is built and not released.** Sprints 139–150 (DEC-193, amended by
-DEC-194, and DEC-195 from the owner's first look: a goal's medium, a search in the day's
-question, *Arrange* redrawn as *Personalize* with *On now* and *Lately* movable; the design is `docs/library-first-proposal.md` with its mockup) are complete on branch
-`library-first-4.0`, all commits local, nothing pushed. The project state is `complete`. The
-running board is still 3.1.0. **Do not tag, push or deploy without asking:** the owner asked
-for the build; the standing permission to release applied to the 3.0 line only.
+**2026-11-23, 4.0.0 is released; the board is still on 3.1.0.** Sprints 139–150 (DEC-193,
+DEC-194, DEC-195) merged as #43 (`21602cb`), tagged `v4.0.0`, image published. Release notes:
+`docs/operations/release-notes-v4.0.md`. **The one thing left is the board upgrade**: the owner
+asked for it, and this machine's SSH key is refused at 192.168.100.240. See the last worklog
+entry for the steps. The project state is `complete`.
 
 What the line changed, in one paragraph: the Library is at `/` with a front above its grid
 (the greeting, *On now*, *Lately*, showcases arranged in place); the navigation is *Library*
@@ -24,11 +23,6 @@ every Playwright project 249 passed, 2 skipped by design; `make audit` clean. Af
 test files around the change 196 passed; the full backend run was not repeated. Not run:
 `make smoke-container`, and an upgrade of a copy of the board's library (a copy of the
 development library was migrated 0038 → 0040 with counts unchanged).
-
-**For a release, still to do:** move the version surfaces from 3.1.0, write
-`docs/operations/release-notes-v4.0.md` (addresses that redirect: `/library`, `/shelves`,
-`/insights`, `/diary`), `make smoke-container`, rehearse the upgrade on a copy of the board's
-library, then the PR, the tag and the board, each on the owner's word.
 
 **For the owner to settle:** the presets' names and number; DEC-194 (a shelf's page stays
 covers to look at and links into the Library; `/pile` and `/lent` keep their pages; *Pin to
