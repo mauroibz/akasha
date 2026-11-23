@@ -1,7 +1,7 @@
 # Sprint 148 — Themes
 
 **Sprint:** 148
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 56
 **Depends on:** 147
 **Owner:** Mauro
@@ -55,4 +55,43 @@ Free colour pickers. Per-medium themes.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commit: `HASH`. This closes the 4.0 line.
+
+- **Presets.** *Moss*, *Claret*, *Dusk* (dark) and *Sakura* (light) as complete token sets in
+  `index.css`. The dark ones carry *Ink*'s score ramp and *Sakura* carries *Paper*'s.
+- **The picker.** `features/theme/ThemePicker.tsx`: swatches for *Match my device*, the two
+  themes and the four presets, in Settings and (compact) while arranging the Library. A choice
+  applies at once; `public/theme-init.js` knows the six names, so a preset is on the page
+  before it paints.
+- **What does not follow.** The score ramp and the mark's dot.
+
+Acceptance: 1 and 3 by `lib/contrast.test.ts` (24 pairs for each of six themes, 144 checks);
+2 by `lib/theme.test.ts` and `e2e/themes.spec.ts` (the theme at parse time, and a reload);
+4 by `e2e/themes.spec.ts` (axe on the Library and the Journal in each preset).
+
+Verification, this sprint: Vitest 760 passed; `e2e/themes.spec.ts` 5 passed; the Library in
+each preset and Settings in *Dusk* looked at in the running app at 1440 and 390 px.
+
+**The line's gates**, run on this tree because it is the last sprint: `make check`;
+`make test`, backend 2,229 passed and Vitest 760 passed; every Playwright project (chromium,
+heavy-library, production-bundle) 249 passed and 2 skipped by design; `make audit` clean.
+`make smoke-container` was NOT RUN: it builds and runs the image, which is a release step and
+no release was asked for.
+
+Three defects the full suites found, fixed here, each one something a per-sprint run had not
+covered:
+
+- Migration 0040 froze the three ways a day is lit in a `CHECK` constraint; the project's
+  rule is that the schema never freezes an application vocabulary
+  (`test_migrations.py`). The constraint is removed and the words are checked where they are
+  written. The migration had not been released.
+- `test_tmdb_recommendations.py` read *More like this* from `/api/home` by default; since
+  Sprint 141 it is a showcase the person places. The test places it.
+- The production-bundle spec clicked the navigation's *Add* link, gone since Sprint 140. It
+  opens the Journal, also a lazily loaded route.
+
+Deviations: none in what was built. The presets' names and number are as the mockup drew
+them; they are the owner's to change.
+
+Impact on later sprints: none planned. The version surfaces still read 3.1.0: moving them
+and writing release notes belong to the release.

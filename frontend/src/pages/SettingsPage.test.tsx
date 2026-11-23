@@ -36,6 +36,14 @@ describe("SettingsPage", () => {
     await userEvent.click(screen.getByRole("radio", { name: /^paper/i }));
     expect(document.documentElement.dataset.theme).toBe("paper");
     expect(localStorage.getItem("akasha:theme")).toBe("paper");
+    // The presets (Sprint 148): six themes and the device's own choice.
+    expect(
+      screen.getAllByRole("radio", { name: /./ }).length,
+    ).toBeGreaterThanOrEqual(7);
+    await userEvent.click(screen.getByRole("radio", { name: /^moss/i }));
+    expect(screen.getByRole("radio", { name: /^moss/i })).toBeChecked();
+    expect(document.documentElement.dataset.theme).toBe("moss");
+    expect(localStorage.getItem("akasha:theme")).toBe("moss");
   });
 
   it("says which suggestion sources are on, and what the model is sent", async () => {

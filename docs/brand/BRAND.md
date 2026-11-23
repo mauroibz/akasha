@@ -48,7 +48,10 @@ its neighbours.
 
 ## Colour
 
-Two themes since Sprint 090 (DEC-165): *Ink* and *Paper*. The arch takes the theme's
+Two themes since Sprint 090 (DEC-165), *Ink* and *Paper*, and four presets since Sprint 148
+(DEC-193): *Moss*, *Claret* and *Dusk* (dark) and *Sakura* (light). A preset changes the
+surfaces and the one accent; the score ramp and the dot below do not follow it. The table shows
+the two original themes; in a preset the arch still takes the text colour. The arch takes the theme's
 text colour; the dot is amber in both.
 
 | Element | Ink | Paper |

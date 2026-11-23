@@ -19,6 +19,7 @@ from sqlalchemy.engine import Engine
 from book_tracker.application.library import LibraryError, LibraryService
 
 Source = Literal["progress", "finish", "tap"]
+SOURCES: tuple[Source, ...] = ("progress", "finish", "tap")
 #: The longest reading: a month drawn with the weeks it starts and ends in.
 MAX_SPAN = 62
 
@@ -81,6 +82,8 @@ class LitDayService:
 
     def record(self, entry_id: int, day: date, source: Source) -> None:
         """Light `day` for an entry; a day it already lights is left as it was."""
+        if source not in SOURCES:
+            raise ValueError(f"not a way a day is lit: {source!r}")
         with self.engine.begin() as connection:
             connection.execute(
                 text(

@@ -2,8 +2,9 @@
 
 The Journal's *Every day* widget draws a light per day. Progress marks say which
 episode or chapter is done, not on which day, so the day is recorded here: once per
-person, day and entry, with how it came to be lit (`progress`, `finish`, or a `tap` by
-hand). A day lit by hand for nothing in particular has no entry, once per person and
+person, day and entry, with how it came to be lit (`progress`, `finish`, or a `tap`
+by hand; the application's words, checked where they are written and not frozen
+here). A day lit by hand for nothing in particular has no entry, once per person and
 day.
 
 Days before this migration are lit from the dates the library already holds: the day
@@ -43,7 +44,6 @@ def upgrade() -> None:
         ),
         sa.Column("source", sa.Text(), nullable=False),
         sa.Column("created_at", sa.Text(), nullable=False),
-        sa.CheckConstraint("source IN ('progress', 'finish', 'tap')", name="ck_lit_days_source"),
     )
     op.create_index(
         "uq_lit_days_entry",

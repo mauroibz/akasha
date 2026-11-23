@@ -1193,7 +1193,11 @@ Design tokens:
 - these are declared once as Tailwind theme tokens and CSS variables. Inline colour literals in components are a defect;
 - no generic border-shadow card grid;
 - visible focus rings and touch targets at least 44 px where practical;
-- all motion disabled/reduced under `prefers-reduced-motion`.
+- all motion disabled/reduced under `prefers-reduced-motion`;
+- six themes (Sprint 148): each a full token set under `[data-theme="…"]` in `index.css`, listed
+  once in `lib/theme.ts` (`THEMES`) and once in `public/theme-init.js`, which runs before first
+  paint; `lib/theme.test.ts` holds the three to one list and `lib/contrast.test.ts` holds every
+  set to AA.
 
 One frame (Sprint 139, DEC-193), each written once and held by `src/test/frame.test.ts`:
 

@@ -13,6 +13,7 @@ import {
 } from "@/api/home";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { YourMedia } from "@/features/media/YourMedia";
+import { ThemePicker } from "@/features/theme/ThemePicker";
 import { queryKeys } from "@/api/keys";
 import { cn } from "@/lib/utils";
 
@@ -241,6 +242,13 @@ export function LibraryFront() {
       )}
       {/* The same moment decides which media there are and in what order. */}
       {arranging && <YourMedia />}
+      {/* And how the room looks (Sprint 148). */}
+      {arranging && (
+        <section aria-label="Theme">
+          <h3 className="font-display text-lg font-medium">Theme</h3>
+          <ThemePicker compact className="mt-3" />
+        </section>
+      )}
       {/* What follows is the whole library: said once, so the showcases above do
           not read as its first rows. */}
       <h2 className="pt-2 font-display text-xl font-medium">Everything</h2>

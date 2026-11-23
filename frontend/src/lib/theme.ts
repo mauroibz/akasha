@@ -1,25 +1,83 @@
 /**
- * The reader's theme (Sprint 090): *Ink*, *Paper*, or whatever the device prefers.
+ * The reader's theme (Sprint 090): *Ink*, *Paper*, or whatever the device prefers;
+ * since Sprint 148 (DEC-193) also one of four presets.
  *
  * Kept per browser rather than on the account: a phone in a bright kitchen and a
- * laptop at night want different things. index.html runs the same resolution inline
- * before first paint; this module keeps the page in step afterwards.
+ * laptop at night want different things. `public/theme-init.js` runs the same
+ * resolution before first paint; this module keeps the page in step afterwards, and
+ * a test holds the two to the same list.
  */
-export type ThemeChoice = "system" | "paper" | "ink";
-export type Theme = "paper" | "ink";
+export const THEMES = [
+  {
+    id: "paper",
+    label: "Paper",
+    hint: "Warm, like a page",
+    page: "#f4f0e6",
+    card: "#d8cdb6",
+    accent: "#e9a23b",
+  },
+  {
+    id: "ink",
+    label: "Ink",
+    hint: "Dark, and warm",
+    page: "#0d0c0a",
+    card: "#2c2820",
+    accent: "#fbbf24",
+  },
+  {
+    id: "moss",
+    label: "Moss",
+    hint: "Dark, and green",
+    page: "#0e130f",
+    card: "#263328",
+    accent: "#9ccc65",
+  },
+  {
+    id: "claret",
+    label: "Claret",
+    hint: "Dark, like wine",
+    page: "#140c0e",
+    card: "#372226",
+    accent: "#e0736f",
+  },
+  {
+    id: "dusk",
+    label: "Dusk",
+    hint: "Dark, and blue",
+    page: "#0d0f18",
+    card: "#282e48",
+    accent: "#8fa4ff",
+  },
+  {
+    id: "sakura",
+    label: "Sakura",
+    hint: "Light, and pink",
+    page: "#f7eef0",
+    card: "#e6d2d7",
+    accent: "#e58aa5",
+  },
+] as const;
+
+export type Theme = (typeof THEMES)[number]["id"];
+export type ThemeChoice = "system" | Theme;
 
 export const THEME_KEY = "akasha:theme";
 const LIGHT_QUERY = "(prefers-color-scheme: light)";
 
+function isTheme(value: string | null): value is Theme {
+  return THEMES.some((theme) => theme.id === value);
+}
+
 export function readThemeChoice(): ThemeChoice {
   try {
     const value = localStorage.getItem(THEME_KEY);
-    return value === "paper" || value === "ink" ? value : "system";
+    return isTheme(value) ? value : "system";
   } catch {
     return "system";
   }
 }
 
+/** The device decides between *Paper* and *Ink* only; a preset is always a choice. */
 export function resolveTheme(choice: ThemeChoice): Theme {
   if (choice !== "system") return choice;
   return window.matchMedia?.(LIGHT_QUERY).matches ? "paper" : "ink";
@@ -28,9 +86,10 @@ export function resolveTheme(choice: ThemeChoice): Theme {
 export function applyTheme(choice: ThemeChoice): void {
   const theme = resolveTheme(choice);
   document.documentElement.dataset.theme = theme;
+  const page = THEMES.find((row) => row.id === theme)?.page ?? "#0d0c0a";
   document
     .querySelector('meta[name="theme-color"]')
-    ?.setAttribute("content", theme === "paper" ? "#f4f0e6" : "#0d0c0a");
+    ?.setAttribute("content", page);
 }
 
 export function saveThemeChoice(choice: ThemeChoice): void {

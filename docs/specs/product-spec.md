@@ -846,6 +846,14 @@ last resorts, *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`); 
 navigation item. What an import left to sort is a link in the shell, "N to sort", absent at
 zero.
 
+**Themes** (Sprint 090, DEC-165; presets since Sprint 148, DEC-193). *Paper* and *Ink*, chosen
+or following the device, and four presets: *Moss*, *Claret*, *Dusk* (dark) and *Sakura*
+(light). Each is a complete set of tokens held to WCAG AA by a test. A preset changes the
+surfaces and the accent; the score colours keep their meaning and the mark's dot stays amber.
+The choice is made from swatches in Settings and while arranging the Library, applies at
+once, is kept in the browser, and is on the page before it paints. There is no free colour
+picker: a colour nobody checked cannot be held to contrast.
+
 **Your media** (Sprint 143, DEC-193). Each person has their own ordered list of media, each
 *Front*, *Kept* or *Off*. The order is the order of every chooser: the Library's strip, the
 bar's web search, Insights, tiers, the rank list, shelves. *Front* media feed the front of the
