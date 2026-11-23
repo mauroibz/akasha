@@ -195,7 +195,7 @@ export function CommandBar({
         label: "Go to Library",
         words: "library books",
         icon: <LibraryBig />,
-        run: () => go("/library"),
+        run: () => go("/"),
       },
       {
         id: "home",
@@ -316,7 +316,7 @@ export function CommandBar({
     label: `Go to ${view.name}`,
     words: `saved view filter ${view.query}`,
     icon: <Bookmark />,
-    run: () => go(`/library?${view.query}`),
+    run: () => go(`/?${view.query}`),
   }));
   const allActions = [actions[0], ...viewActions, ...actions.slice(1)];
   const words = query.trim().toLowerCase();

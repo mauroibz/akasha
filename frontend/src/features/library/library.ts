@@ -113,34 +113,6 @@ export function writePinnedShelf(shelf: PinnedShelf | null): void {
   else localStorage.removeItem(pinnedShelfKey);
 }
 
-/**
- * The query parameters the library reads (`LibraryPage`'s `filtersFromParams`).
- * A `/` address carrying any of them was a library link before Sprint 130 moved
- * the library to `/library`, so it is sent there with them (DEC-183).
- */
-export const libraryQueryKeys = [
-  "type",
-  "status",
-  "shelf",
-  "format",
-  "q",
-  "sort",
-  "order",
-  "key",
-  "value",
-  "label",
-  "location",
-  "lent",
-  "unscored",
-] as const;
-
-/** `/library` with whatever library parameters `search` carries, or `null`. */
-export function libraryRedirect(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const carries = libraryQueryKeys.some((key) => params.has(key));
-  return carries ? `/library?${params.toString()}` : null;
-}
-
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],
   shelves: [],

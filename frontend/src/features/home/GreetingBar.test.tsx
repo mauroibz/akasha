@@ -9,7 +9,7 @@ describe("GreetingBar", () => {
     renderWithRouter(
       <GreetingBar greeting={fullHome().greeting} types={types} />,
     );
-    const heading = screen.getByRole("heading", { level: 1 });
+    const heading = screen.getByRole("heading", { level: 2 });
     expect(heading).toHaveTextContent(
       "Sunday. Day 32 of Designing Data-Intensive Applications.",
     );
@@ -26,7 +26,7 @@ describe("GreetingBar", () => {
     const greeting = fullHome().greeting;
     greeting.active = { entry: greeting.active!.entry, day: null };
     renderWithRouter(<GreetingBar greeting={greeting} types={types} />);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Sunday. Designing Data-Intensive Applications.",
     );
     expect(screen.queryByText(/Day \d+/)).toBeNull();
@@ -36,7 +36,7 @@ describe("GreetingBar", () => {
     renderWithRouter(
       <GreetingBar greeting={emptyHome().greeting} types={types} />,
     );
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
       "Sunday, 22 November.",
     );
   });

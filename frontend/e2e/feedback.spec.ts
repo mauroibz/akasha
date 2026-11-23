@@ -116,7 +116,7 @@ for (const size of widths) {
       await page.goto("/add");
       await page.getByLabel(/^title$/i).fill("Rayuela");
       await page.getByRole("button", { name: /add to library/i }).click();
-      await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
       await expectVisibleToast(page, "Book added");
     });
 
@@ -161,7 +161,7 @@ for (const size of widths) {
         .getByRole("alertdialog", { name: /remove this/i })
         .getByRole("button", { name: /delete entry/i })
         .click();
-      await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
       await expectVisibleToast(page, "Removed from your library");
     });
 

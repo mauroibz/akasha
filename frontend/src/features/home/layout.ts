@@ -1,22 +1,14 @@
 import type { ModuleLayout, ModuleSize } from "@/api/home";
 
 /**
- * Home's modules and how they share a row (Sprints 130-131, DEC-183). The layout
- * itself (order, size, hidden) is stored per person on the server; these are the
- * keys it names, what each is called in *Edit home*, and how sizes become columns.
+ * The Library's showcases and how they share a row (Sprints 130-131, DEC-183; on the
+ * Library since Sprint 141, DEC-193). The layout itself (order, size, hidden) is
+ * stored per person on the server; these are the keys it names, what each is called
+ * when arranging, and how sizes become columns. What the Library's bands and tabs
+ * say is not a showcase: what is under way, what happened lately, the libraries,
+ * the shelves' names, the small jobs and the loans were modules of Home.
  */
-export const MODULES = [
-  "now",
-  "next",
-  "year",
-  "lately",
-  "libraries",
-  "tidy",
-  "question",
-  "shelves",
-  "lent",
-  "suggested",
-] as const;
+export const MODULES = ["next", "question", "suggested"] as const;
 
 export type ModuleKey = (typeof MODULES)[number];
 
@@ -50,36 +42,19 @@ export function labelOf(row: {
 }
 
 export const moduleLabels: Record<ModuleKey, string> = {
-  now: "On now",
   next: "Up next",
-  year: "The year",
-  lately: "Lately",
-  libraries: "Library tiles",
-  tidy: "Tidy up",
   question: "One question",
-  shelves: "Shelves",
-  lent: "Lent out",
   suggested: "More like this",
 };
-
-/** Modules that always take the whole row; their size only changes how much they show. */
-export const fullWidth: ReadonlySet<ModuleKey> = new Set(["libraries"]);
 
 /**
  * The server's default, used only until the stored layout arrives or when it cannot
  * be read: `GET /api/home/layout` is the source of truth and carries its own.
  */
 export const fallbackLayout: ModuleLayout[] = [
-  { module: "now", size: "M", hidden: false },
   { module: "next", size: "L", hidden: false },
-  { module: "year", size: "L", hidden: false },
-  { module: "lately", size: "M", hidden: false },
-  { module: "libraries", size: "L", hidden: false },
-  { module: "tidy", size: "S", hidden: false },
-  { module: "question", size: "S", hidden: false },
-  { module: "shelves", size: "S", hidden: false },
-  { module: "lent", size: "S", hidden: false },
-  { module: "suggested", size: "M", hidden: false },
+  { module: "question", size: "S", hidden: true },
+  { module: "suggested", size: "M", hidden: true },
 ];
 
 /** Columns of twelve a size asks for on a wide screen (the proposal's S 3, M 5, L 7). */
@@ -110,7 +85,7 @@ export function packRows<K extends string>(
     used = 0;
   };
   for (const { key, size } of modules) {
-    const span = isModuleKey(key) && fullWidth.has(key) ? 12 : sizeSpan[size];
+    const span = sizeSpan[size];
     if (used + span > 12) close();
     row.push({ key, size, span });
     used += span;

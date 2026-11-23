@@ -57,8 +57,11 @@ def _keys() -> list[str]:
 
 def test_the_default_names_every_module_once() -> None:
     assert [row["module"] for row in DEFAULT_LAYOUT] == list(MODULES)
-    assert set(MODULES) >= {"now", "next", "year", "libraries", "lately", "tidy"}
-    assert all(row["size"] in {"S", "M", "L"} and row["hidden"] is False for row in DEFAULT_LAYOUT)
+    # Sprint 141 (DEC-193): what the Library's bands and tabs now say is no longer a
+    # module, and only Up next is shown until the person places more.
+    assert list(MODULES) == ["next", "question", "suggested"]
+    assert all(row["size"] in {"S", "M", "L"} for row in DEFAULT_LAYOUT)
+    assert [row["module"] for row in DEFAULT_LAYOUT if not row["hidden"]] == ["next"]
 
 
 @pytest.mark.anyio
@@ -87,22 +90,30 @@ async def test_a_layout_naming_only_some_modules_gets_the_rest_appended(tmp_path
     async with _client(tmp_path) as (_app, client):
         await client.put(
             "/api/home/layout",
-            json={"modules": [{"module": "year", "size": "S", "hidden": False}]},
+            json={"modules": [{"module": "question", "size": "L", "hidden": False}]},
         )
         modules = (await client.get("/api/home/layout")).json()["modules"]
-    assert modules[0] == {"module": "year", "size": "S", "hidden": False, "label": None}
-    assert [row["module"] for row in modules[1:]] == [m for m in _keys() if m != "year"]
+    assert modules[0] == {"module": "question", "size": "L", "hidden": False, "label": None}
+    assert [row["module"] for row in modules[1:]] == [m for m in _keys() if m != "question"]
 
 
 @pytest.mark.anyio
 async def test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads(
     tmp_path: Path,
 ) -> None:
+    # A layout as 3.1 stored it: every module the Library's bands replaced (Sprint 141).
     stored = [
-        {"module": "retired", "size": "L", "hidden": False},
+        {"module": "now", "size": "M", "hidden": False},
         {"module": "lately", "size": "S", "hidden": True},
+        {"module": "retired", "size": "L", "hidden": False},
         "not even an object",
-        {"module": "now", "size": "XL", "hidden": False},
+        {"module": "suggested", "size": "S", "hidden": False},
+        {"module": "libraries", "size": "L", "hidden": False},
+        {"module": "year", "size": "L", "hidden": False},
+        {"module": "tidy", "size": "S", "hidden": False},
+        {"module": "shelves", "size": "S", "hidden": False},
+        {"module": "lent", "size": "S", "hidden": False},
+        {"module": "next", "size": "XL", "hidden": False},
     ]
     async with _client(tmp_path) as (app, client):
         with app.state.engine.begin() as connection:
@@ -116,14 +127,15 @@ async def test_a_stored_layout_naming_a_module_that_no_longer_exists_still_loads
         layout = (await client.get("/api/home/layout")).json()["modules"]
         home = await client.get("/api/home")
     assert home.status_code == 200, home.text
-    assert layout[0] == {"module": "lately", "size": "S", "hidden": True, "label": None}
+    # What is still a module keeps its order, size and visibility.
+    assert layout[0] == {"module": "suggested", "size": "S", "hidden": False, "label": None}
     # An unknown size falls back to the module's default rather than failing the read.
-    now_default = next(row for row in DEFAULT_LAYOUT if row["module"] == "now")
-    assert layout[1] == {**now_default, "label": None}
+    next_default = next(row for row in DEFAULT_LAYOUT if row["module"] == "next")
+    assert layout[1] == {**next_default, "label": None}
     assert [row["module"] for row in layout] == [
-        "lately",
-        "now",
-        *[m for m in _keys() if m not in {"lately", "now"}],
+        "suggested",
+        "next",
+        *[m for m in _keys() if m not in {"suggested", "next"}],
     ]
 
 
@@ -166,22 +178,14 @@ async def test_a_write_naming_what_is_not_a_module_is_refused(
 
 @pytest.mark.anyio
 async def test_home_skips_a_hidden_module(tmp_path: Path) -> None:
-    hidden = [
-        {
-            **row,
-            "hidden": row["module"] in {"year", "lately", "tidy", "next", "libraries", "suggested"},
-        }
-        for row in _defaults()
-    ]
+    hidden = [{**row, "hidden": row["module"] in {"next", "suggested"}} for row in _defaults()]
     async with _client(tmp_path) as (_app, client):
         await client.put("/api/home/layout", json={"modules": hidden})
         body = (await client.get("/api/home")).json()
-    assert body["year"] is None
-    assert body["lately"] is None
-    assert body["tidy"] is None
     assert body["next"] == []
-    assert body["domains"] == []
     assert body["suggested"] is None
+    # The bands are not modules: they are read whatever the layout says (Sprint 141).
+    assert body["now"] == [] and body["lately"] == []
 
 
 def _shelf(app: Any, name: str, user: int = 1) -> int:
@@ -219,9 +223,9 @@ async def test_each_library_has_a_year_and_each_shelf_a_hidden_module(tmp_path: 
         "label": "Shelf: Favorites",
     }
     assert layout["defaults"] == layout["modules"]
-    # The libraries' years follow Lately, so the year and Lately keep their row.
+    # The libraries' years follow Up next.
     keys = [row["module"] for row in layout["modules"]]
-    assert keys.index("year:book") == keys.index("lately") + 1
+    assert keys.index("year:book") == keys.index("next") + 1
 
 
 @pytest.mark.anyio

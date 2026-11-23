@@ -46,18 +46,22 @@ describe("EditHome", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
     const user = userEvent.setup();
-    screen.getByRole("button", { name: "Move Lately" }).focus();
+    screen.getByRole("button", { name: "Move More like this" }).focus();
     await user.keyboard("{ArrowUp}");
-    expect(order().slice(0, 4)).toEqual(["now", "next", "lately", "year"]);
+    expect(order()).toEqual(["next", "suggested", "question"]);
     expect(onChange).toHaveBeenLastCalledWith(
-      expect.arrayContaining([expect.objectContaining({ module: "lately" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ module: "suggested" }),
+      ]),
     );
-    expect(screen.getByRole("button", { name: "Move Lately" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Move More like this" }),
+    ).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Lately moved to 3 of 10",
+      "More like this moved to 2 of 3",
     );
-    await user.keyboard("{ArrowDown}{ArrowDown}");
-    expect(order().slice(2, 5)).toEqual(["year", "libraries", "lately"]);
+    await user.keyboard("{ArrowUp}{ArrowDown}{ArrowDown}");
+    expect(order()).toEqual(["next", "question", "suggested"]);
   });
 
   it("moves twice for two presses before the stored layout comes back", async () => {
@@ -72,20 +76,20 @@ describe("EditHome", () => {
         onChange={onChange}
       />,
     );
-    screen.getByRole("button", { name: "Move Lately" }).focus();
+    screen.getByRole("button", { name: "Move More like this" }).focus();
     await userEvent.setup().keyboard("{ArrowUp}{ArrowUp}");
     const last = onChange.mock.lastCall![0] as ModuleLayout[];
-    expect(last.map((row) => row.module).slice(0, 3)).toEqual([
-      "now",
-      "lately",
+    expect(last.map((row) => row.module)).toEqual([
+      "suggested",
       "next",
+      "question",
     ]);
   });
 
   it("changes a module's size", async () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    const row = screen.getByRole("group", { name: "Size of Tidy up" });
+    const row = screen.getByRole("group", { name: "Size of One question" });
     await userEvent
       .setup()
       .click(within(row).getByRole("button", { name: "Large" }));
@@ -94,18 +98,18 @@ describe("EditHome", () => {
       "true",
     );
     const saved = onChange.mock.lastCall![0] as ModuleLayout[];
-    expect(saved.find((m) => m.module === "tidy")?.size).toBe("L");
+    expect(saved.find((m) => m.module === "question")?.size).toBe("L");
   });
 
   it("hides a module with its switch", async () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    const toggle = screen.getByRole("switch", { name: "Show Lent out" });
+    const toggle = screen.getByRole("switch", { name: "Show Up next" });
     expect(toggle).toHaveAttribute("aria-checked", "true");
     await userEvent.setup().click(toggle);
     expect(toggle).toHaveAttribute("aria-checked", "false");
     const saved = onChange.mock.lastCall![0] as ModuleLayout[];
-    expect(saved.find((m) => m.module === "lent")?.hidden).toBe(true);
+    expect(saved.find((m) => m.module === "next")?.hidden).toBe(true);
   });
 
   it("puts the default back with Reset", async () => {
@@ -162,17 +166,5 @@ describe("EditHome", () => {
     expect(
       screen.getByRole("group", { name: "Size of Shelf: Favorites" }),
     ).toBeVisible();
-  });
-
-  it("offers the library tiles no size: they take the whole row", () => {
-    render(<Harness onChange={vi.fn()} />);
-    expect(
-      screen.queryByRole("group", { name: "Size of Library tiles" }),
-    ).toBeNull();
-    expect(
-      within(screen.getByRole("list", { name: "Modules" }))
-        .getAllByRole("listitem")
-        .find((item) => item.getAttribute("data-module") === "libraries"),
-    ).toHaveTextContent("Full width");
   });
 });

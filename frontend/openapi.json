@@ -1929,67 +1929,6 @@
         "title": "HomeCover",
         "type": "object"
       },
-      "HomeDomainTile": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "covers": {
-            "items": {
-              "$ref": "#/components/schemas/HomeCover"
-            },
-            "title": "Covers",
-            "type": "array"
-          },
-          "item_type": {
-            "title": "Item Type",
-            "type": "string"
-          },
-          "mean_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mean Score"
-          },
-          "scores": {
-            "items": {
-              "type": "integer"
-            },
-            "maxItems": 10,
-            "minItems": 10,
-            "title": "Scores",
-            "type": "array"
-          },
-          "status_counts": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Status Counts",
-            "type": "object"
-          },
-          "without_cover": {
-            "title": "Without Cover",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "item_type",
-          "count",
-          "status_counts",
-          "scores",
-          "mean_score",
-          "covers",
-          "without_cover"
-        ],
-        "title": "HomeDomainTile",
-        "type": "object"
-      },
       "HomeGoalCount": {
         "properties": {
           "count": {
@@ -2153,27 +2092,6 @@
         "title": "HomeLayoutResponse",
         "type": "object"
       },
-      "HomeLent": {
-        "properties": {
-          "loans": {
-            "items": {
-              "$ref": "#/components/schemas/HomeLoan"
-            },
-            "title": "Loans",
-            "type": "array"
-          },
-          "total": {
-            "title": "Total",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "total",
-          "loans"
-        ],
-        "title": "HomeLent",
-        "type": "object"
-      },
       "HomeLibraryYear": {
         "description": "One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.",
         "properties": {
@@ -2217,33 +2135,6 @@
         "title": "HomeLibraryYear",
         "type": "object"
       },
-      "HomeLoan": {
-        "properties": {
-          "entry": {
-            "$ref": "#/components/schemas/EntryResponse"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "lent_on": {
-            "title": "Lent On",
-            "type": "string"
-          },
-          "person": {
-            "title": "Person",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "person",
-          "lent_on",
-          "entry"
-        ],
-        "title": "HomeLoan",
-        "type": "object"
-      },
       "HomeModuleLayout": {
         "properties": {
           "hidden": {
@@ -2283,40 +2174,6 @@
         "title": "HomeModuleLayout",
         "type": "object"
       },
-      "HomeMonth": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "counts": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Counts",
-            "type": "object"
-          },
-          "covers": {
-            "items": {
-              "$ref": "#/components/schemas/HomeCover"
-            },
-            "title": "Covers",
-            "type": "array"
-          },
-          "month": {
-            "title": "Month",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "month",
-          "count",
-          "counts",
-          "covers"
-        ],
-        "title": "HomeMonth",
-        "type": "object"
-      },
       "HomeQuestion": {
         "description": "One question from Play: an old score to look at again, else a gap to fill.",
         "properties": {
@@ -2352,41 +2209,17 @@
         "type": "object"
       },
       "HomeResponse": {
-        "description": "Every module's payload. A module the person hid is empty or `null`, unread.",
+        "description": "The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase\nthe person hid is empty or `null`, unread.",
         "properties": {
-          "domains": {
-            "items": {
-              "$ref": "#/components/schemas/HomeDomainTile"
-            },
-            "title": "Domains",
-            "type": "array"
-          },
           "greeting": {
             "$ref": "#/components/schemas/HomeGreeting"
           },
           "lately": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/HomeLatelyRow"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Lately"
-          },
-          "lent": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeLent"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "items": {
+              "$ref": "#/components/schemas/HomeLatelyRow"
+            },
+            "title": "Lately",
+            "type": "array"
           },
           "library_years": {
             "items": {
@@ -2426,20 +2259,6 @@
             "title": "Shelf Modules",
             "type": "array"
           },
-          "shelves": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/HomeShelf"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Shelves"
-          },
           "suggested": {
             "anyOf": [
               {
@@ -2453,72 +2272,19 @@
               }
             ],
             "title": "Suggested"
-          },
-          "tidy": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeTidy"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "year": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/HomeYear"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "required": [
           "greeting",
           "now",
           "next",
-          "year",
-          "domains",
           "lately",
-          "tidy",
           "question",
-          "shelves",
-          "lent",
           "suggested",
           "library_years",
           "shelf_modules"
         ],
         "title": "HomeResponse",
-        "type": "object"
-      },
-      "HomeShelf": {
-        "properties": {
-          "entry_count": {
-            "title": "Entry Count",
-            "type": "integer"
-          },
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "slug": {
-            "title": "Slug",
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "entry_count"
-        ],
-        "title": "HomeShelf",
         "type": "object"
       },
       "HomeShelfModule": {
@@ -2556,68 +2322,6 @@
           "covers"
         ],
         "title": "HomeShelfModule",
-        "type": "object"
-      },
-      "HomeTidy": {
-        "properties": {
-          "duplicates": {
-            "title": "Duplicates",
-            "type": "integer"
-          },
-          "unscored": {
-            "title": "Unscored",
-            "type": "integer"
-          },
-          "unscored_by_type": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "Unscored By Type",
-            "type": "object"
-          },
-          "without_cover": {
-            "title": "Without Cover",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "duplicates",
-          "without_cover",
-          "unscored",
-          "unscored_by_type"
-        ],
-        "title": "HomeTidy",
-        "type": "object"
-      },
-      "HomeYear": {
-        "properties": {
-          "goals": {
-            "items": {
-              "$ref": "#/components/schemas/HomeYearGoal"
-            },
-            "title": "Goals",
-            "type": "array"
-          },
-          "months": {
-            "items": {
-              "$ref": "#/components/schemas/HomeMonth"
-            },
-            "maxItems": 12,
-            "minItems": 12,
-            "title": "Months",
-            "type": "array"
-          },
-          "year": {
-            "title": "Year",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "year",
-          "months",
-          "goals"
-        ],
-        "title": "HomeYear",
         "type": "object"
       },
       "HomeYearGoal": {

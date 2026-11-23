@@ -18,7 +18,7 @@ import { navigateWithTransition } from "@/lib/viewTransition";
  */
 export function BackToLibrary({
   className,
-  to = "/library",
+  to = "/",
   label = "Library",
 }: {
   className?: string;

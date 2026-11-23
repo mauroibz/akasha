@@ -170,7 +170,7 @@ test("library to detail and back is possible without a pointer", async ({
     .first()
     .focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

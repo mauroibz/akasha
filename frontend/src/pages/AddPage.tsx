@@ -156,7 +156,7 @@ export function AddPage() {
               // state rather than sessionStorage so a reload does not resurrect a
               // stale highlight, and so the handoff is visible in the navigation
               // itself.
-              navigate("/library", { state: { newEntryId: entryId } });
+              navigate("/", { state: { newEntryId: entryId } });
             }}
             onOpenExisting={(entryId) => navigate(`/books/${entryId}`)}
           />

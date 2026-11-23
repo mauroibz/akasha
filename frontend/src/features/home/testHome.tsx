@@ -126,13 +126,6 @@ export function entry(
   } as unknown as LibraryEntry;
 }
 
-const months = Array.from({ length: 12 }, (_, index) => ({
-  month: index + 1,
-  count: 0,
-  counts: {},
-  covers: [] as NonNullable<Home["year"]>["months"][number]["covers"],
-}));
-
 export function emptyHome(): Home {
   return {
     greeting: {
@@ -144,22 +137,8 @@ export function emptyHome(): Home {
     },
     now: [],
     next: [],
-    year: {
-      year: 2026,
-      months: months.map((m) => ({ ...m, covers: [] })),
-      goals: [],
-    },
-    domains: [],
     lately: [],
-    tidy: {
-      duplicates: 0,
-      without_cover: 0,
-      unscored: 0,
-      unscored_by_type: {},
-    },
     question: null,
-    shelves: [],
-    lent: { total: 0, loans: [] },
   };
 }
 
@@ -208,77 +187,6 @@ export function fullHome(): Home {
       reasons: [{ signal: "waiting", text: "Waiting since Sep 2025" }],
     },
   ];
-  const year = home.year!;
-  year.months[7] = {
-    month: 8,
-    count: 1,
-    counts: { book: 1 },
-    covers: [
-      {
-        entry_id: 20,
-        item_id: 120,
-        item_type: "book",
-        title: "Slaughterhouse-Five",
-        cover_url: null,
-        score: 8,
-      },
-    ],
-  };
-  year.months[10] = {
-    month: 11,
-    count: 2,
-    counts: { book: 1, anime: 1 },
-    covers: [
-      {
-        entry_id: 21,
-        item_id: 121,
-        item_type: "book",
-        title: "Pálido fuego",
-        cover_url: null,
-        score: 7,
-      },
-      {
-        entry_id: 22,
-        item_id: 122,
-        item_type: "anime",
-        title: "Odd Taxi",
-        cover_url: null,
-        score: 9,
-      },
-    ],
-  };
-  year.goals = [
-    { item_type: "book", period: "month", count: 2, target: 24, done: 2 },
-  ];
-  home.domains = [
-    {
-      item_type: "book",
-      count: 105,
-      status_counts: { read: 57, reading: 1, to_read: 41, dropped: 6 },
-      scores: [0, 1, 1, 2, 6, 8, 5, 3, 1, 1],
-      mean_score: 6.1,
-      covers: [
-        {
-          entry_id: 30,
-          item_id: 130,
-          item_type: "book",
-          title: "La milla verde",
-          cover_url: null,
-          score: 10,
-        },
-      ],
-      without_cover: 11,
-    },
-    {
-      item_type: "album",
-      count: 148,
-      status_counts: { owned: 148 },
-      scores: [0, 0, 0, 0, 0, 2, 5, 10, 12, 6],
-      mean_score: 7.8,
-      covers: [],
-      without_cover: 21,
-    },
-  ];
   const finished = entry(40, "Pálido fuego", "book", {
     status: "read",
     score: 7,
@@ -309,37 +217,10 @@ export function fullHome(): Home {
       count: 3,
     },
   ];
-  home.tidy = {
-    duplicates: 12,
-    without_cover: 32,
-    unscored: 3,
-    unscored_by_type: { book: 3 },
-  };
   home.question = {
     kind: "revisit",
     entry: entry(43, "Pet Sematary", "book", { status: "read", score: 9 }),
     scored_at: "2019-03-02T00:00:00Z",
-  };
-  home.shelves = [
-    { id: 1, name: "novela", slug: "novela", entry_count: 11 },
-    { id: 2, name: "distopía", slug: "distopia", entry_count: 5 },
-  ];
-  home.lent = {
-    total: 2,
-    loans: [
-      {
-        id: 1,
-        person: "Ana",
-        lent_on: "2026-01-05",
-        entry: entry(44, "Rayuela", "book", { status: "read" }),
-      },
-      {
-        id: 2,
-        person: "Luis",
-        lent_on: "2026-06-10",
-        entry: entry(45, "Ficciones", "book", { status: "read" }),
-      },
-    ],
   };
   return home;
 }

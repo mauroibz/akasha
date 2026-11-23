@@ -833,42 +833,58 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — Home** (Sprints 130–132, DEC-183–186). The screen Akasha opens on: a 12-column grid of
-modules over one `GET /api/home` that reads stored data only. The greeting names the day, "Day
-N of" an entry under way (when it has a start date) and the library's totals; what it names and
-the goal beside it are always of one library — the first goal's library with something under
-way, else the entry touched last beside its own library's goal. *On now* holds what is under
-way with *+N* progress, *Finished* (the finish sheet) and *Set aside* (back to the domain's
-planned status); *Up next* holds the pile ranked by what the person is most likely to want next
-(Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
-under way or finished, a creator or a subject they score above their own average, how long it
-has waited, a library short of its goal, and pushed down for a while when set aside; with
-embeddings configured (Sprint 136), also what stands closest to what they scored highest, from
-vectors already stored — each pick
-with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you gave book 1
-a 9"), and *Start* (or *Finished* where a domain has no under-way status); a goal's picks in the
-Diary are the same ranking within that library; *Year* draws twelve months of covers, as large as the height its row gives it allows, and,
-from this month on, an empty slot for each thing the lead goal still needs, never marking a
-past month short; *Lately* lists finishes, score changes (a score kept reads "still a 9") and
-additions (a day's additions as one row, the day being the person's own), newest first; one tile per library opens
-`/library?type=…`; *Tidy up* counts duplicate pairs (the duplicates deck), entries without a
-cover (the covers deck) and finished entries with no score (the library filtered to them, one
-link per library); *One question* asks an old score again ("Still a 9" keeps it, *Change* opens
-the revisit deck) or else one gap of an entry, answered in place; *Shelves* shows the shelves
-in use with counts; *Lent out* shows open loans, longest out first. A module with nothing to
-show is hidden until it has something. *Edit home* lists the modules: drag a handle (or focus
-it and use the arrow keys) to reorder, S/M/L, a switch to hide, *Reset*; each change is stored
-per person on the server at once. On a wide screen sizes are column spans (S 3, M 5, L 7; the
-library tiles always take the row) and each row's spare columns are shared out so no row ends
-in a gap; below 720 px every module is full width in the same order and its size only changes
-how much it shows. An empty library sees a first-run message.
+**`/` — The library** (the home again since Sprint 141, DEC-193; `/library`, its address
+during Sprints 130–140 while a separate Home held `/`, redirects here with whatever filters it
+carried). The primary screen and the one to get right: the screen Akasha opens on, **the screen
+you search from and the screen you add from** (DEC-065, DEC-073).
 
-**`/library` — The library** (at `/` until Sprint 130; a `/` address carrying library
-parameters redirects here with them). The primary screen and the one to get right. Since Sprint 029 it is
-also **the screen you search from and the screen you add from** (DEC-065, DEC-073); adding
-something no provider lists is the only thing that still leaves it.
+**Navigation** (Sprints 140–141). The shell lists places only: *Library*, *Shelves*,
+*Insights*, *Diary*. Finding and adding is the bar: on the Library it is the Library's own
+field; on every other screen the shell draws it as a field that opens the command bar (⌘K), and
+on a phone it is the filled button in the middle of the tab bar. The bar's footer holds the two
+last resorts, *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`); neither is a
+navigation item. What an import left to sort is a link in the shell, "N to sort", absent at
+zero.
 
-- **One bar across the top: the domain selector, the search input, and *Add*.** One control
+**The front of the Library** (Sprint 141; Home's content from Sprints 130–138 without what
+repeated the Library). Above the grid, on the plain Library only (a search or a filter puts it
+away), over one `GET /api/home` that reads stored data only. The grid does not wait for it,
+and if it cannot be read it draws nothing. In order:
+
+- **The greeting** names the day, "Day N of" an entry under way (when it has a start date) and
+  the library's totals; what it names and the goal beside it are always of one library — the
+  first goal's library with something under way, else the entry touched last beside its own
+  library's goal.
+- **On now** holds what is under way, across media, with *+N* progress, *Mark as …* (the
+  finish sheet) and *Set aside* (back to the domain's planned status).
+- **Lately** is one row of covers, newest first: finishes with their score, score changes (a
+  score kept reads "Still") and additions (a day's additions as one cover, "Added +2", the day
+  being the person's own).
+- **The showcases** the person placed, in a 12-column grid: *Up next*, *One question*, *More
+  like this*, a year per library (`year:<item type>`) and any shelf (`shelf:<id>`). *Up next*
+  and the libraries' years are shown until the person changes that; the rest are hidden until
+  placed. *Up next* holds the pile ranked by what the person is most likely to want next
+  (Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
+  under way or finished, a creator or a subject they score above their own average, how long it
+  has waited, a library short of its goal, and pushed down for a while when set aside; with
+  embeddings configured (Sprint 136), also what stands closest to what they scored highest —
+  each pick with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you
+  gave book 1 a 9"), and *Start*. *One question* asks an old score again ("Still a 9" keeps it,
+  *Change* opens the revisit deck) or else one gap of an entry, answered in place. A showcase
+  with nothing to show is left out until it has something. *Edit home* lists them: drag a
+  handle (or focus it and use the arrow keys) to reorder, S/M/L, a switch to hide, *Reset*;
+  each change is stored per person on the server at once. Sizes are column spans (S 3, M 5,
+  L 7) and each row's spare columns are shared out so no row ends in a gap; below 720 px every
+  showcase is full width in the same order.
+- **Everything**: the grid below.
+
+What Home showed and the Library's front does not: the all-media year, the library tiles, the
+shelves' names, *Tidy up* and *Lent out*. The Library's tabs, the Shelves screen, the chores
+and the loans say them.
+
+**The grid and its bar.**
+
+- **One bar across the top: the domain selector and the search input.** One control
   picks two things at once — the rows you see *and* the providers a search would reach — so
   there is never a moment where the application has to ask which domain you meant. The input
   carries a clear control while it holds anything, and clearing empties the box, the query and

@@ -36,7 +36,7 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Home", "Library", "Shelves", "Insights", "Diary"]) {
+    for (const label of ["Library", "Shelves", "Insights", "Diary"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
         hidden: true,
@@ -57,12 +57,10 @@ describe("AppShell", () => {
         <Route path="/add" element={<div>Add page</div>} />
       </Routes>,
     );
-    // `/` is Home since Sprint 130; the library is `/library` and not current here.
-    const homeLinks = screen.getAllByRole("link", { name: /^home$/i });
-    expect(homeLinks.find((l) => l.hasAttribute("aria-current"))).toBeDefined();
-    for (const link of screen.getAllByRole("link", { name: /^library$/i })) {
-      expect(link.hasAttribute("aria-current")).toBe(false);
-    }
+    // The Library is at `/` again since Sprint 141 (DEC-193).
+    const links = screen.getAllByRole("link", { name: /^library$/i });
+    expect(links.find((l) => l.hasAttribute("aria-current"))).toBeDefined();
+    expect(screen.queryAllByRole("link", { name: /^home$/i })).toHaveLength(0);
   });
 
   it("puts the bar's button in the middle of the phone's places (Sprint 140)", () => {
@@ -78,13 +76,7 @@ describe("AppShell", () => {
     const labels = Array.from(phone.querySelectorAll("a, button")).map((el) =>
       el.getAttribute("aria-label"),
     );
-    expect(labels).toEqual([
-      "Home",
-      "Library",
-      "Search or add",
-      "Shelves",
-      "Insights",
-    ]);
+    expect(labels).toEqual(["Library", "Search or add", "Shelves", "Insights"]);
   });
 
   it("shows the bar as a field on every screen but the Library, which has its own (Sprint 140)", () => {
@@ -95,21 +87,21 @@ describe("AppShell", () => {
       });
     const { unmount } = renderShell(
       <Routes>
-        <Route path="/" element={<div>Home page</div>} />
+        <Route path="/" element={<div>Library page</div>} />
       </Routes>,
     );
-    expect(door()).toHaveLength(1);
+    expect(door()).toHaveLength(0);
     unmount();
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <MemoryRouter initialEntries={["/library"]}>
+        <MemoryRouter initialEntries={["/shelves"]}>
           <AppShell>
-            <div>Library page</div>
+            <div>Shelves page</div>
           </AppShell>
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(door()).toHaveLength(0);
+    expect(door()).toHaveLength(1);
   });
 
   it("says how many wait to be sorted, as a link to the Inbox, and nothing when none do (Sprint 140)", async () => {
@@ -208,7 +200,7 @@ describe("AppShell", () => {
             onSignedOut={vi.fn()}
           >
             <Routes>
-              <Route path="/library" element={<h1>Own library</h1>} />
+              <Route path="/" element={<h1>Own library</h1>} />
               <Route
                 path="/books/7"
                 element={<div role="dialog">Edit entry</div>}

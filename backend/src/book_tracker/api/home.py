@@ -72,42 +72,12 @@ class HomeCover(BaseModel):
     score: int | None
 
 
-class HomeMonth(BaseModel):
-    #: 1 for January.
-    month: int
-    #: Everything finished that month, per item type and in all.
-    count: int
-    counts: dict[str, int]
-    #: In the order finished; at most 24 even when `count` is more.
-    covers: list[HomeCover]
-
-
 class HomeYearGoal(BaseModel):
     item_type: str
     period: Literal["month", "year"]
     count: int
     target: int
     done: int
-
-
-class HomeYear(BaseModel):
-    year: int
-    months: list[HomeMonth] = Field(min_length=12, max_length=12)
-    goals: list[HomeYearGoal]
-
-
-class HomeDomainTile(BaseModel):
-    item_type: str
-    #: Entries in this library, the Inbox's unsorted ones aside.
-    count: int
-    #: Per status, in the domain's declared order.
-    status_counts: dict[str, int]
-    #: Index `i` counts the entries scored `i + 1`.
-    scores: list[int] = Field(min_length=10, max_length=10)
-    mean_score: float | None
-    #: Up to three, best scored first.
-    covers: list[HomeCover]
-    without_cover: int
 
 
 class HomeLatelyRow(BaseModel):
@@ -124,18 +94,6 @@ class HomeLatelyRow(BaseModel):
     count: int
 
 
-class HomeTidy(BaseModel):
-    #: Pairs that look like one work entered twice.
-    duplicates: int
-    #: Entries without a cover, the Inbox aside.
-    without_cover: int
-    #: Entries in a status their domain declares finished, with no score.
-    unscored: int
-    #: The same per library, in registry order, only those with some: the library
-    #: Tidy up links to opens one domain at a time.
-    unscored_by_type: dict[str, int]
-
-
 class HomeQuestion(BaseModel):
     """One question from Play: an old score to look at again, else a gap to fill."""
 
@@ -143,26 +101,6 @@ class HomeQuestion(BaseModel):
     entry: EntryResponse
     #: When the score was given or last looked at, for a revisit.
     scored_at: str | None
-
-
-class HomeShelf(BaseModel):
-    id: int
-    name: str
-    slug: str
-    entry_count: int
-
-
-class HomeLoan(BaseModel):
-    id: int
-    person: str
-    lent_on: str
-    entry: EntryResponse
-
-
-class HomeLent(BaseModel):
-    #: Open loans in all; `loans` holds the five out longest.
-    total: int
-    loans: list[HomeLoan]
 
 
 class HomeLibraryYear(BaseModel):
@@ -190,19 +128,16 @@ class HomeShelfModule(BaseModel):
 
 
 class HomeResponse(BaseModel):
-    """Every module's payload. A module the person hid is empty or `null`, unread."""
+    """The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase
+    the person hid is empty or `null`, unread."""
 
     greeting: HomeGreeting
     now: list[EntryResponse]
     #: The pile ranked across libraries (Sprint 132): five, each with its reasons.
     next: list[PilePick]
-    year: HomeYear | None
-    domains: list[HomeDomainTile]
-    lately: list[HomeLatelyRow] | None
-    tidy: HomeTidy | None
+    #: What was finished, rescored and added, newest first: the Library's second band.
+    lately: list[HomeLatelyRow]
     question: HomeQuestion | None
-    shelves: list[HomeShelf] | None
-    lent: HomeLent | None
     #: *More like this* (Sprint 134): the newest suggestions found and unanswered,
     #: across libraries, from storage.
     suggested: list[SuggestionResponse] | None

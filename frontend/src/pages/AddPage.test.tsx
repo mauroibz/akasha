@@ -29,7 +29,7 @@ function renderPage(initialEntry = "/add") {
         <Routes>
           <Route path="/add" element={<AddPage />} />
           <Route path="/books/:id" element={<h1>Book detail</h1>} />
-          <Route path="/library" element={<h1>Library page</h1>} />
+          <Route path="/" element={<h1>Library page</h1>} />
           <Route path="/import" element={<ImportProbe />} />
         </Routes>
         <Toaster />

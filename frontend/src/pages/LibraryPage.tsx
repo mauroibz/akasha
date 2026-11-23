@@ -87,7 +87,7 @@ import {
 } from "@/features/library/usePatchEntry";
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { NowStrip } from "@/features/library/NowStrip";
+import { LibraryFront } from "@/features/home/LibraryFront";
 import { SaveView } from "@/features/library/SaveView";
 import { PageFrame } from "@/components/PageFrame";
 
@@ -1057,9 +1057,10 @@ export function LibraryPage() {
         )}
       </div>
 
-      {/* What you are in the middle of (Sprint 098), on the plain library only:
-          a search or a filter is a question this strip does not answer. */}
-      {!filterActive && !filters.query && <NowStrip />}
+      {/* The front of the Library (Sprint 141, DEC-193): the greeting, what is under
+          way, what happened lately and the person's showcases. On the plain library
+          only: a search or a filter is a question it does not answer. */}
+      {!filterActive && !filters.query && <LibraryFront />}
 
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the

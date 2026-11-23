@@ -27,16 +27,8 @@ from book_tracker.domain.registry import DOMAINS
 
 #: How deep *Up next* goes.
 NEXT_LIMIT = 5
-#: Covers returned per month of the year; `count` still counts them all.
-MONTH_COVERS = 24
-#: Covers on a library tile.
-TILE_COVERS = 3
 #: Rows in *Lately* at its largest; eight at its default size.
 LATELY_LIMIT = 10
-#: Shelves in the *Shelves* module.
-SHELF_LIMIT = 8
-#: Loans listed in *Lent out*; `total` still counts them all.
-LENT_LIMIT = 5
 #: Suggestions on Home's *More like this*: the most its L size shows.
 SUGGESTED = 8
 #: Covers in a library's year (Sprint 138): a goal of 24 or fewer fills its slots, and
@@ -118,29 +110,6 @@ class HomeService:
                 ),
                 params,
             ).all()
-            histogram = connection.execute(
-                text(
-                    "SELECT i.type, e.score, count(*) FROM entries e"
-                    " JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted"
-                    " AND e.score IS NOT NULL GROUP BY 1, 2"
-                ),
-                params,
-            ).all()
-            best = connection.execute(
-                text(
-                    "SELECT entry_id, item_id, type, title, cover_path, updated_at, score FROM ("
-                    " SELECT e.id AS entry_id, i.id AS item_id, i.type, i.title, i.cover_path,"
-                    " i.updated_at, e.score, row_number() OVER (PARTITION BY i.type"
-                    "  ORDER BY e.score IS NULL, e.score DESC, e.date_finished IS NULL,"
-                    "  e.date_finished DESC, e.id DESC) AS rank"
-                    " FROM entries e JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted"
-                    " AND i.cover_path IS NOT NULL"
-                    ") WHERE rank <= :covers ORDER BY type, rank"
-                ),
-                {**params, "covers": TILE_COVERS},
-            ).all()
             finished = connection.execute(
                 text(
                     "SELECT e.id, i.id, i.type, i.title, i.cover_path, i.updated_at, e.score,"
@@ -161,15 +130,11 @@ class HomeService:
 
         return {
             "greeting": self._greeting(today, now, by_status, finished, goals),
-            "now": now if shown("now") else [],
+            # The Library's first two bands (Sprint 141): not modules, so always read.
+            "now": now,
             "next": self._next(today) if shown("next") else [],
-            "year": self._year(today, finished, goals) if shown("year") else None,
-            "domains": self._domains(by_status, histogram, best) if shown("libraries") else [],
-            "lately": self._lately(zone) if shown("lately") else None,
-            "tidy": self._tidy() if shown("tidy") else None,
+            "lately": self._lately(zone),
             "question": self._question() if shown("question") else None,
-            "shelves": self._shelves() if shown("shelves") else None,
-            "lent": self._lent() if shown("lent") else None,
             "suggested": self._suggested() if shown("suggested") else None,
             "library_years": self._library_years(today, years, finished, goals),
             "shelf_modules": self._shelf_modules(shelves),
@@ -333,45 +298,6 @@ class HomeService:
             )
         return list(days.values())[:LATELY_LIMIT]
 
-    def _tidy(self) -> dict[str, Any]:
-        """What *Tidy up* counts: pairs, entries without a cover, finished but unscored.
-
-        The cover count is the covers deck's own filter (the Inbox aside). The unscored
-        count is each domain's declared finished status with no score, per domain as
-        well, because the library it links to opens one domain at a time.
-        """
-        finished = [
-            (domain.item_type, status.value)
-            for domain in DOMAINS.values()
-            for status in domain.statuses
-            if status.finished
-        ]
-        params: dict[str, Any] = {"user": self.user_id, "unsorted": UNSORTED}
-        clauses = []
-        for index, (item_type, status) in enumerate(finished):
-            params[f"type{index}"] = item_type
-            params[f"status{index}"] = status
-            clauses.append(f"(i.type = :type{index} AND e.status = :status{index})")
-        unscored = f"sum(e.score IS NULL AND ({' OR '.join(clauses)}))" if clauses else "0"
-        with self.engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "SELECT i.type, sum(i.cover_path IS NULL OR i.cover_path = ''),"
-                    f" {unscored} FROM entries e JOIN items i ON i.id = e.item_id"
-                    " WHERE e.user_id = :user AND e.status != :unsorted GROUP BY i.type"
-                ),
-                params,
-            ).all()
-        by_type = {item_type: count or 0 for item_type, _covers, count in rows}
-        return {
-            "duplicates": self.library.duplicate_count(),
-            "without_cover": sum(covers or 0 for _type, covers, _count in rows),
-            "unscored": sum(by_type.values()),
-            "unscored_by_type": {
-                item_type: by_type[item_type] for item_type in DOMAINS if by_type.get(item_type)
-            },
-        }
-
     def _question(self) -> dict[str, Any] | None:
         """One question from Play: an old score to look at again, else a gap to fill."""
         cards = self.library.revisit(limit=1)["cards"]
@@ -385,44 +311,6 @@ class HomeService:
         if gaps:
             return {"kind": "gap", "entry": gaps[0], "scored_at": None}
         return None
-
-    def _shelves(self) -> list[dict[str, Any]]:
-        """Shelves holding something, the one whose members were touched last first.
-
-        A membership has no timestamp of its own, so a member's own last change is the
-        nearest signal of a shelf in use.
-        """
-        with self.engine.connect() as connection:
-            rows = connection.execute(
-                text(
-                    "SELECT s.id, s.name, s.slug, count(*), max(e.updated_at)"
-                    " FROM shelves s JOIN entry_shelves es ON es.shelf_id = s.id"
-                    " JOIN entries e ON e.id = es.entry_id"
-                    " WHERE s.user_id = :user GROUP BY s.id"
-                    " ORDER BY max(e.updated_at) DESC, count(*) DESC, s.id LIMIT :limit"
-                ),
-                {"user": self.user_id, "limit": SHELF_LIMIT},
-            ).all()
-        return [
-            {"id": shelf_id, "name": name, "slug": slug, "entry_count": count}
-            for shelf_id, name, slug, count, _used in rows
-        ]
-
-    def _lent(self) -> dict[str, Any]:
-        """What is out now, longest out first."""
-        loans = self.library.loans(open_only=True)
-        return {
-            "total": len(loans),
-            "loans": [
-                {
-                    "id": loan["id"],
-                    "person": loan["person"],
-                    "lent_on": loan["lent_on"],
-                    "entry": loan["entry"],
-                }
-                for loan in loans[:LENT_LIMIT]
-            ],
-        }
 
     def _greeting(
         self,
@@ -477,80 +365,6 @@ class HomeService:
             {"entry": entry, "score": pick["score"], "reasons": pick["reasons"]}
             for pick, entry in zip(ranked, entries, strict=True)
         ]
-
-    def _year(self, today: date, finished: Sequence[Any], goals: GoalService) -> dict[str, Any]:
-        months: list[dict[str, Any]] = [
-            {"month": month, "count": 0, "counts": {}, "covers": []} for month in range(1, 13)
-        ]
-        for row in finished:
-            month = row[7]
-            if not month or not 1 <= month <= 12:
-                continue
-            bucket = months[month - 1]
-            bucket["count"] += 1
-            bucket["counts"][row[2]] = bucket["counts"].get(row[2], 0) + 1
-            if len(bucket["covers"]) < MONTH_COVERS:
-                bucket["covers"].append(_cover(row))
-        done = _done_by_type(finished)
-        return {
-            "year": today.year,
-            "months": months,
-            "goals": [
-                {
-                    "item_type": goal["item_type"],
-                    "period": goal["period"],
-                    "count": goal["count"],
-                    "target": _target(goal),
-                    "done": done.get(goal["item_type"], 0),
-                }
-                for goal in self._goals(goals)
-            ],
-        }
-
-    @staticmethod
-    def _domains(
-        by_status: Sequence[Any], histogram: Sequence[Any], best: Sequence[Any]
-    ) -> list[dict[str, Any]]:
-        statuses: dict[str, dict[str, int]] = defaultdict(dict)
-        rated: dict[str, int] = defaultdict(int)
-        total: dict[str, int] = defaultdict(int)
-        coverless: dict[str, int] = defaultdict(int)
-        for item_type, status, count, scored, score_sum, without in by_status:
-            statuses[item_type][status] = count
-            rated[item_type] += scored
-            total[item_type] += score_sum or 0
-            coverless[item_type] += without or 0
-        scores: dict[str, list[int]] = defaultdict(lambda: [0] * 10)
-        for item_type, score, count in histogram:
-            if 1 <= score <= 10:
-                scores[item_type][score - 1] = count
-        covers: dict[str, list[dict[str, Any]]] = defaultdict(list)
-        for row in best:
-            covers[row[2]].append(_cover(row))
-        tiles = []
-        for item_type, domain in DOMAINS.items():
-            counts = statuses.get(item_type)
-            if not counts:
-                continue
-            ordered = {
-                status.value: counts[status.value]
-                for status in domain.statuses
-                if status.value in counts
-            }
-            tiles.append(
-                {
-                    "item_type": item_type,
-                    "count": sum(counts.values()),
-                    "status_counts": ordered,
-                    "scores": scores[item_type],
-                    "mean_score": round(total[item_type] / rated[item_type], 2)
-                    if rated[item_type]
-                    else None,
-                    "covers": covers[item_type],
-                    "without_cover": coverless[item_type],
-                }
-            )
-        return tiles
 
 
 def _greeting_pair(

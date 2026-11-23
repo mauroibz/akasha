@@ -1,15 +1,11 @@
-import { ArrowDownUp, Check, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import type { HomeLatelyRow, ModuleSize } from "@/api/home";
-import { scoreArticle } from "@/features/rescore/rescore";
-import { scoreChipClass } from "@/lib/score";
+import type { HomeLatelyRow } from "@/api/home";
+import { Cover } from "@/components/Cover";
+import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
-import { HomeModule } from "./HomeModule";
 import { localDate } from "./year";
-
-const ROWS: Record<ModuleSize, number> = { S: 4, M: 8, L: 10 };
 
 /**
  * A row's day where the person is. A finish is a bare day and is that day; an addition
@@ -27,101 +23,73 @@ function day(at: string): string {
   }).format(shown);
 }
 
-const icons = {
-  finished: Check,
-  score: ArrowDownUp,
-  added: Plus,
-} as const;
+/** What a row says under its cover: what happened, in a word or a figure. */
+function what(row: HomeLatelyRow): string {
+  if (row.kind === "finished") return "Finished";
+  if (row.kind === "added")
+    return row.count > 1 ? `Added +${row.count - 1}` : "Added";
+  if (row.score !== null && row.previous === row.score) return "Still";
+  return `${row.previous ?? "–"} → ${row.score ?? "–"}`;
+}
+
+/** The same for a screen reader, in words. */
+function said(row: HomeLatelyRow): string {
+  if (row.kind === "added" && row.count > 1)
+    return `Added with ${row.count - 1} more`;
+  if (row.kind === "score" && row.previous !== row.score)
+    return `Score changed from ${row.previous ?? "none"} to ${row.score ?? "none"}`;
+  return what(row);
+}
 
 /**
- * What happened lately (Sprint 131): finishes and score changes from the Diary's
- * timeline, and what was added, a day's additions as one row. Newest first; the
- * size says how many rows.
+ * The Library's second band (Sprint 141, DEC-193): what was finished, rescored and
+ * added, newest first, as one row of covers that scrolls sideways when it is longer
+ * than the screen. It was a list of sentences on Home (Sprint 131); the Library is a
+ * place of covers, and a day's additions are still one cover.
  */
-export function Lately({
-  rows,
-  size,
-  className,
-}: {
-  rows: HomeLatelyRow[];
-  size: ModuleSize;
-  className?: string;
-}) {
+export function Lately({ rows }: { rows: HomeLatelyRow[] }) {
+  if (rows.length === 0) return null;
   return (
-    <HomeModule
-      title="Lately"
-      className={className}
-      aside={
-        <Link
-          to="/diary"
-          className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
-        >
-          Diary →
-        </Link>
-      }
-    >
-      <ul className="space-y-1">
-        {rows.slice(0, ROWS[size]).map((row) => {
-          const Icon = icons[row.kind];
-          const title = (
+    <section aria-labelledby="lately-heading">
+      <div className="mb-3 flex items-baseline gap-3">
+        <h2 id="lately-heading" className="font-display text-xl font-medium">
+          Lately
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          finished and added, newest first
+        </p>
+      </div>
+      <ul className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-2">
+        {rows.map((row) => (
+          <li
+            key={`${row.kind}-${row.entry.id}-${row.at}`}
+            className="w-24 shrink-0 sm:w-28"
+          >
             <Link
               to={`/books/${row.entry.id}`}
-              className="font-medium text-foreground underline-offset-4 hover:underline focus-ring"
+              aria-label={`${said(row)}: ${row.entry.item.title}, ${day(row.at)}`}
+              className="group block rounded-md focus-ring"
             >
-              {row.entry.item.title}
-            </Link>
-          );
-          return (
-            <li
-              key={`${row.kind}-${row.entry.id}-${row.at}`}
-              className="flex min-h-9 items-center gap-2.5 text-sm"
-            >
-              <span
-                aria-hidden="true"
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground [&_svg]:h-3 [&_svg]:w-3"
-              >
-                <Icon />
+              <Cover src={row.entry.item.cover_url} size="m" />
+              <span className="mt-2 block truncate text-sm font-medium">
+                {row.entry.item.title}
               </span>
-              <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                {row.kind === "finished" ? (
-                  <>Finished {title}</>
-                ) : row.kind === "score" ? (
-                  <>
-                    {title}{" "}
-                    {row.score !== null && row.previous === row.score ? (
-                      // A score looked at again and kept (One question, the
-                      // revisit deck): not a change to itself.
-                      <>still {scoreArticle(row.score)}</>
-                    ) : (
-                      <span className="tabular-nums">
-                        {row.previous ?? "–"} → {row.score ?? "–"}
-                      </span>
-                    )}
-                  </>
+              <span className="mt-0.5 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                <span className="truncate tabular-nums">{what(row)}</span>
+                {row.kind !== "added" && row.score !== null ? (
+                  <span
+                    className={cn(scoreChipShape, scoreChipClass(row.score))}
+                  >
+                    {row.score}
+                  </span>
                 ) : (
-                  <>
-                    Added {title}
-                    {row.count > 1 ? ` and ${row.count - 1} more` : ""}
-                  </>
+                  <span className="shrink-0 tabular-nums">{day(row.at)}</span>
                 )}
               </span>
-              {row.kind === "finished" && row.score !== null ? (
-                <span
-                  className={cn(
-                    "rounded px-1.5 text-xs font-semibold tabular-nums",
-                    scoreChipClass(row.score),
-                  )}
-                >
-                  {row.score}
-                </span>
-              ) : null}
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {day(row.at)}
-              </span>
-            </li>
-          );
-        })}
+            </Link>
+          </li>
+        ))}
       </ul>
-    </HomeModule>
+    </section>
   );
 }

@@ -151,7 +151,7 @@ describe("authentication routing", () => {
 
     renderApp("/login");
 
-    expect(await screen.findByRole("main", { name: "Home" })).toBeVisible();
+    expect(await screen.findByText("Your library is waiting")).toBeVisible();
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
     expect(screen.queryByText("Sign out")).toBeNull();
     expect(screen.queryByLabelText("Username")).toBeNull();
@@ -254,55 +254,43 @@ function authOff(url: string) {
   return libraryResponse(url);
 }
 
-describe("home and library routes (Sprint 130)", () => {
-  it("opens on Home at /", async () => {
+describe("the library is the home (Sprint 141, DEC-193)", () => {
+  it("opens on the Library at /", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request) => authOff(String(input))),
     );
     renderApp("/");
 
-    expect(await screen.findByRole("main", { name: "Home" })).toBeVisible();
+    expect(await screen.findByText("Your library is waiting")).toBeVisible();
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
   });
 
-  it("keeps the library, unchanged, at /library", async () => {
+  it("sends the old /library address to / with the filters it carried", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request) => authOff(String(input))),
     );
-    renderApp("/library");
-
-    expect(await screen.findByText("Your library is waiting")).toBeVisible();
-    expect(screen.queryByRole("main", { name: "Home" })).toBeNull();
-  });
-
-  it("sends a / address carrying library filters to /library with them", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (input: string | URL | Request) => authOff(String(input))),
-    );
-    renderApp("/?type=anime&status=watching");
+    renderApp("/library?type=anime&status=watching");
 
     expect(await screen.findByText("Your library is waiting")).toBeVisible();
     expect(screen.getByTestId("location")).toHaveTextContent(
-      "/library?type=anime&status=watching",
+      "/?type=anime&status=watching",
     );
   });
 
-  it("puts Home first in the navigation and keeps Library", async () => {
+  it("puts the Library first in the navigation, at /, with no Home beside it", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string | URL | Request) => authOff(String(input))),
     );
     renderApp("/");
-    await screen.findByRole("main", { name: "Home" });
+    await screen.findByText("Your library is waiting");
 
     const [desktop] = screen.getAllByRole("navigation", { name: "Primary" });
     const links = Array.from(desktop.querySelectorAll("a"));
     expect(links[0]).toHaveAttribute("href", "/");
-    expect(links[0]).toHaveTextContent("Home");
-    expect(links[1]).toHaveAttribute("href", "/library");
-    expect(links[1]).toHaveTextContent("Library");
+    expect(links[0]).toHaveTextContent("Library");
+    expect(links.some((link) => link.textContent === "Home")).toBe(false);
   });
 });

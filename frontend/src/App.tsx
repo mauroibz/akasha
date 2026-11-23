@@ -22,8 +22,6 @@ import {
 import { AUTH_REQUIRED_EVENT } from "@/api/request";
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
-import { HomePage } from "@/features/home/HomePage";
-import { libraryRedirect } from "@/features/library/library";
 import { LibraryPage } from "@/pages/LibraryPage";
 import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
@@ -119,15 +117,13 @@ const PeoplePage = lazy(async () => ({
 }));
 
 /**
- * `/` is Home since Sprint 130 (DEC-183). A `/` address carrying library filters
- * was a library link before that, in bookmarks and saved views, so it lands on
- * `/library` with them rather than on Home without them.
+ * `/library` was the Library's address while Home held `/` (Sprints 130-140,
+ * DEC-183). The Library is the home again (Sprint 141, DEC-193), so a bookmark or a
+ * saved view lands on `/` with the filters it carried.
  */
-function HomeRoute() {
+function LibraryRedirect() {
   const location = useLocation();
-  const target = libraryRedirect(location.search);
-  if (target) return <Navigate to={`${target}${location.hash}`} replace />;
-  return <HomePage />;
+  return <Navigate to={`/${location.search}${location.hash}`} replace />;
 }
 
 /**
@@ -199,8 +195,8 @@ function PrivateRoutes({
       >
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<HomeRoute />} />
-            <Route path="/library" element={<LibraryPage />} />
+            <Route path="/" element={<LibraryPage />} />
+            <Route path="/library" element={<LibraryRedirect />} />
             <Route path="/add" element={<AddPage />} />
             <Route path="/books/:entryId" element={<DetailPage />} />
             <Route path="/import" element={<ImportPage />} />

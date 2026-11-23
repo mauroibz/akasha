@@ -21,10 +21,10 @@ describe("packRows", () => {
   it("gives a module the whole row when nothing fits beside it", () => {
     expect(
       spans([
-        { key: "year", size: "L" },
-        { key: "libraries", size: "S" },
+        { key: "next", size: "L" },
+        { key: "year:book", size: "L" },
       ]),
-    ).toEqual(["year:12", "libraries:12"]);
+    ).toEqual(["next:12", "year:book:12"]);
   });
 
   it("shares a row's spare columns so it ends without a gap", () => {

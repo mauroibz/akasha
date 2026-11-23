@@ -99,7 +99,7 @@ function PersonRow({
     onSuccess: () => {
       onActAs(person);
       // "View Bruno's library": the library itself, not Home (Sprint 130).
-      void navigate("/library", { replace: true });
+      void navigate("/", { replace: true });
     },
   });
   return (

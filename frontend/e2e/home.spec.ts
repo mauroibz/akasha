@@ -206,16 +206,12 @@ const home = {
   },
 };
 
+// The showcases: what the Library's bands and tabs say is no longer a module
+// (Sprint 141, DEC-193).
 const defaults = [
-  ["now", "M"],
   ["next", "L"],
-  ["year", "L"],
-  ["lately", "M"],
-  ["libraries", "L"],
-  ["tidy", "S"],
   ["question", "S"],
-  ["shelves", "S"],
-  ["lent", "S"],
+  ["suggested", "M"],
 ].map(([module, size]) => ({ module, size, hidden: false }));
 
 type Layout = typeof defaults;
@@ -266,37 +262,34 @@ async function stubHome(page: Page) {
   return patches;
 }
 
-test("Home renders its modules from the one payload", async ({ page }) => {
+test("the Library opens with the greeting, what is under way, lately and the showcases, above the grid", async ({
+  page,
+}) => {
   await stubHome(page);
+  await stubLayout(page);
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Sunday. Day 32 of Designing Data-Intensive Applications.",
-  );
-  for (const name of [
-    "On now",
-    "Up next",
-    "2026",
-    "Lately",
-    "Your libraries",
-    "Tidy up",
-    "One question",
-    "Shelves",
-    "Lent out",
-  ]) {
+  await expect(
+    page.getByRole("heading", {
+      level: 2,
+      name: "Sunday. Day 32 of Designing Data-Intensive Applications.",
+    }),
+  ).toBeVisible();
+  for (const name of ["On now", "Lately", "Up next", "One question"]) {
     await expect(page.getByRole("region", { name })).toBeVisible();
   }
-  await expect(page.getByText("1 / 24")).toBeVisible();
+  // It is the Library's page: its own field above, the whole library below.
+  await expect(page.getByRole("searchbox")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Everything" })).toBeVisible();
 });
 
-test("the year and Lately share a row, 7 and 5", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+test("a search puts the front away: it is a question the front does not answer", async ({
+  page,
+}) => {
   await stubHome(page);
   await page.goto("/");
-  const year = await page.locator('[data-module="year"]').boundingBox();
-  const lately = await page.locator('[data-module="lately"]').boundingBox();
-  expect(year && lately).toBeTruthy();
-  expect(Math.abs(year!.y - lately!.y)).toBeLessThan(2);
-  expect(year!.width / lately!.width).toBeCloseTo(7 / 5, 0);
+  await expect(page.getByRole("region", { name: "Lately" })).toBeVisible();
+  await page.getByRole("searchbox").fill("seeded");
+  await expect(page.getByRole("region", { name: "Lately" })).toHaveCount(0);
 });
 
 test("the pile's count opens the pile as a list, and Sort the deck (DEC-192)", async ({
@@ -320,19 +313,6 @@ test("the pile's count opens the pile as a list, and Sort the deck (DEC-192)", a
   );
 });
 
-test("Tidy up's counts open what resolves them", async ({ page }) => {
-  await stubHome(page);
-  await page.goto("/");
-  const tidy = page.getByRole("region", { name: "Tidy up" });
-  await tidy.getByRole("link", { name: /finished, not scored/ }).click();
-  await expect(page).toHaveURL(
-    /\/library\?type=book&status=read&unscored=true/,
-  );
-  await expect(
-    page.getByRole("button", { name: /No score yet/ }),
-  ).toBeVisible();
-});
-
 test("Edit home reorders with the keyboard, resizes and hides, and a reload keeps it", async ({
   page,
 }) => {
@@ -341,29 +321,32 @@ test("Edit home reorders with the keyboard, resizes and hides, and a reload keep
   await page.goto("/");
   await page.getByRole("button", { name: "Edit home" }).click();
   const panel = page.getByRole("dialog", { name: "Edit home" });
-  await panel.getByRole("button", { name: "Move Lately" }).focus();
-  await page.keyboard.press("ArrowUp");
+  await panel.getByRole("button", { name: "Move One question" }).focus();
   await page.keyboard.press("ArrowUp");
   await expect(
-    panel.getByRole("button", { name: "Move Lately" }),
+    panel.getByRole("button", { name: "Move One question" }),
   ).toBeFocused();
   await panel
-    .getByRole("group", { name: "Size of Lately" })
-    .getByRole("button", { name: "Small" })
+    .getByRole("group", { name: "Size of One question" })
+    .getByRole("button", { name: "Large" })
     .click();
-  await panel.getByRole("switch", { name: "Show Lent out" }).click();
+  await panel.getByRole("switch", { name: "Show Up next" }).click();
   await panel.getByRole("button", { name: "Done" }).click();
   await expect(panel).toBeHidden();
   await expect
-    .poll(() => store.modules.map((row) => row.module).slice(0, 3))
-    .toEqual(["now", "lately", "next"]);
-  expect(store.modules.find((row) => row.module === "lately")?.size).toBe("S");
-  expect(store.modules.find((row) => row.module === "lent")?.hidden).toBe(true);
+    .poll(() => store.modules.map((row) => row.module).slice(0, 2))
+    .toEqual(["question", "next"]);
+  expect(store.modules.find((row) => row.module === "question")?.size).toBe(
+    "L",
+  );
+  expect(store.modules.find((row) => row.module === "next")?.hidden).toBe(true);
 
   await page.reload();
-  await expect(page.getByRole("region", { name: "Lately" })).toBeVisible();
-  expect((await shown(page)).slice(0, 3)).toEqual(["now", "lately", "next"]);
-  await expect(page.getByRole("region", { name: "Lent out" })).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "One question" }),
+  ).toBeVisible();
+  expect((await shown(page))[0]).toBe("question");
+  await expect(page.getByRole("region", { name: "Up next" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Edit home" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Reset" }).click();
@@ -376,7 +359,7 @@ test("Edit home reorders by dragging a handle", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Edit home" }).click();
   const panel = page.getByRole("dialog", { name: "Edit home" });
-  const handle = panel.getByRole("button", { name: "Move Shelves" });
+  const handle = panel.getByRole("button", { name: "Move One question" });
   // The panel zooms in; hovering waits for the handle to stand still.
   await handle.hover();
   const from = (await handle.boundingBox())!;
@@ -385,8 +368,8 @@ test("Edit home reorders by dragging a handle", async ({ page }) => {
   await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 });
   await page.mouse.up();
   await expect
-    .poll(() => store.modules.map((row) => row.module).slice(0, 3))
-    .toEqual(["now", "shelves", "next"]);
+    .poll(() => store.modules.map((row) => row.module).slice(0, 2))
+    .toEqual(["question", "next"]);
 });
 
 test("Start moves a pile entry under way", async ({ page }) => {
@@ -425,21 +408,12 @@ test("Mark as read opens the finish sheet and finishes the entry", async ({
   await expect(sheet).toBeHidden();
 });
 
-test("a library tile opens the library filtered to its domain", async ({
+test("the old /library address lands on / with its filters", async ({
   page,
 }) => {
   await stubHome(page);
-  await page.goto("/");
-  await page.getByRole("link", { name: /^81 Anime/ }).click();
-  await expect(page).toHaveURL(/\/library\?type=anime/);
-});
-
-test("a / address with library filters lands on the library", async ({
-  page,
-}) => {
-  await stubHome(page);
-  await page.goto("/?type=anime&sort=title");
-  await expect(page).toHaveURL(/\/library\?type=anime&sort=title/);
+  await page.goto("/library?type=anime&sort=title");
+  await expect(page).toHaveURL(/\/\?type=anime&sort=title/);
 });
 
 for (const theme of ["ink", "paper"] as const) {
@@ -637,9 +611,10 @@ for (const width of [390, 1440]) {
   });
 }
 
-test("an empty library gets the first-run message", async ({ page }) => {
+test("an empty library draws no front, only its own first screen", async ({
+  page,
+}) => {
   await page.goto("/");
-  await expect(
-    page.getByRole("heading", { name: "Your desk is ready" }),
-  ).toBeVisible();
+  await expect(page.getByText("Your library is waiting")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Lately" })).toHaveCount(0);
 });

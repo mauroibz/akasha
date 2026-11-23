@@ -97,7 +97,10 @@ export function UpNext({
             return (
               <li
                 key={pick.entry.id}
-                className="flex w-28 shrink-0 snap-start flex-col gap-1.5 min-[720px]:w-auto"
+                // A cover never grows past a shelf's size: with two picks in a wide
+                // showcase it was 380px across and pushed the Library off the
+                // screen (Sprint 141's walkthrough).
+                className="flex w-28 shrink-0 snap-start flex-col gap-1.5 min-[720px]:w-auto min-[720px]:max-w-[9.5rem]"
               >
                 <span className="text-xs tabular-nums text-primary">
                   {index + 1}

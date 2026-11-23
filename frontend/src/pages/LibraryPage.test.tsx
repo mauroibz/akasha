@@ -95,9 +95,10 @@ test("announces loading and then renders the populated library and inbox facet",
       if (String(request).startsWith("/api/shelves")) {
         return Promise.resolve(new Response("[]", { status: 200 }));
       }
-      // The Now strip's own request (Sprint 098): nothing under way.
-      if (String(request).startsWith("/api/now")) {
-        return Promise.resolve(new Response("[]", { status: 200 }));
+      // The front of the Library (Sprint 141) asks for itself and its layout;
+      // unanswered here, it draws nothing.
+      if (String(request).startsWith("/api/home")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
       }
       // The places for the location filter (Sprint 111): none written yet.
       if (String(request).startsWith("/api/locations")) {

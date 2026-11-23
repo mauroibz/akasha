@@ -13,7 +13,8 @@ function plural(itemType: string, types: ItemType[] | undefined): string {
 }
 
 /**
- * Home's first line (Sprints 130-131, DEC-183): the day, what is under way and
+ * The Library's first line (Sprints 130-131, DEC-183; a second-level heading since
+ * Sprint 141, when the Library's own title became the page's): the day, what is under way and
  * for how long, the library in three numbers, and *Edit home*. What it names and the
  * goal beside it are of one library (the server picks the pair). "Day N of …" only when the entry has a
  * start date; without one the title stands alone.
@@ -40,7 +41,7 @@ export function GreetingBar({
   const year = today.getFullYear();
   return (
     <div className="flex flex-col gap-2 lg:flex-row lg:items-baseline lg:justify-between">
-      <h1 className="min-w-0 font-display text-2xl font-medium leading-tight tracking-tight sm:text-3xl">
+      <h2 className="min-w-0 font-display text-2xl font-medium leading-tight tracking-tight sm:text-3xl">
         {active ? (
           <>
             {weekday}. {active.day ? <>Day {active.day} of </> : null}
@@ -57,7 +58,7 @@ export function GreetingBar({
             {weekday}, {date}.
           </>
         )}
-      </h1>
+      </h2>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <dl className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
           <div className="flex gap-1">

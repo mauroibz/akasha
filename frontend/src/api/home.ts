@@ -6,12 +6,7 @@ import type { components } from "./schema";
 type Schemas = components["schemas"];
 
 export type HomeCover = Schemas["HomeCover"];
-export type HomeMonth = Schemas["HomeMonth"];
-export type HomeYear = Schemas["HomeYear"];
 export type HomeYearGoal = Schemas["HomeYearGoal"];
-export type HomeDomainTile = Schemas["HomeDomainTile"];
-export type HomeTidy = Schemas["HomeTidy"];
-export type HomeShelf = Schemas["HomeShelf"];
 export type HomeLibraryYear = Schemas["HomeLibraryYear"];
 export type HomeShelfModule = Schemas["HomeShelfModule"];
 
@@ -31,34 +26,23 @@ export type HomeLatelyRow = Omit<Schemas["HomeLatelyRow"], "entry"> & {
 export type HomeQuestion = Omit<Schemas["HomeQuestion"], "entry"> & {
   entry: LibraryEntry;
 };
-export type HomeLoan = Omit<Schemas["HomeLoan"], "entry"> & {
-  entry: LibraryEntry;
-};
-export interface HomeLent {
-  total: number;
-  loans: HomeLoan[];
-}
-
 /**
- * Home's one read (Sprints 130-131, DEC-183): every module's payload, stored data
- * only. A module the person hid comes back empty or `null`, unread.
+ * The Library's front in one read (Sprints 130-131, DEC-183; the Library's since
+ * Sprint 141, DEC-193): the greeting, what is under way, what happened lately, and
+ * every showcase's payload, stored data only. A showcase the person hid comes back
+ * empty or `null`, unread.
  */
 export interface Home {
   greeting: HomeGreeting;
   now: LibraryEntry[];
+  lately: HomeLatelyRow[];
   next: HomeNext[];
-  year: HomeYear | null;
-  domains: HomeDomainTile[];
-  lately: HomeLatelyRow[] | null;
-  tidy: HomeTidy | null;
   question: HomeQuestion | null;
-  shelves: HomeShelf[] | null;
-  lent: HomeLent | null;
   /** *More like this* (Sprint 134): found, unanswered suggestions, newest first. */
   suggested?: Suggestion[] | null;
-  /** The libraries' years the person shows (Sprint 138); absent from an older server. */
+  /** The libraries' years the person shows (Sprint 138). */
   library_years?: HomeLibraryYear[];
-  /** The shelves placed on Home (Sprint 138). */
+  /** The shelves the person placed (Sprint 138). */
   shelf_modules?: HomeShelfModule[];
 }
 

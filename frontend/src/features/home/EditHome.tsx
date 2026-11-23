@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-import { fullWidth, isModuleKey, labelOf as nameOf } from "./layout";
+import { labelOf as nameOf } from "./layout";
 
 const sizes: Array<{ value: ModuleSize; label: string }> = [
   { value: "S", label: "Small" },
@@ -158,7 +158,6 @@ export function EditHome({
         <ul aria-label="Modules" className="space-y-1.5">
           {shown.map((row) => {
             const label = labelOf(row.module);
-            const whole = isModuleKey(row.module) && fullWidth.has(row.module);
             return (
               <li
                 key={row.module}
@@ -197,11 +196,7 @@ export function EditHome({
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {label}
                 </span>
-                {whole ? (
-                  <span className="text-xs text-muted-foreground">
-                    Full width
-                  </span>
-                ) : (
+                {
                   <div
                     role="group"
                     aria-label={`Size of ${label}`}
@@ -225,7 +220,7 @@ export function EditHome({
                       </button>
                     ))}
                   </div>
-                )}
+                }
                 <button
                   type="button"
                   role="switch"

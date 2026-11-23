@@ -79,7 +79,7 @@ test("first-run setup claims the library by keyboard at 390px", async ({
   await expectFocusRing(page.getByRole("button", { name: "Claim library" }));
   await page.keyboard.press("Enter");
 
-  await expect(page).toHaveURL(/\/library(\?.*)?$/);
+  await expect(page).toHaveURL(/\/(\?.*)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

@@ -2409,25 +2409,6 @@ export interface components {
       /** Title */
       title: string;
     };
-    /** HomeDomainTile */
-    HomeDomainTile: {
-      /** Count */
-      count: number;
-      /** Covers */
-      covers: components["schemas"]["HomeCover"][];
-      /** Item Type */
-      item_type: string;
-      /** Mean Score */
-      mean_score: number | null;
-      /** Scores */
-      scores: number[];
-      /** Status Counts */
-      status_counts: {
-        [key: string]: number;
-      };
-      /** Without Cover */
-      without_cover: number;
-    };
     /** HomeGoalCount */
     HomeGoalCount: {
       /** Count */
@@ -2481,13 +2462,6 @@ export interface components {
       /** Modules */
       modules: components["schemas"]["HomeModuleLayout"][];
     };
-    /** HomeLent */
-    HomeLent: {
-      /** Loans */
-      loans: components["schemas"]["HomeLoan"][];
-      /** Total */
-      total: number;
-    };
     /**
      * HomeLibraryYear
      * @description One library's year on Home (Sprint 138, DEC-192): the Diary goal band's grid.
@@ -2502,16 +2476,6 @@ export interface components {
       total: number;
       /** Year */
       year: number;
-    };
-    /** HomeLoan */
-    HomeLoan: {
-      entry: components["schemas"]["EntryResponse"];
-      /** Id */
-      id: number;
-      /** Lent On */
-      lent_on: string;
-      /** Person */
-      person: string;
     };
     /** HomeModuleLayout */
     HomeModuleLayout: {
@@ -2530,19 +2494,6 @@ export interface components {
        */
       size: "S" | "M" | "L";
     };
-    /** HomeMonth */
-    HomeMonth: {
-      /** Count */
-      count: number;
-      /** Counts */
-      counts: {
-        [key: string]: number;
-      };
-      /** Covers */
-      covers: components["schemas"]["HomeCover"][];
-      /** Month */
-      month: number;
-    };
     /**
      * HomeQuestion
      * @description One question from Play: an old score to look at again, else a gap to fill.
@@ -2559,15 +2510,13 @@ export interface components {
     };
     /**
      * HomeResponse
-     * @description Every module's payload. A module the person hid is empty or `null`, unread.
+     * @description The Library's bands and every showcase's payload (Sprint 141, DEC-193). A showcase
+     *     the person hid is empty or `null`, unread.
      */
     HomeResponse: {
-      /** Domains */
-      domains: components["schemas"]["HomeDomainTile"][];
       greeting: components["schemas"]["HomeGreeting"];
       /** Lately */
-      lately: components["schemas"]["HomeLatelyRow"][] | null;
-      lent: components["schemas"]["HomeLent"] | null;
+      lately: components["schemas"]["HomeLatelyRow"][];
       /** Library Years */
       library_years: components["schemas"]["HomeLibraryYear"][];
       /** Next */
@@ -2577,23 +2526,8 @@ export interface components {
       question: components["schemas"]["HomeQuestion"] | null;
       /** Shelf Modules */
       shelf_modules: components["schemas"]["HomeShelfModule"][];
-      /** Shelves */
-      shelves: components["schemas"]["HomeShelf"][] | null;
       /** Suggested */
       suggested: components["schemas"]["SuggestionResponse"][] | null;
-      tidy: components["schemas"]["HomeTidy"] | null;
-      year: components["schemas"]["HomeYear"] | null;
-    };
-    /** HomeShelf */
-    HomeShelf: {
-      /** Entry Count */
-      entry_count: number;
-      /** Id */
-      id: number;
-      /** Name */
-      name: string;
-      /** Slug */
-      slug: string;
     };
     /**
      * HomeShelfModule
@@ -2610,28 +2544,6 @@ export interface components {
       name: string;
       /** Slug */
       slug: string;
-    };
-    /** HomeTidy */
-    HomeTidy: {
-      /** Duplicates */
-      duplicates: number;
-      /** Unscored */
-      unscored: number;
-      /** Unscored By Type */
-      unscored_by_type: {
-        [key: string]: number;
-      };
-      /** Without Cover */
-      without_cover: number;
-    };
-    /** HomeYear */
-    HomeYear: {
-      /** Goals */
-      goals: components["schemas"]["HomeYearGoal"][];
-      /** Months */
-      months: components["schemas"]["HomeMonth"][];
-      /** Year */
-      year: number;
     };
     /** HomeYearGoal */
     HomeYearGoal: {

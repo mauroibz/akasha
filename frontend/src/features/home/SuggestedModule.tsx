@@ -78,7 +78,9 @@ export function SuggestedModule({
     >
       <ul
         className={
-          size === "S" ? "grid grid-cols-2 gap-2.5" : "grid grid-cols-4 gap-2.5"
+          size === "S"
+            ? "grid grid-cols-2 gap-2.5 [&>li]:max-w-[9.5rem]"
+            : "grid grid-cols-4 gap-2.5 [&>li]:max-w-[9.5rem]"
         }
       >
         {shown.map((suggestion) => {

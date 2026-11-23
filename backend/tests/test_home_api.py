@@ -102,6 +102,13 @@ def _entry(app: Any, title: str, item_type: str, status: str, user: int = 1, **v
     return created.entry_id
 
 
+async def _show_everything(client: httpx.AsyncClient) -> None:
+    """Turn every showcase on: only Up next is shown until the person places more."""
+    modules = (await client.get("/api/home/layout")).json()["modules"]
+    shown = [{"module": m["module"], "size": m["size"], "hidden": False} for m in modules]
+    assert (await client.put("/api/home/layout", json={"modules": shown})).status_code == 200
+
+
 def _goal(app: Any, item_type: str, count: int, period: str, user: int = 1) -> None:
     now = datetime.now(UTC).isoformat()
     with app.state.engine.begin() as connection:
@@ -117,6 +124,7 @@ def _goal(app: Any, item_type: str, count: int, period: str, user: int = 1) -> N
 @pytest.mark.anyio
 async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> None:
     async with _client(tmp_path) as (_app, client):
+        await _show_everything(client)
         response = await client.get("/api/home")
     assert response.status_code == 200
     body = response.json()
@@ -124,13 +132,8 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
         "greeting",
         "now",
         "next",
-        "year",
-        "domains",
         "lately",
-        "tidy",
         "question",
-        "shelves",
-        "lent",
         "suggested",
         "library_years",
         "shelf_modules",
@@ -142,22 +145,9 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
     assert body["greeting"]["goals"] == []
     assert body["now"] == []
     assert body["next"] == []
-    assert body["year"]["year"] == date.today().year
-    assert [month["month"] for month in body["year"]["months"]] == list(range(1, 13))
-    assert all(month["count"] == 0 and month["covers"] == [] for month in body["year"]["months"])
-    assert body["year"]["goals"] == []
-    assert body["domains"] == []
     # Nothing to show is an empty section, which the screen hides.
     assert body["lately"] == []
-    assert body["tidy"] == {
-        "duplicates": 0,
-        "without_cover": 0,
-        "unscored": 0,
-        "unscored_by_type": {},
-    }
     assert body["question"] is None
-    assert body["shelves"] == []
-    assert body["lent"] == {"total": 0, "loans": []}
     assert body["suggested"] == []
     # A library with no finish this year and no goal draws nothing (Sprint 138).
     assert body["library_years"] == []
@@ -223,32 +213,6 @@ async def test_the_five_sections_read_the_library(
         "text": "Toward 6 movies this year; 1 so far",
     }
     assert nexts[1]["reasons"][0]["text"] == "Toward 24 books this year; 2 so far"
-
-    months = {month["month"]: month for month in body["year"]["months"]}
-    assert months[3]["count"] == 2
-    assert {cover["title"] for cover in months[3]["covers"]} == {"Rayuela", "Ficciones"}
-    assert months[7]["covers"][0]["item_type"] == "movie"
-    assert months[7]["covers"][0]["cover_url"].startswith("/api/items/")
-    assert months[12]["count"] == 0
-    assert body["year"]["goals"] == [
-        {"item_type": "book", "period": "month", "count": 2, "target": 24, "done": 2},
-        {"item_type": "movie", "period": "year", "count": 6, "target": 6, "done": 1},
-    ]
-
-    tiles = {tile["item_type"]: tile for tile in body["domains"]}
-    # Registry order, and only domains holding entries.
-    assert [tile["item_type"] for tile in body["domains"]] == [
-        item_type for item_type in DOMAINS if item_type in {"book", "album", "anime", "movie"}
-    ]
-    book = tiles["book"]
-    assert book["count"] == 11
-    assert book["status_counts"] == {"read": 3, "reading": 1, "to_read": 7}
-    assert book["scores"] == [0, 0, 0, 1, 0, 0, 1, 0, 1, 0]
-    assert book["mean_score"] == pytest.approx(6.7, abs=0.05)
-    assert [cover["title"] for cover in book["covers"]] == ["Rayuela", "Old"]
-    assert book["without_cover"] == 9
-    assert tiles["album"]["covers"][0]["score"] == 10
-    assert tiles["anime"]["mean_score"] is None
 
 
 @pytest.mark.anyio
@@ -359,6 +323,7 @@ async def test_the_remaining_modules_read_the_library(tmp_path: Path) -> None:
         _shelve(app, "Empty", [])
         _lend(app, rayuela, "Ana", "2026-01-05")
         _lend(app, ficciones, "Luis", "2025-11-01", returned_on="2025-12-01")
+        await _show_everything(client)
         body = (await client.get("/api/home")).json()
 
     lately = body["lately"]
@@ -373,50 +338,10 @@ async def test_the_remaining_modules_read_the_library(tmp_path: Path) -> None:
     assert len(lately) <= 10
     assert all(row["entry"]["status"] != "unsorted" for row in lately)
 
-    # The pair, every entry without a cover but the one in the Inbox, and finished
-    # entries with no score (Ficciones, Up and the second Hobbit).
-    assert body["tidy"] == {
-        "duplicates": 1,
-        "without_cover": 5,
-        "unscored": 3,
-        # Per library, in registry order: the library opens one domain at a time.
-        "unscored_by_type": {"book": 2, "movie": 1},
-    }
-    assert watched
-
     question = body["question"]
     assert question["kind"] == "gap"
     assert question["entry"]["status"] in {"read", "watched"}
-
-    assert [(shelf["name"], shelf["entry_count"]) for shelf in body["shelves"]] == [
-        ("Favourites", 2)
-    ]
-
-    assert body["lent"]["total"] == 1
-    (loan,) = body["lent"]["loans"]
-    assert loan["person"] == "Ana"
-    assert loan["entry"]["id"] == rayuela
-    assert twice
-
-
-@pytest.mark.anyio
-async def test_tidy_ups_unscored_count_is_what_its_library_link_lists(tmp_path: Path) -> None:
-    """Tidy up links each library's unscored count to `/library?type=…&unscored=true`."""
-    finished = [
-        status.value for domain in DOMAINS.values() for status in domain.statuses if status.finished
-    ]
-    async with _client(tmp_path) as (app, client):
-        _entry(app, "Scored", "book", "read", score=8)
-        _entry(app, "Unscored book", "book", "read")
-        _entry(app, "Unscored film", "movie", "watched")
-        _entry(app, "Waiting", "book", "to_read")
-        tidy = (await client.get("/api/home")).json()["tidy"]
-        listed = (
-            await client.get("/api/entries", params={"status": finished, "unscored": "true"})
-        ).json()
-    assert tidy["unscored"] == 2
-    assert tidy["unscored_by_type"] == {"book": 1, "movie": 1}
-    assert {row["item"]["title"] for row in listed["items"]} == {"Unscored book", "Unscored film"}
+    assert watched and twice
 
 
 @pytest.mark.anyio
@@ -433,6 +358,7 @@ async def test_one_question_asks_an_old_score_again_before_a_gap(tmp_path: Path)
                 {"id": old},
             )
         _entry(app, "Undated", "book", "read")  # a gap: no finish date
+        await _show_everything(client)
         body = (await client.get("/api/home")).json()
     assert body["question"]["kind"] == "revisit"
     assert body["question"]["entry"]["id"] == old
@@ -598,9 +524,7 @@ async def test_home_answers_for_the_person_asking(tmp_path: Path) -> None:
     assert body["next"] == []
     assert body["greeting"]["entries"] == 1
     assert body["greeting"]["goals"] == []
-    assert body["year"]["goals"] == []
-    assert all(month["count"] == 0 for month in body["year"]["months"])
-    assert [tile["item_type"] for tile in body["domains"]] == ["anime"]
+    assert body["library_years"] == []
 
 
 @pytest.mark.anyio
@@ -682,9 +606,10 @@ _HOME_BUDGET = 0.150 * (2 if os.environ.get("CI") else 1)
 async def test_home_answers_inside_its_budget_on_a_large_library(tmp_path: Path) -> None:
     async with _client(tmp_path) as (app, client):
         _seed_large(app, 10_000)
+        await _show_everything(client)
         first = await client.get("/api/home")
         assert first.status_code == 200, first.text
-        assert sum(tile["count"] for tile in first.json()["domains"]) > 7_000
+        assert first.json()["greeting"]["entries"] > 7_000
         timings = []
         for _ in range(5):
             started = time.perf_counter()

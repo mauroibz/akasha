@@ -12,8 +12,13 @@ per library, `year:<item type>`, for every registered domain whose entries carry
 finished date, and a shelf, `shelf:<shelf id>`, for each of this person's shelves. The
 registry and the shelves table say which members exist; a row naming one that no
 longer does (a deleted shelf) is dropped like any unknown key. A library's year is
-shown by default, after *Lately*, so *The year* and *Lately* keep their row; a shelf
-is hidden until it is turned on.
+shown by default, after *Up next*; a shelf is hidden until it is turned on.
+
+Since Sprint 141 (DEC-193) the Library is the home and these are its showcases. What
+its bands and tabs say is no longer a module (`now`, `lately`, `libraries`, `shelves`,
+`tidy`, `lent` and the all-media `year`): a layout stored before then still names
+them, and the lenient read drops them like any unknown key. Only *Up next* and the
+libraries' years are shown until the person places more, so the grid stays near.
 """
 
 import json
@@ -52,16 +57,9 @@ SHELF = "shelf:"
 #: spans on a wide screen (S 3, M 5, L 7 of 12); on a phone every module is full
 #: width and its size only changes how much it shows.
 DEFAULT_LAYOUT: tuple[ModuleLayout, ...] = (
-    {"module": "now", "size": "M", "hidden": False},
     {"module": "next", "size": "L", "hidden": False},
-    {"module": "year", "size": "L", "hidden": False},
-    {"module": "lately", "size": "M", "hidden": False},
-    {"module": "libraries", "size": "L", "hidden": False},
-    {"module": "tidy", "size": "S", "hidden": False},
-    {"module": "question", "size": "S", "hidden": False},
-    {"module": "shelves", "size": "S", "hidden": False},
-    {"module": "lent", "size": "S", "hidden": False},
-    {"module": "suggested", "size": "M", "hidden": False},
+    {"module": "question", "size": "S", "hidden": True},
+    {"module": "suggested", "size": "M", "hidden": True},
 )
 MODULES: tuple[str, ...] = tuple(row["module"] for row in DEFAULT_LAYOUT)
 
@@ -84,11 +82,11 @@ def year_members() -> list[tuple[str, str]]:
 
 
 def defaults(shelves: Sequence[tuple[int, str]] = ()) -> list[LabelledLayout]:
-    """The default: the fixed modules, each library's year after *Lately*, then shelves."""
+    """The default: the fixed modules, each library's year after *Up next*, then shelves."""
     rows: list[LabelledLayout] = []
     for row in DEFAULT_LAYOUT:
         rows.append(LabelledLayout(**row, label=None))
-        if row["module"] == "lately":
+        if row["module"] == "next":
             rows.extend(
                 LabelledLayout(module=key, size="M", hidden=False, label=label)
                 for key, label in year_members()

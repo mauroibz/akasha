@@ -2,7 +2,6 @@ import {
   BookOpen,
   Bookmark,
   ChartBar,
-  House,
   LibraryBig,
   LogOut,
   Settings,
@@ -54,13 +53,8 @@ interface NavItem {
 // what you do there. One label, easy to change if the owner prefers the longer
 // one; nothing downstream depends on the exact word.
 const navItems: readonly NavItem[] = [
-  // Home leads since Sprint 130 (DEC-183); the library moved to `/library`.
-  { to: "/", label: "Home", icon: <House aria-hidden="true" /> },
-  {
-    to: "/library",
-    label: "Library",
-    icon: <LibraryBig aria-hidden="true" />,
-  },
+  // The Library is the home again (Sprint 141, DEC-193).
+  { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
   // No Add and no Import since Sprint 140 (DEC-193): the bar finds and adds, and its
   // footer holds the form and the importer. The navigation is places only.
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
@@ -260,7 +254,7 @@ function ActingAsBanner({
       await stopActingAs();
       onActingAsChanged(null);
       // "Return to your library": the library, not Home (Sprint 130).
-      void navigate("/library", { replace: true });
+      void navigate("/", { replace: true });
     } catch {
       setLeaving(false);
       toast.error("You could not return to your library. Try again.");
@@ -301,7 +295,7 @@ export function AppShell({
   onSignedOut?: () => void;
 }) {
   const location = useLocation();
-  const onLibrary = location.pathname === "/library";
+  const onLibrary = location.pathname === "/";
   const phoneItems = navItems.filter((item) => !item.desktopOnly);
   const phoneLink = (item: NavItem) => (
     <NavLink
@@ -403,13 +397,13 @@ export function AppShell({
                 aria-label="Primary"
                 className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
               >
-                {phoneItems.slice(0, 2).map(phoneLink)}
+                {phoneItems.slice(0, 1).map(phoneLink)}
                 {/* The bar between the places (Sprint 140): on a phone it is the
                   thing done most, so it sits under the thumb. */}
                 <span className="flex h-14 flex-1 items-center justify-center">
                   <SearchButton className="h-11 w-11 rounded-full bg-primary text-primary-foreground hover:text-primary-foreground" />
                 </span>
-                {phoneItems.slice(2).map(phoneLink)}
+                {phoneItems.slice(1).map(phoneLink)}
               </nav>
               <div
                 key={location.pathname}
