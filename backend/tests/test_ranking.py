@@ -599,6 +599,9 @@ async def test_the_pile_route_ranks_with_reasons_and_no_network(tmp_path: Path) 
             albums = await client.get("/api/pile", params={"type": "album"})
             refused = await client.get("/api/pile", params={"type": "comic"})
             too_many = await client.get("/api/pile", params={"limit": 0})
+            # The pile page lists all of it (DEC-192): up to a thousand.
+            whole = await client.get("/api/pile", params={"limit": 1000})
+            over = await client.get("/api/pile", params={"limit": 1001})
             picks = await client.get("/api/goals/book/picks")
 
     assert every.status_code == 200, every.text
@@ -614,6 +617,8 @@ async def test_the_pile_route_ranks_with_reasons_and_no_network(tmp_path: Path) 
     assert albums.json() == []
     assert refused.status_code == 422
     assert too_many.status_code == 422
+    assert whole.status_code == 200
+    assert over.status_code == 422
     assert [row["entry"]["id"] for row in picks.json()] == [second]
     assert picks.json()[0]["reasons"][0]["signal"] == "series"
     assert calls == []

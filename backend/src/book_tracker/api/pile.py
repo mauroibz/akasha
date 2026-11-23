@@ -48,7 +48,7 @@ def pile(
     request: Request,
     user: CurrentUser,
     item_type: Annotated[ItemTypeName | None, Query(alias="type")] = None,
-    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    limit: Annotated[int, Query(ge=1, le=1000)] = 20,
 ) -> list[PilePick]:
     """Waiting entries ranked from the library's own data; every library when no type."""
     ranked = rank_pile(

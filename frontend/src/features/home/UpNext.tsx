@@ -58,12 +58,21 @@ export function UpNext({
       className={className}
       aside={
         pile ? (
-          <Link
-            to="/deck/planned"
-            className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
-          >
-            {pile.toLocaleString()} on the pile →
-          </Link>
+          // The list and the deck, both (DEC-192).
+          <span className="flex gap-3">
+            <Link
+              to="/pile"
+              className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
+            >
+              {pile.toLocaleString()} on the pile →
+            </Link>
+            <Link
+              to="/deck/planned"
+              className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
+            >
+              Sort
+            </Link>
+          </span>
         ) : undefined
       }
     >

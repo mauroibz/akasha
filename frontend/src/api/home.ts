@@ -93,3 +93,13 @@ export function putHomeLayout(modules: ModuleLayout[]) {
     jsonOrApiError<HomeLayout>(r, "Your Home layout could not be saved"),
   );
 }
+
+/**
+ * The whole pile, ranked (DEC-192): every library's waiting entries in the order *Up
+ * next* would offer them, for the pile's own page.
+ */
+export function getPile(limit: number, signal?: AbortSignal) {
+  return request(`/api/pile?limit=${limit}`, { signal }).then((r) =>
+    jsonOrApiError<HomeNext[]>(r, "The pile could not be loaded"),
+  );
+}

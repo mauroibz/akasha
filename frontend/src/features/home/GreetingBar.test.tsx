@@ -16,6 +16,10 @@ describe("GreetingBar", () => {
     expect(screen.getByText("345")).toBeVisible();
     expect(screen.getByText(/of 24 books in 2026/)).toBeVisible();
     expect(screen.getByText("41")).toBeVisible();
+    // The pile's count opens the pile as a list (DEC-192).
+    expect(
+      screen.getByRole("link", { name: "41 on the pile" }),
+    ).toHaveAttribute("href", "/pile");
   });
 
   it("leaves the day count out when nothing under way has a start date", () => {

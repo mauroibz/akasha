@@ -299,6 +299,27 @@ test("the year and Lately share a row, 7 and 5", async ({ page }) => {
   expect(year!.width / lately!.width).toBeCloseTo(7 / 5, 0);
 });
 
+test("the pile's count opens the pile as a list, and Sort the deck (DEC-192)", async ({
+  page,
+}) => {
+  await stubHome(page);
+  await page.route("**/api/pile?*", (route) =>
+    route.fulfill({ json: home.next }),
+  );
+  await page.goto("/");
+  const next = page.getByRole("region", { name: "Up next" });
+  await expect(next.getByRole("link", { name: "Sort" })).toHaveAttribute(
+    "href",
+    "/deck/planned",
+  );
+  await next.getByRole("link", { name: /on the pile/ }).click();
+  await expect(page).toHaveURL(/\/pile$/);
+  await expect(page.getByRole("heading", { name: "The pile" })).toBeVisible();
+  await expect(page.getByRole("list").getByRole("listitem")).toHaveCount(
+    home.next.length,
+  );
+});
+
 test("Tidy up's counts open what resolves them", async ({ page }) => {
   await stubHome(page);
   await page.goto("/");

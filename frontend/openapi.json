@@ -12165,7 +12165,7 @@
             "required": false,
             "schema": {
               "default": 20,
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "title": "Limit",
               "type": "integer"
