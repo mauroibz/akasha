@@ -484,6 +484,118 @@ describe("Choosing the source", () => {
   });
 });
 
+function withLibrary(): ItemType[] {
+  return homeTypes.map((type) =>
+    type.id === "movie"
+      ? {
+          ...type,
+          recommendation: {
+            sources: [
+              { name: "tmdb", label: "TMDB", configured: true, hint: null },
+              {
+                name: "library",
+                label: "From your library",
+                configured: true,
+                hint: null,
+                from_library: true,
+                about: {
+                  provider: "gemini",
+                  provider_label: "Gemini",
+                  model: "gemini-embedding-001",
+                  sends:
+                    "Each item's title, creator, year, subjects or genres and description; nothing about you, your scores or your notes.",
+                },
+              },
+            ],
+            attribution: { tmdb: ATTRIBUTION },
+          },
+        }
+      : type,
+  );
+}
+
+describe("From your library", () => {
+  it("lists your own waiting entries nearest first, to open rather than want", async () => {
+    const posts: string[] = [];
+    const tmdbRound = { ...round("done", [suggestion(11, "Yojimbo")]), id: 7 };
+    const own = (id: number, title: string, entryId: number) =>
+      suggestion(id, title, {
+        source: "library",
+        round_id: 9,
+        enrichment: "enriched",
+        item_id: 100 + id,
+        entry_id: entryId,
+        external_ids: {},
+        reason: {
+          signal: "library",
+          text: "Close to Seven Samurai; on your list since Mar 2024",
+        },
+      });
+    const libraryRound = {
+      ...round("done", [own(31, "Ran", 41), own(32, "Yojimbo", 42)]),
+      id: 9,
+      source: "library",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "POST") {
+          posts.push(url);
+          const body = url.includes("source=library")
+            ? libraryRound
+            : tmdbRound;
+          return new Response(JSON.stringify(body), { status: 202 });
+        }
+        return new Response(
+          JSON.stringify(url.endsWith("/9") ? libraryRound : tmdbRound),
+        );
+      }),
+    );
+    renderWithRouter(<MoreLikeThis seed={seed} types={withLibrary()} />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "More like Seven Samurai" }),
+    );
+    const sheet = screen.getByRole("dialog", {
+      name: "More like Seven Samurai",
+    });
+    const segment = within(sheet).getByRole("radiogroup", { name: "Source" });
+    await user.click(
+      within(segment).getByRole("radio", { name: "From your library" }),
+    );
+    await waitFor(() =>
+      expect(posts).toContain("/api/entries/3/more-like-this?source=library"),
+    );
+    const list = await within(sheet).findByRole("list", {
+      name: "Suggestions",
+    });
+    expect(
+      within(sheet).getByText("2 on your list, nearest first"),
+    ).toBeVisible();
+    expect(
+      within(sheet).getByText(/Gemini · gemini-embedding-001/),
+    ).toBeVisible();
+    const [first] = within(list).getAllByRole("listitem");
+    expect(
+      within(first).getByText(
+        "Close to Seven Samurai; on your list since Mar 2024",
+      ),
+    ).toBeVisible();
+    expect(within(first).getByText("On your list")).toBeVisible();
+    expect(
+      within(first).getByRole("link", { name: "Open Ran (1961)" }),
+    ).toHaveAttribute("href", "/books/41");
+    // Already the person's: nothing to want, look up or mark seen.
+    expect(within(list).queryByRole("button", { name: /^Want/ })).toBeNull();
+    expect(within(list).queryByRole("button", { name: /^Seen/ })).toBeNull();
+    expect(
+      within(first).getByRole("button", { name: "Not for me: Ran (1961)" }),
+    ).toBeVisible();
+    expect(within(sheet).queryByText("Found in your providers")).toBeNull();
+  });
+});
+
 describe("Home's More like this", () => {
   it("shows found picks with TMDB's line, and wants one in a tap", async () => {
     const bodies: unknown[] = [];

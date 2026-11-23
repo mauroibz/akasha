@@ -164,6 +164,11 @@ export interface RecommendationSourceInfo {
    * library's providers found are shown.
    */
   resolved_only?: boolean;
+  /**
+   * Its picks are your own waiting entries (*From your library*, Sprint 136): a
+   * screen opens them instead of offering *Want*.
+   */
+  from_library?: boolean;
   /** What Settings says about it: provider, model, and what it sends. */
   about?: RecommendationSourceAbout | null;
 }

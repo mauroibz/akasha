@@ -408,8 +408,8 @@ def test_films_and_series_declare_tmdb_and_want_on_their_list() -> None:
         domain = DOMAINS[item_type]
         spec = domain.recommendation
         assert spec is not None
-        # TMDB first; the hosted model second (Sprint 135).
-        assert spec.sources == ("tmdb", "model")
+        # TMDB first; the hosted model second (Sprint 135), the library third (136).
+        assert spec.sources == ("tmdb", "model", "library")
         assert dict(spec.source_options["tmdb"]) == {"media": media}
         assert want_status(domain) == want
 
@@ -586,12 +586,16 @@ async def test_without_a_token_the_round_is_not_configured_and_says_how(tmp_path
         "configured": False,
         "hint": film["sources"][0]["hint"],
         "resolved_only": False,
+        "from_library": False,
         "about": None,
     }
-    assert [row["name"] for row in film["sources"]] == ["tmdb", "model"]
+    assert [row["name"] for row in film["sources"]] == ["tmdb", "model", "library"]
     assert "TMDB_READ_TOKEN" in film["sources"][0]["hint"]
     assert film["attribution"] == {"tmdb": TMDB_ATTRIBUTION}
-    assert [row["name"] for row in by_id["book"]["recommendation"]["sources"]] == ["model"]
+    assert [row["name"] for row in by_id["book"]["recommendation"]["sources"]] == [
+        "model",
+        "library",
+    ]
     assert queued.status_code == 202
     assert queued.json()["status"] == "not_configured"
     assert "TMDB_READ_TOKEN" in queued.json()["error"]

@@ -203,6 +203,9 @@ class RecommendationSourceResponse(BaseModel):
     #: Its picks may be inventions (a model's, Sprint 135): a screen shows only the
     #: ones the library's providers found.
     resolved_only: bool = False
+    #: Its picks are the person's own entries (*From your library*, Sprint 136): a
+    #: screen opens them instead of offering *Want*.
+    from_library: bool = False
     #: What Settings says about it: `provider`, `provider_label`, `model` and what it
     #: `sends`, for a hosted model; `None` for a source with nothing to say.
     about: dict[str, str] | None = None

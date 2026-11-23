@@ -331,11 +331,13 @@ def test_a_key_for_another_provider_does_not_configure_this_one(tmp_path: Path) 
 
 
 def test_every_domain_declares_the_model_after_its_own_sources() -> None:
-    assert DOMAINS["movie"].recommendation.sources == ("tmdb", "model")  # type: ignore[union-attr]
-    assert DOMAINS["series"].recommendation.sources == ("tmdb", "model")  # type: ignore[union-attr]
+    # The library's own embeddings follow the model (Sprint 136).
+    movie, series = DOMAINS["movie"].recommendation, DOMAINS["series"].recommendation
+    assert movie is not None and movie.sources == ("tmdb", "model", "library")
+    assert series is not None and series.sources == ("tmdb", "model", "library")
     for item_type in ("book", "anime", "album"):
         spec = DOMAINS[item_type].recommendation
-        assert spec is not None and spec.sources == ("model",)
+        assert spec is not None and spec.sources == ("model", "library")
         assert spec.source_options["model"]["kind"]
 
 
@@ -497,7 +499,7 @@ async def test_without_a_key_the_source_says_how_and_nothing_fails(tmp_path: Pat
         types = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
         queued = await client.post(f"/api/entries/{seed}/more-like-this?source=model")
         job = JobRepository(app.state.engine).claim(datetime.now(UTC))
-    (source,) = types["book"]["recommendation"]["sources"]
+    source, _library = types["book"]["recommendation"]["sources"]
     assert source["name"] == "model" and source["label"] == "Model"
     assert source["configured"] is False
     assert "AKASHA_RECS_MODEL_KEY" in source["hint"]
@@ -507,6 +509,7 @@ async def test_without_a_key_the_source_says_how_and_nothing_fails(tmp_path: Pat
     assert [row["name"] for row in types["movie"]["recommendation"]["sources"]] == [
         "tmdb",
         "model",
+        "library",
     ]
     assert queued.status_code == 202
     assert queued.json()["status"] == "not_configured"

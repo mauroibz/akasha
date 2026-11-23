@@ -190,7 +190,7 @@ def recognize_movie_url(value: str) -> UrlMatch | None:
 # A hosted model (Sprint 135) comes second: its picks carry no id, so they reach
 # the title search, and only the films found there are shown.
 MOVIE_RECOMMENDATION = RecommendationSpec(
-    sources=("tmdb", "model"),
+    sources=("tmdb", "model", "library"),
     resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
     source_options={
         "tmdb": {"media": "movie"},

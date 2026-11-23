@@ -101,7 +101,11 @@ class AnswerBody(BaseModel):
 
 
 def _store(request: Request, user: CurrentUser) -> SuggestionStore:
-    return SuggestionStore(request.app.state.engine, user.effective_user_id)
+    return SuggestionStore(
+        request.app.state.engine,
+        user.effective_user_id,
+        embedding_model=getattr(request.app.state, "embedding_model", None),
+    )
 
 
 Store = Annotated[SuggestionStore, Depends(_store)]
@@ -128,6 +132,7 @@ def more_like_this(
         entry_id,
         source=source,
         refresh=refresh,
+        embedding_model=getattr(request.app.state, "embedding_model", None),
     )
     return RoundResponse.model_validate(found)
 

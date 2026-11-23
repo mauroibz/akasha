@@ -4337,6 +4337,11 @@
             "title": "Configured",
             "type": "boolean"
           },
+          "from_library": {
+            "default": false,
+            "title": "From Library",
+            "type": "boolean"
+          },
           "hint": {
             "anyOf": [
               {

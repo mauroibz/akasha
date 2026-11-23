@@ -126,7 +126,7 @@ def recognize_book_input(value: str) -> UrlMatch | None:
 # each is searched by title and author (a title alone is many books) and only the
 # ones found are shown. *Want* puts it on the list to read.
 BOOK_RECOMMENDATION = RecommendationSpec(
-    sources=("model",),
+    sources=("model", "library"),
     resolve=resolve_by_identity_or_search(with_creator=True),
     source_options={"model": {"kind": "books", "creator": "author"}},
 )

@@ -3252,6 +3252,11 @@ export interface components {
       } | null;
       /** Configured */
       configured: boolean;
+      /**
+       * From Library
+       * @default false
+       */
+      from_library: boolean;
       /** Hint */
       hint: string | null;
       /** Label */

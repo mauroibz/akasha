@@ -145,7 +145,7 @@ def recognize_anime_url(value: str) -> UrlMatch | None:
 # A hosted model suggests anime (Sprint 135), found by title in AniList and Kitsu
 # (a studio appended would hide a title from their search); *Want* is the plan.
 ANIME_RECOMMENDATION = RecommendationSpec(
-    sources=("model",),
+    sources=("model", "library"),
     resolve=resolve_by_identity_or_search(),
     source_options={"model": {"kind": "anime", "creator": "studio"}},
 )

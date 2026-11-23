@@ -26,6 +26,7 @@ import httpx
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
+from book_tracker.application.embeddings import load_vectors, similarity
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.normalization import normalize_text
@@ -145,30 +146,35 @@ class _Works:
         self.titles.setdefault(_norm(title), []).append((year, _norm(creator), value))
 
 
-def _known(connection: Connection, user_id: int, item_type: str) -> _Works:
-    """What a new round leaves out: the library in this domain, and *not for me*."""
+def _known(connection: Connection, user_id: int, item_type: str, *, library: bool = True) -> _Works:
+    """What a new round leaves out: the library in this domain, and *not for me*.
+
+    A source whose candidates are the library itself (`from_library`) is held only
+    to *not for me*: its picks are the person's own entries by design.
+    """
     known = _Works({}, {})
     params = {"user": user_id, "type": item_type}
-    mine = "SELECT e.item_id FROM entries e JOIN items i ON i.id = e.item_id" + (
-        " WHERE e.user_id = :user AND i.type = :type"
-    )
-    for kind, value in connection.execute(
-        text(f"SELECT kind, normalized_value FROM item_identifiers WHERE item_id IN ({mine})"),
-        params,
-    ):
-        known.identities[(str(kind), str(value))] = True
-    for source, source_id in connection.execute(
-        text(f"SELECT source, source_id FROM item_sources WHERE item_id IN ({mine})"), params
-    ):
-        known.identities[(str(source).casefold(), str(source_id))] = True
-    for title, year, creator in connection.execute(
-        text(
-            "SELECT i.title, i.year, i.creator_primary FROM entries e"
-            " JOIN items i ON i.id = e.item_id WHERE e.user_id = :user AND i.type = :type"
-        ),
-        params,
-    ):
-        known.titles.setdefault(_norm(title), []).append((year, _norm(creator), True))
+    if library:
+        mine = "SELECT e.item_id FROM entries e JOIN items i ON i.id = e.item_id" + (
+            " WHERE e.user_id = :user AND i.type = :type"
+        )
+        for kind, value in connection.execute(
+            text(f"SELECT kind, normalized_value FROM item_identifiers WHERE item_id IN ({mine})"),
+            params,
+        ):
+            known.identities[(str(kind), str(value))] = True
+        for source, source_id in connection.execute(
+            text(f"SELECT source, source_id FROM item_sources WHERE item_id IN ({mine})"), params
+        ):
+            known.identities[(str(source).casefold(), str(source_id))] = True
+        for title, year, creator in connection.execute(
+            text(
+                "SELECT i.title, i.year, i.creator_primary FROM entries e"
+                " JOIN items i ON i.id = e.item_id WHERE e.user_id = :user AND i.type = :type"
+            ),
+            params,
+        ):
+            known.titles.setdefault(_norm(title), []).append((year, _norm(creator), True))
     for title, year, creator, ids in connection.execute(
         text(
             "SELECT title, year, creator, external_ids_json FROM suggestions"
@@ -283,11 +289,17 @@ def _suggestion(row: Sequence[Any]) -> dict[str, Any]:
 
 
 class SuggestionStore:
-    """One person's rounds and suggestions. Every read is scoped to them."""
+    """One person's rounds and suggestions. Every read is scoped to them.
 
-    def __init__(self, engine: Engine, user_id: int) -> None:
+    With `embedding_model` (embeddings configured, Sprint 136) a round's found picks
+    are read in order of likeness to its seed: each keeps a place a found pick held,
+    so the source's order still decides where the pending ones stand.
+    """
+
+    def __init__(self, engine: Engine, user_id: int, *, embedding_model: str | None = None) -> None:
         self.engine = engine
         self.user_id = user_id
+        self.embedding_model = embedding_model
 
     def create_round(
         self,
@@ -368,29 +380,39 @@ class SuggestionStore:
                 ),
                 {"id": round_id, "user": self.user_id},
             ).all()
+            shown = [_suggestion(suggestion) for suggestion in suggestions]
+            if self.embedding_model is not None and row[2] is not None:
+                shown = _by_likeness(connection, self.embedding_model, int(row[2]), shown)
         keys = ("id", "item_type", "seed_entry_id", "source", "status", "error")
         return {
             **dict(zip(keys, row[:6], strict=True)),
             "created_at": row[6],
             "finished_at": row[7],
-            "suggestions": [_suggestion(suggestion) for suggestion in suggestions],
+            "suggestions": shown,
         }
 
     def store(
-        self, round_id: int, item_type: str, candidates: Iterable[Candidate]
+        self,
+        round_id: int,
+        item_type: str,
+        candidates: Iterable[Candidate],
+        *,
+        from_library: bool = False,
     ) -> tuple[list[int], int]:
         """Keep what is new to this person; return the ids stored and how many dropped.
 
         Dropped: what their library already holds in this domain (by identity, or by
         title with a year or creator that agrees), what they answered *not for me*,
         and a second mention of the same work in this round. A work an earlier round
-        already resolved is stored resolved, to the same item, without a request.
+        already resolved is stored resolved, to the same item, without a request; so
+        is a candidate naming its cached item. `from_library` (the library source's
+        rounds) keeps the person's own entries, which are what it suggests.
         """
         now = _now()
         stored: list[int] = []
         dropped = 0
         with self.engine.begin() as connection:
-            known = _known(connection, self.user_id, item_type)
+            known = _known(connection, self.user_id, item_type, library=not from_library)
             resolved = _resolved(connection, self.user_id, item_type)
             for candidate in candidates:
                 title = candidate.title.strip()
@@ -399,7 +421,9 @@ class SuggestionStore:
                     dropped += 1
                     continue
                 known.add(title, candidate.year, candidate.creator, ids)
-                item_id = resolved.find(title, candidate.year, candidate.creator, ids)
+                item_id = candidate.item_id or resolved.find(
+                    title, candidate.year, candidate.creator, ids
+                )
                 result = connection.execute(
                     text(
                         "INSERT INTO suggestions (round_id, user_id, item_type, title, year,"
@@ -522,6 +546,38 @@ class SuggestionStore:
                     "user": self.user_id,
                 },
             )
+
+
+def _by_likeness(
+    connection: Connection, model: str, seed_entry_id: int, suggestions: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Found picks reordered by their vectors' likeness to the seed's, in their own places.
+
+    A pick without a vector (pending, or not embedded yet) keeps its place; so does
+    everything when the seed has none. Reading stored vectors only: no request.
+    """
+    seed_item = connection.execute(
+        text("SELECT item_id FROM entries WHERE id = :id"), {"id": seed_entry_id}
+    ).scalar()
+    if seed_item is None:
+        return suggestions
+    vectors = load_vectors(
+        connection,
+        model,
+        [int(seed_item), *(row["item_id"] for row in suggestions if row["item_id"] is not None)],
+    )
+    seed = vectors.get(int(seed_item))
+    if seed is None:
+        return suggestions
+    places = [index for index, row in enumerate(suggestions) if row["item_id"] in vectors]
+    ranked = sorted(
+        (suggestions[index] for index in places),
+        key=lambda row: -similarity(seed, vectors[row["item_id"]]),
+    )
+    ordered = list(suggestions)
+    for index, row in zip(places, ranked, strict=True):
+        ordered[index] = row
+    return ordered
 
 
 def round_owner(engine: Engine, round_id: int) -> tuple[int, str] | None:
@@ -659,6 +715,7 @@ def start_round(
     source: str | None = None,
     refresh: bool = False,
     now: datetime | None = None,
+    embedding_model: str | None = None,
 ) -> dict[str, Any]:
     """*More like this* on one entry: a recent round again, or a new one queued."""
     seed = seed_for_entry(engine, user_id, entry_id)
@@ -682,7 +739,7 @@ def start_round(
             status_code=422,
             details={"sources": list(spec.sources)},
         )
-    store = SuggestionStore(engine, user_id)
+    store = SuggestionStore(engine, user_id, embedding_model=embedding_model)
     moment = now or datetime.now(UTC)
     if not refresh:
         recent = store.reusable_round(entry_id, source, moment)
@@ -1151,7 +1208,12 @@ class RecommendHandler:
                 f"{name} could not answer ({type(error).__name__})",
             )
         stored, dropped = await off_loop(
-            store.store, round_id, domain.item_type, candidates[:SELECT_LIMIT]
+            lambda: store.store(
+                round_id,
+                domain.item_type,
+                candidates[:SELECT_LIMIT],
+                from_library=self.registry.from_library(name),
+            )
         )
         await off_loop(store.set_round, round_id, "enriching")
         progress.update(status="enriching", stored=len(stored), dropped=dropped)

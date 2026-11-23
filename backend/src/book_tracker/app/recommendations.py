@@ -11,6 +11,7 @@ from typing import Any
 
 from sqlalchemy.engine import Engine
 
+from book_tracker.application import library_source as library
 from book_tracker.application.embeddings import BUDGET, DEFAULT_DAILY_REQUESTS, Embedder
 from book_tracker.config import Settings
 from book_tracker.domain.recommendations import (
@@ -20,7 +21,16 @@ from book_tracker.domain.recommendations import (
 )
 from book_tracker.infrastructure import model_recommendations as model
 from book_tracker.infrastructure import tmdb_recommendations as tmdb
-from book_tracker.infrastructure.embedding_clients import EmbeddingClient, build_embedding_client
+from book_tracker.infrastructure.embedding_clients import (
+    DEFAULT_MODELS as EMBEDDING_MODELS,
+)
+from book_tracker.infrastructure.embedding_clients import (
+    PROVIDER_LABELS as EMBEDDING_LABELS,
+)
+from book_tracker.infrastructure.embedding_clients import (
+    EmbeddingClient,
+    build_embedding_client,
+)
 from book_tracker.infrastructure.model_clients import (
     DEFAULT_MODELS,
     PROVIDER_LABELS,
@@ -110,10 +120,32 @@ def build_embedding(configured: Settings, provider_client: Any, engine: Engine) 
     return Embedder(engine, client, ProviderQuota(engine, limits={BUDGET: limit}))
 
 
-#: TMDB from Sprint 134, a hosted model from 135; the library's own embeddings in 136
-#: join them. The test-only `fake` source is registered by the tests themselves and
-#: never built here.
-SOURCE_FACTORIES: tuple[SourceFactory, ...] = (tmdb_source, model_source)
+def library_source(
+    configured: Settings, provider_client: Any, engine: Engine | None = None
+) -> RecommendationSource | NotConfigured:
+    """*From your library*, with an embedding endpoint and the database (Sprint 136)."""
+    embedder = build_embedding(configured, provider_client, engine) if engine is not None else None
+    if engine is None or embedder is None:
+        provider = configured.recs_embeddings_provider
+        return NotConfigured(
+            library.NAME,
+            library.NOT_CONFIGURED_HINT,
+            label=library.LABEL,
+            from_library=True,
+            about={
+                "provider": provider,
+                "provider_label": EMBEDDING_LABELS[provider],
+                "model": configured.recs_embeddings_model.strip() or EMBEDDING_MODELS[provider],
+                "sends": library.SENDS,
+            },
+        )
+    return library.LibrarySource(engine, embedder)
+
+
+#: TMDB from Sprint 134, a hosted model from 135, the library's own embeddings from
+#: 136. The test-only `fake` source is registered by the tests themselves and never
+#: built here.
+SOURCE_FACTORIES: tuple[SourceFactory, ...] = (tmdb_source, model_source, library_source)
 
 
 def build_source_registry(

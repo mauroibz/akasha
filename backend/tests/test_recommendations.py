@@ -206,7 +206,7 @@ def test_the_registry_is_filled_from_configuration(tmp_path: Path) -> None:
         configured, None, (needs_a_token, lambda _s, _c, _e: FakeSource())
     )
     assert registry.configured("fake") and not registry.configured("keyed")
-    assert build_source_registry(configured, None).names() == ("tmdb", "model")
+    assert build_source_registry(configured, None).names() == ("tmdb", "model", "library")
 
 
 def _record(title: str, year: int | None, creators: tuple[str, ...]) -> SearchCandidate:
@@ -740,6 +740,9 @@ def test_the_shared_recommendation_layers_never_name_a_domain() -> None:
         SRC / "application" / "recommendations.py",
         SRC / "api" / "suggestions.py",
         SRC / "app" / "recommendations.py",
+        SRC / "application" / "embeddings.py",
+        SRC / "application" / "library_source.py",
+        SRC / "infrastructure" / "embedding_clients.py",
     ):
         source = path.read_text(encoding="utf-8")
         assert not branch.search(source), f"{path.name} branches on an item type"

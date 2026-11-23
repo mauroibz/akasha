@@ -150,7 +150,7 @@ def recognize_album_url(value: str) -> UrlMatch | None:
 # MusicBrainz by title and artist, and only the ones found are shown. Albums have no
 # planned status, so *Want* puts one on the wishlist (DEC-189 point 8).
 ALBUM_RECOMMENDATION = RecommendationSpec(
-    sources=("model",),
+    sources=("model", "library"),
     resolve=resolve_by_identity_or_search(with_creator=True),
     source_options={"model": {"kind": "albums", "creator": "artist"}},
     want_status="wishlist",

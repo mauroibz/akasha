@@ -106,6 +106,9 @@ class Candidate:
     reason: str = ""
     source_score: float | None = None
     display: Mapping[str, Any] = _EMPTY
+    #: A cached item the source already knows this is (the library source's own
+    #: entries, Sprint 136): stored found, with no provider asked.
+    item_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -163,6 +166,8 @@ class NotConfigured:
     resolved_only: bool = False
     #: What Settings says about it while it is off (which provider, which model).
     about: Mapping[str, str] | None = None
+    #: Whether its picks are the person's own entries (the library source).
+    from_library: bool = False
 
 
 @runtime_checkable
@@ -178,8 +183,10 @@ class RecommendationSource(Protocol):
     `timedelta`: how long its rows may be kept, after which the maintenance pass
     deletes them), `attribution` (the line its terms ask for beside its rows),
     `resolved_only` (true when a candidate may be an invention, so the round resolves
-    every candidate and a screen shows only those found; Sprint 135) and `about` (a
-    few facts Settings shows); each is read with a default when absent.
+    every candidate and a screen shows only those found; Sprint 135), `about` (a
+    few facts Settings shows) and `from_library` (true when its candidates are the
+    person's own entries, which the round keeps instead of dropping as already in
+    the library; Sprint 136); each is read with a default when absent.
     """
 
     name: str
@@ -259,11 +266,15 @@ class SourceRegistry:
             "configured": configured,
             "hint": hint,
             "resolved_only": self.resolved_only(name),
+            "from_library": self.from_library(name),
             "about": dict(about) if about else None,
         }
 
     def resolved_only(self, name: str) -> bool:
         return bool(getattr(self._sources.get(name), "resolved_only", False))
+
+    def from_library(self, name: str) -> bool:
+        return bool(getattr(self._sources.get(name), "from_library", False))
 
     def attribution(self, name: str) -> str | None:
         return getattr(self._sources.get(name), "attribution", None)

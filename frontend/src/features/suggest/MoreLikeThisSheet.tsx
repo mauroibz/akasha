@@ -48,18 +48,15 @@ function progressLine(
   round: SuggestionRound,
   label: string,
   resolvedOnly: boolean,
+  fromLibrary: boolean,
 ): string | null {
-  switch (round.status) {
-    case "queued":
-    case "selecting":
-      return `Asking ${label}…`;
-    case "enriching":
-      return resolvedOnly
-        ? `Looking up what ${label} named in your providers…`
-        : "Finding the first few in your providers…";
-    default:
-      return null;
-  }
+  if (FINISHED_ROUNDS.has(round.status)) return null;
+  // The library's own picks need no lookup: reading the library is all of it.
+  if (fromLibrary) return "Reading your library…";
+  if (round.status !== "enriching") return `Asking ${label}…`;
+  return resolvedOnly
+    ? `Looking up what ${label} named in your providers…`
+    : "Finding the first few in your providers…";
 }
 
 /** The line under a finished round: how many, and how many were found. */
@@ -69,7 +66,12 @@ function doneLine(
   shown: number,
   found: number,
   resolvedOnly: boolean,
+  fromLibrary: boolean,
 ): string {
+  if (fromLibrary)
+    return shown
+      ? `${shown} on your list, nearest first`
+      : "Nothing waiting on your list is close to this yet.";
   if (resolvedOnly) {
     if (!stored) return `${label} had nothing new to suggest.`;
     if (!found)
@@ -294,6 +296,7 @@ export function MoreLikeThisSheet({
 
   const label = source?.label ?? "the source";
   const resolvedOnly = source?.resolved_only ?? false;
+  const fromLibrary = source?.from_library ?? false;
   const attribution = source ? info?.attribution[source.name] : undefined;
   const stored = data?.suggestions.length ?? 0;
   // An unresolved pick is never shown; a model's is shown only once found.
@@ -341,8 +344,15 @@ export function MoreLikeThisSheet({
     body = (
       <>
         <p className="text-xs text-muted-foreground" aria-live="polite">
-          {progressLine(data, label, resolvedOnly) ??
-            doneLine(label, stored, shown.length, found, resolvedOnly)}
+          {progressLine(data, label, resolvedOnly, fromLibrary) ??
+            doneLine(
+              label,
+              stored,
+              shown.length,
+              found,
+              resolvedOnly,
+              fromLibrary,
+            )}
           {data.status === "done" && data.error ? ` · ${data.error}` : null}
         </p>
         {resolvedOnly && finished && waiting.length ? (
@@ -491,6 +501,9 @@ function Row({
   onOpenEntry: () => void;
 }) {
   const enriched = suggestion.enrichment === "enriched";
+  // Already yours, unanswered: *From your library*'s picks are your own waiting
+  // entries (Sprint 136), so the row opens the entry instead of offering *Want*.
+  const held = suggestion.entry_id !== null && !suggestion.answer;
   const name = suggestion.year
     ? `${suggestion.title} (${suggestion.year})`
     : suggestion.title;
@@ -519,11 +532,13 @@ function Row({
             enriched ? "text-foreground" : "text-muted-foreground",
           )}
         >
-          {enriched
-            ? "Found in your providers"
-            : looking
-              ? "Looking it up…"
-              : "Looked up when you open it"}
+          {held
+            ? "On your list"
+            : enriched
+              ? "Found in your providers"
+              : looking
+                ? "Looking it up…"
+                : "Looked up when you open it"}
         </p>
       </div>
       <div className="col-start-2 flex flex-wrap items-center gap-1.5">
@@ -554,6 +569,27 @@ function Row({
                 Undo
               </Button>
             ) : null}
+          </>
+        ) : held ? (
+          <>
+            <Link
+              to={`/books/${suggestion.entry_id}`}
+              onClick={onOpenEntry}
+              aria-label={`Open ${name}`}
+              className="inline-flex h-8 items-center rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground focus-ring"
+            >
+              Open
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={busy}
+              aria-label={`Not for me: ${name}`}
+              onClick={() => onAnswer("not_for_me")}
+            >
+              Not for me
+            </Button>
           </>
         ) : (
           <>

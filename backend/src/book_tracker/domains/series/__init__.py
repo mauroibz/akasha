@@ -210,7 +210,7 @@ def recognize_series_url(value: str) -> UrlMatch | None:
 # and a title search is the last resort. *Want* puts it on the list to watch.
 # A hosted model (Sprint 135) comes second, resolved by title like a film.
 SERIES_RECOMMENDATION = RecommendationSpec(
-    sources=("tmdb", "model"),
+    sources=("tmdb", "model", "library"),
     resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
     source_options={
         "tmdb": {"media": "tv"},
