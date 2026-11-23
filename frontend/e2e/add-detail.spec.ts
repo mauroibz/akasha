@@ -91,7 +91,7 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   await page.getByLabel(/^title$/i).fill("Rayuela");
   await page.getByRole("button", { name: /add to library/i }).press("Enter");
   // New entries return to the library with a success toast
-  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
   expect(posted).toBe(1);
   // Navigate to detail to verify the entry was created
   await page.goto("/books/7");
@@ -116,7 +116,7 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
   );
   // Resolving a pasted URL is one of the eleven behaviours that had to survive
   // the move onto `/` (Sprint 029, inventory row 2).
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("searchbox").fill("https://openlibrary.org/works/OL1W");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(
@@ -321,7 +321,7 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
       ),
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
 
   const samples = await sampleAnimations(page, async () => {
     await page.getByRole("searchbox").fill("Rayuela");

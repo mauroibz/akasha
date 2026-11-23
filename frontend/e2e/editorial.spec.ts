@@ -66,7 +66,7 @@ async function stubEntry(page: Page) {
 
 test("library row opens detail by pointer and Enter", async ({ page }) => {
   await stubEntry(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
   // Click the title to open detail
   await page.getByRole("heading", { name: "Rayuela" }).click();
@@ -76,7 +76,7 @@ test("library row opens detail by pointer and Enter", async ({ page }) => {
 
 test("Enter on a focused row opens detail", async ({ page }) => {
   await stubEntry(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
   const row = page.locator("[data-entry-id='7']");
   await row.focus();
@@ -86,7 +86,7 @@ test("Enter on a focused row opens detail", async ({ page }) => {
 
 test("URL-backed filters are reload-stable", async ({ page }) => {
   await stubEntry(page);
-  await page.goto("/?status=reading&sort=score&order=asc");
+  await page.goto("/library?status=reading&sort=score&order=asc");
   await expect(page).toHaveURL(/status=reading/);
   await expect(page).toHaveURL(/sort=score/);
   await expect(page).toHaveURL(/order=asc/);
@@ -99,7 +99,7 @@ test("URL-backed filters are reload-stable", async ({ page }) => {
 
 test("Inbox button opens the triage tab on Import", async ({ page }) => {
   await stubEntry(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.getByText(/Inbox 5/).first()).toBeVisible();
   await page
     .getByText(/Inbox 5/)
@@ -153,7 +153,7 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .getByRole("alertdialog", { name: /remove this/i })
     .getByRole("button", { name: /delete entry/i })
     .click();
-  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
   expect(deleted).toBe(true);
 });
 
@@ -284,14 +284,14 @@ test("unknown route shows a useful 404", async ({ page }) => {
     page.getByRole("button", { name: /go to library/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /go to library/i }).click();
-  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
 });
 
 test("navigation shell exposes every destination at desktop width", async ({
   page,
 }) => {
   await stubEntry(page);
-  await page.goto("/");
+  await page.goto("/library");
   // Triage is absent on purpose: it folded into Import as a tab (DEC-079).
   // The Import/Triage/Export destination reads "Data" as of Sprint 069.
   for (const label of ["Library", "Add", "Data", "Shelves"]) {
@@ -317,5 +317,5 @@ test("navigation shell exposes every destination at desktop width", async ({
     .getByRole("link", { name: /library/i })
     .first()
     .click();
-  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
 });

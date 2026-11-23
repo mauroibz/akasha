@@ -113,6 +113,33 @@ export function writePinnedShelf(shelf: PinnedShelf | null): void {
   else localStorage.removeItem(pinnedShelfKey);
 }
 
+/**
+ * The query parameters the library reads (`LibraryPage`'s `filtersFromParams`).
+ * A `/` address carrying any of them was a library link before Sprint 130 moved
+ * the library to `/library`, so it is sent there with them (DEC-183).
+ */
+export const libraryQueryKeys = [
+  "type",
+  "status",
+  "shelf",
+  "format",
+  "q",
+  "sort",
+  "order",
+  "key",
+  "value",
+  "label",
+  "location",
+  "lent",
+] as const;
+
+/** `/library` with whatever library parameters `search` carries, or `null`. */
+export function libraryRedirect(search: string): string | null {
+  const params = new URLSearchParams(search);
+  const carries = libraryQueryKeys.some((key) => params.has(key));
+  return carries ? `/library?${params.toString()}` : null;
+}
+
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],
   shelves: [],
@@ -227,7 +254,7 @@ export function gridColumnCount(containerWidth: number): number {
 }
 
 /**
- * The container width HomePage's main row hands the wall at a given viewport
+ * The container width LibraryPage's main row hands the wall at a given viewport
  * width — the same `px-5` / `sm:px-8` paddings, the `max-w-[1600px]` ceiling
  * and the 640px `sm:` breakpoint. Kept here so the wall's column contract
  * (2 / ≥5 / ≥6 columns at 390 / 1440 / 2560; 2 since Sprint 093) is asserted against the same

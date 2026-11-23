@@ -219,7 +219,7 @@ describe("CommandBar", () => {
       await screen.findByRole("option", { name: "Go to Vinyl" }),
     );
     expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
-      "/?type=album&status=owned",
+      "/library?type=album&status=owned",
     );
   });
 });

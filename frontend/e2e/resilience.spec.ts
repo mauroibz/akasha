@@ -19,7 +19,7 @@ test(
     // built deployment this is the hashed chunk. Either way the browser is
     // asking for code that does not arrive.
     await page.route("**/ImportPage.tsx*", (route) => route.abort());
-    await page.goto("/");
+    await page.goto("/library");
     await expect(
       page.getByRole("heading", { name: "Seeded book 0003" }),
     ).toBeVisible();
@@ -68,7 +68,7 @@ test("a failed library load says so and can be retried", async ({ page }) => {
     });
   });
 
-  await page.goto("/");
+  await page.goto("/library");
   const failure = page.getByRole("alert");
   await expect(failure).toContainText(/could not be loaded/i);
 
@@ -100,7 +100,7 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
   // The notice sits with the web results: a library page reaches no provider, so
   // a degraded one is only the reader's problem once they are adding.
   await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("searchbox").fill("rayuela");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   const notice = page
@@ -150,7 +150,7 @@ test("library to detail and back is possible without a pointer", async ({
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -171,7 +171,7 @@ test("library to detail and back is possible without a pointer", async ({
     .first()
     .focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

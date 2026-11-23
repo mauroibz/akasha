@@ -6,7 +6,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
-import { HomePage } from "./HomePage";
+import { LibraryPage } from "./LibraryPage";
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -17,7 +17,7 @@ function renderPage(initialEntry = "/", client = makeClient()) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LibraryPage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
           <Route path="/import" element={<h1>Import</h1>} />
           <Route path="/inbox" element={<h1>Inbox page</h1>} />
@@ -1521,7 +1521,7 @@ test("the shell's Library link lands on a library, not on a permanent loading st
       <MemoryRouter initialEntries={["/?type=album"]}>
         <Link to="/">Library</Link>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LibraryPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

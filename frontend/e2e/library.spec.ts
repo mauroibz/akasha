@@ -105,7 +105,7 @@ test("the wall starts near the top and gives at least seventy percent of each ca
       width: viewport.width,
       height: viewport.height,
     });
-    await page.goto("/");
+    await page.goto("/library");
     const card = page.locator("[data-entry-id]").first();
     await expect(card).toBeVisible();
     const cardBox = (await card.boundingBox())!;
@@ -140,7 +140,7 @@ test("the wall reaches two, five, and six columns at its acceptance widths", asy
     { width: 2560, height: 1400, minimum: 6 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("/library");
     const feed = page.getByRole("feed", { name: "Library" });
     await expect(feed).toBeVisible();
     const columns = Number(await feed.getAttribute("data-columns"));
@@ -154,7 +154,7 @@ test("list density shows at least fourteen rows in a 900px viewport", async ({
 }) => {
   await seedLibrary(page, 100);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("button", { name: "Table view" }).click();
   const rowMeasurement = await page
     .locator("[data-entry-id]")
@@ -178,7 +178,7 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   // Ten thousand is the figure the technical spec budgets against, so the
   // mounted-DOM bounds are asserted at that size rather than at half of it.
   await seedLibrary(page, 10_000);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -248,7 +248,7 @@ test("the 10,000-entry library keeps its DOM budget with web results on the page
       })),
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -304,7 +304,7 @@ test("web results are a region beside the feed, not rows inside it", async ({
       ],
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -348,7 +348,7 @@ test("a settled search with nothing local collapses the controls, and Clear rest
     });
   });
   await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -382,7 +382,7 @@ test("the edition year line is readable at every width, not clipped", async ({
   // column 88px once the fixed cover and padding are taken out. Measured, not
   // eyeballed — `scrollWidth > clientWidth` is what truncation actually is.
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await expect(
@@ -414,7 +414,7 @@ test("changing sort crossfades the container and animates no row", async ({
   // loosening any bound (DEC-163).
   test.slow();
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
   // Stamp the live container so a second one can be told from a re-rendered
   // first one: exactly one re-key must happen, not zero and not two.
@@ -453,7 +453,7 @@ test("changing sort crossfades the container and animates no row", async ({
 test("the mounted-DOM budget holds through a crossfade", async ({ page }) => {
   test.slow();
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
   await openFilters(page);
   await page.evaluate(() => {
@@ -507,7 +507,7 @@ test("animated surfaces really do animate without the preference", async ({
   page,
 }) => {
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
   await openFilters(page);
   await expectAnimated(page, animatedSurfaces.card, "card");
@@ -520,7 +520,7 @@ test("reduced motion reaches the animations no stylesheet can touch", async ({
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
   await openFilters(page);
 
@@ -580,7 +580,7 @@ test("a cover that arrives late shifts nothing in its card", async ({
       }),
     });
   });
-  await page.goto("/");
+  await page.goto("/library");
 
   const card = page.locator("[data-entry-id='1']");
   await expect(card.locator("img")).toHaveAttribute(
@@ -628,7 +628,7 @@ test("keyboard guards and reduced motion remain effective", async ({
 }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
   const bar = page.getByRole("searchbox", {
     name: "Search your library, or add something new",
   });
@@ -687,7 +687,7 @@ for (const viewport of viewports) {
       height: viewport.height,
     });
     await seedLibrary(page);
-    await page.goto("/");
+    await page.goto("/library");
     await expect(page.locator("[data-entry-id='1']")).toBeVisible();
 
     const library = await libraryBox(page);
@@ -769,7 +769,7 @@ test("an expanded score picker stays inside its card at every width", async ({
       width: viewport.width,
       height: viewport.height,
     });
-    await page.goto("/");
+    await page.goto("/library");
     const card = page.locator("[data-entry-id='1']");
     await expect(card).toBeVisible();
     await card.getByRole("button", { name: /^Score for /i }).click();
@@ -824,7 +824,7 @@ test("a card status listbox is not recycled out from under the reader", async ({
     await route.fulfill({ json: { ...entry(1), ...body } });
   });
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
 
   const card = page.locator("[data-entry-id='1']");
   await expect(card).toBeVisible();
@@ -873,7 +873,7 @@ test("grid view is multi-column where space permits and reflows on resize", asyn
 }) => {
   await seedLibrary(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
 
   const columnsAt = async () => {
@@ -918,7 +918,7 @@ test("grid and table views both keep inline editing, navigation and persistence"
     });
   });
   await seedLibrary(page);
-  await page.goto("/");
+  await page.goto("/library");
 
   const card = page.locator("[data-entry-id='3']");
   await expect(card).toBeVisible();
@@ -956,7 +956,7 @@ test("the library scrolls with the page and never inside a box", async ({
   await seedLibrary(page, 10_000);
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("/library");
     await expect(page.locator("[data-entry-id='1']")).toBeVisible();
     const library = page.getByRole("feed", { name: "Library" });
 
@@ -994,7 +994,7 @@ test("the shell's Library link lands on a library, from the library", async ({
   // the backend port asserts on that instead.
   await stubItemTypes(page);
   await seedLibrary(page, 20);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -1025,7 +1025,7 @@ test("the library fits a phone with five domains, and the domain strip scrolls w
     seriesItemType,
   ]);
   await seedLibrary(page, 20);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

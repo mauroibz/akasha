@@ -111,7 +111,7 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
-    // An insights ranking row links here as `/?type=...&key=...&value=...` — without
+    // An insights ranking row links here as `/library?type=...&key=...&value=...` — without
     // reading them back out, the library page would silently ignore the link.
     key: params.get("key") ?? "",
     value: params.get("value") ?? "",
@@ -140,7 +140,7 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   return params;
 }
 
-export function HomePage() {
+export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
     () => filtersFromParams(searchParams),

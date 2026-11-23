@@ -66,7 +66,7 @@ test("the format of a copy is readable from the library row", async ({
   page,
 }) => {
   await library(page, [album()]);
-  await page.goto("/");
+  await page.goto("/library");
 
   const row = page.getByRole("article").filter({ hasText: "Discovery" });
   await expect(row.locator("[data-card-formats]")).toContainText("Vinyl");
@@ -90,7 +90,7 @@ test("the status filter offers the chosen domain's vocabulary, and only that dom
   // control in 029's second pass. What still has to hold is that no domain's
   // vocabulary leaks into another's list.
   await library(page, [album()]);
-  await page.goto("/");
+  await page.goto("/library");
 
   await page.getByRole("button", { name: /^Filters/ }).click();
   let status = page.getByRole("combobox", { name: "Filter by status" });
@@ -124,7 +124,7 @@ test("filtering to owned asks the server for that status", async ({ page }) => {
   page.on("request", (request) => {
     if (request.url().includes("/api/entries")) requests.push(request.url());
   });
-  await page.goto("/");
+  await page.goto("/library");
 
   await page.getByRole("radio", { name: "Album" }).click();
   await page.getByRole("button", { name: /^Filters/ }).click();

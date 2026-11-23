@@ -26,7 +26,7 @@ test("first-run setup claims the library by keyboard at 390px", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await stubAuth(page, "setup");
   await seedLibrary(page, 3);
-  await page.goto("/");
+  await page.goto("/library");
 
   await expect(page).toHaveURL(/\/setup$/);
   await expect(
@@ -79,7 +79,7 @@ test("first-run setup claims the library by keyboard at 390px", async ({
   await expectFocusRing(page.getByRole("button", { name: "Claim library" }));
   await page.keyboard.press("Enter");
 
-  await expect(page).toHaveURL(/\/$/);
+  await expect(page).toHaveURL(/\/library(\?.*)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -136,7 +136,7 @@ test("account sessions stay usable without step-up prompts at 390px", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await stubAuth(page, "authenticated");
   await page.route("**/api/users", (route) => route.fulfill({ json: [] }));
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("button", { name: "Mauro" }).first().click();
   await page.getByRole("button", { name: "People" }).click();
 
@@ -181,7 +181,7 @@ test("sign out cannot be undone with browser back", async ({ page }) => {
   await page.route("**/api/shelves", (route) =>
     route.fulfill({ json: [favorite] }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await page.goto("/shelves/favorites");
   await expect(page.getByRole("heading", { name: "Favorites" })).toBeVisible();
 
@@ -343,7 +343,7 @@ test("two people build two libraries without seeing each other's rows", async ({
     });
   });
 
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -358,7 +358,7 @@ test("two people build two libraries without seeing each other's rows", async ({
   await page.getByLabel("Username").fill("bruno");
   await page.getByLabel("Password").fill("bruno password");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.goto("/");
+  await page.goto("/library");
 
   await expect(
     page.getByRole("heading", { name: "Your library is waiting" }),
@@ -405,6 +405,11 @@ test("two people build two libraries without seeing each other's rows", async ({
   await page.getByLabel("Username").fill("bruno");
   await page.getByLabel("Password").fill("bruno password");
   await page.getByRole("button", { name: "Sign in" }).click();
+  // The library is `/library` since Sprint 130; open it once signed in.
+  await expect(
+    page.getByRole("button", { name: "Bruno" }).first(),
+  ).toBeVisible();
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Admin repair" }),
   ).toBeVisible();

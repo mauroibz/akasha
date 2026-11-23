@@ -56,6 +56,6 @@ describe("PageHeader", () => {
       </MemoryRouter>,
     );
     const back = screen.getByRole("link", { name: "← Library" });
-    expect(back).toHaveAttribute("href", "/");
+    expect(back).toHaveAttribute("href", "/library");
   });
 });

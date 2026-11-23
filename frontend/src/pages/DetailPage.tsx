@@ -270,7 +270,7 @@ export function DetailPage() {
   // working through, instead of the library. Absent (a deep link, the library)
   // means the library — the only place left to go back to.
   const from = (useLocation().state as { from?: string } | null)?.from;
-  const backTo = from === "triage" ? "/inbox" : "/";
+  const backTo = from === "triage" ? "/inbox" : "/library";
   const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
     | "opinion"
@@ -420,7 +420,7 @@ export function DetailPage() {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: queryKeys.library.all });
       toast.success("Removed from your library");
-      navigate("/");
+      navigate("/library");
     } catch (e) {
       // Reported inside the dialog, which is still open and still covering the
       // page: an alert rendered behind a modal is an alert nobody sees.

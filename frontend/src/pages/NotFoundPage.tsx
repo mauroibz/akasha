@@ -12,7 +12,7 @@ export function NotFoundPage() {
       <div className="mt-6 flex gap-3">
         <button
           className="min-h-11 rounded-full bg-primary px-5 font-semibold text-primary-foreground focus-ring"
-          onClick={() => void navigate("/")}
+          onClick={() => void navigate("/library")}
         >
           Go to library
         </button>

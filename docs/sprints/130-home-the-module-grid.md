@@ -1,7 +1,7 @@
 # Sprint 130 — Home: the module grid
 
 **Sprint:** 130
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 54
 **Depends on:** 129
 **Owner:** Mauro

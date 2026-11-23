@@ -106,7 +106,7 @@ test("three EPUBs dropped on Add are previewed, committed and waiting in the Inb
     });
   });
 
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("link", { name: /add/i }).first().click();
   await expect(page).toHaveURL("/add");
 

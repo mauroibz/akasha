@@ -120,7 +120,7 @@ test("dropping from a library row asks too, and Skip saves nothing more", async 
     });
   });
   await seedLibrary(page, 3);
-  await page.goto("/");
+  await page.goto("/library");
   const card = page.locator("[data-entry-id='1']");
   await card.getByRole("combobox").click();
   await page.getByRole("option", { name: "Dropped", exact: true }).click();

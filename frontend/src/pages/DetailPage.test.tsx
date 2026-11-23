@@ -125,7 +125,10 @@ function renderPage(
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/books/:entryId" element={<DetailPage />} />
-          <Route path="/" element={extraRoutes ?? <div>Library page</div>} />
+          <Route
+            path="/library"
+            element={extraRoutes ?? <div>Library page</div>}
+          />
         </Routes>
         <Toaster />
       </MemoryRouter>

@@ -11,6 +11,7 @@ import {
   isEditableTarget,
   libraryFiltersPreferenceKey,
   libraryMotionKey,
+  libraryRedirect,
   mergeUniqueEntries,
   pinnedShelfKey,
   readLibraryFiltersPreference,
@@ -251,5 +252,18 @@ describe("the pinned shelf (Sprint 074 deliverable 6)", () => {
     expect(readPinnedShelf()).toBeNull();
     localStorage.setItem(pinnedShelfKey, JSON.stringify({ slug: "only-slug" }));
     expect(readPinnedShelf()).toBeNull();
+  });
+});
+
+describe("libraryRedirect (Sprint 130)", () => {
+  it("sends a library filter on / to /library, keeping every parameter", () => {
+    expect(libraryRedirect("?type=anime&status=watching&sort=title")).toBe(
+      "/library?type=anime&status=watching&sort=title",
+    );
+  });
+
+  it("leaves a bare / alone", () => {
+    expect(libraryRedirect("")).toBeNull();
+    expect(libraryRedirect("?utm=x")).toBeNull();
   });
 });
