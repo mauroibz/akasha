@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 54,
-  "project_status": "in_progress",
-  "active_sprint": "132",
-  "active_sprint_file": "docs/sprints/132-the-ranked-pile.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "131",
+  "project_status": "ready",
+  "active_sprint": "133",
+  "active_sprint_file": "docs/sprints/133-recommendation-infrastructure.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "132",
   "completed_sprints": [
     "001",
     "002",
@@ -137,8 +137,9 @@
     "128",
     "129",
     "130",
-    "131"
+    "131",
+    "132"
   ],
-  "started_at": "2026-11-23T00:32:13-03:00",
-  "updated_at": "2026-11-23T00:32:13-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T00:57:20-03:00"
 }

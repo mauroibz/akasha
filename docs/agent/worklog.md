@@ -6910,3 +6910,35 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   add dialog over the library* fails about one run in four on a contrast probe inside the add
   dialog, on the base commit too.
 - Next: Sprint 132, the ranked pile.
+
+## 2026-11-23 — Sprint 132 (complete)
+- Done: `application/ranking.py` and `GET /api/pile`; Home `next` and goal picks read it
+  (`68f8b1e`). Prerequisite Home repairs: Lately by the person's day via `?tz=` (`b83f2c2`);
+  the year fills its row beside Lately (`929fca4`). Walkthrough-driven tuning (`5272c90`,
+  `8da1fbd`); e2e reason check (`0993d52`); conformance check for `RankingSpec` (`05bdc34`);
+  specs, DEC-186, roadmap (`375d4fe`).
+- Verified: backend 341 (ranking, goals, home, layout, isolation, app shape, domain,
+  conformance); pile 26 ms median on a 2,000 pile; `/api/home` 119 ms median on 10k (was
+  126–133); vitest related 49; `make check`; Playwright home + diary-goal 18.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by scratchpad `seed_132.py` (137 items:
+  Mistborn #1 read 9 with #2/#3 waiting, Tres Cuerpos #1 an 8, Expanse #1 read and #2 under
+  way, Le Guin/King/García Márquez rated, 30 generic old pile, a book set aside 6 days ago,
+  anime/films/series piles, book and anime goals, an evening import at 21:30/22:40 Buenos
+  Aires), vite 5180, browser in America/Argentina/Buenos_Aires, 1440 and 390, Ink and Paper.
+  Up next: Well of Ascension (Next in Mistborn; you gave book 1 a 9), El bosque oscuro (an 8),
+  Crónica de una muerte anunciada (García Márquez 9.0 across 2), Abaddon's Gate (you're on book
+  2 now), 22/11/63 (King 8.2 across 5). Judgement: the order feels right — continuations of
+  series the person liked, then favourite creators, then the old pile with a small subject
+  lift; the set-aside book stays out of the top fifteen. *Start* on Mistborn #2 moved it to On
+  now and put El bosque oscuro first, The Hero of Ages second. Lately: the three evening
+  additions are one row dated 22 Nov. Year: strip 268 px tall at 1440, covers 53x79 in one
+  column per month. Scroll width 0 at 390. Console: only the auth-off `/api/auth/me` 404.
+- Observed and fixed: "You rate Fiction 7.3 across 59 books" on nearly every pick (a subject
+  on everything read as taste when recent scores ran higher); "a 8"; #3 of a series leading
+  right after #2 was started.
+- Observed, left: all five picks are books — the book goal is short of pace and books carry
+  the most signals; no diversity rule (the approved mockup showed five books too). On a phone
+  the year's strip keeps a 144 px minimum, so a light year shows some empty space above its
+  covers; at 1440 about one cover row stays empty above the busiest month. The goal reason is
+  the second reason on every book (only the first is shown on Home).
+- Next: Sprint 133, recommendation infrastructure.

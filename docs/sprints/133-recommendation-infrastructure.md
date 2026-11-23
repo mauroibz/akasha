@@ -1,7 +1,7 @@
 # Sprint 133 — Recommendation infrastructure
 
 **Sprint:** 133
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 54
 **Depends on:** 132
 **Owner:** Mauro

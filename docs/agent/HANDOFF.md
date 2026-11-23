@@ -2,27 +2,27 @@
 
 ## Where the project stands
 
-**2026-11-22, Sprint 131 closed.** On branch `home-and-recommendations` (local, not pushed):
-Home has every module of the approved design but *More like this* (134): On now, Up next, the
-year, Lately, library tiles, Tidy up, One question, Shelves, Lent out, and *Edit home* (drag or
-arrow keys, S/M/L, hide, Reset) with the layout stored per person (`home_layouts`, migration
-0036, `GET`/`PUT /api/home/layout`). DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT`
-136); DEC-184 and DEC-185 record the choices 130 and 131 made. **Sprint 132 is next and
-`ready`**: the pile ranked locally with a reason each.
+**2026-11-23, Sprint 132 closed.** On branch `home-and-recommendations` (local, not pushed):
+Home has every module of the approved design but *More like this* (134), and *Up next* is the
+pile ranked locally with a reason each (`application/ranking.py`, `GET /api/pile`, DEC-186).
+A goal's picks in the Diary are the same ranking within one library. `/api/home?tz=` makes
+today and Lately's days the person's. DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT`
+136). **Sprint 133 is next and `ready`**: recommendation infrastructure with a fake source.
 
-Things to know for 132:
+Things to know for 133:
 
-- `application/home.py` `_next` is the placeholder 132 replaces; Home shows 3, 4 or 5 picks by
-  *Up next*'s size (`features/home/UpNext.tsx`).
-- `/api/home` must stay under 150 ms on 10,000 entries (`test_home_answers_inside_its_budget…`);
-  it is at 126–133 ms, so a ranking that reads the whole pile has little room.
-- Adding a Home module (134) touches `application/home_layout.py`, `features/home/layout.ts`,
-  `HomePage`'s `hasContent`, and the e2e console's default layout stub (DEC-185).
-- Walkthrough: `scripts/walkthrough.py --keep`, then the scratchpad seeder `seed_131.py` (if the
-  scratchpad survived; otherwise write one), vite on 5180 with `AKASHA_E2E_BACKEND`.
+- `Domain.ranking: RankingSpec` exists; `RecommendationSpec` goes beside it, and the
+  conformance suite's `test_the_suite_covers_every_field_of_the_contract` demands a check for
+  each new `Domain` field.
+- A pile reason is `{signal, text}`; `PileReason.signal` in `api/pile.py` is a closed Literal.
+- Nothing stores a dismissal of a pile entry (DEC-186 point 5).
+- `/api/home` is at about 119 ms median of its 150 ms budget on 10,000 entries.
+- Walkthrough: `scripts/walkthrough.py --keep`, then the scratchpad seeder `seed_132.py` (if
+  the scratchpad survived), vite on 5180 with `AKASHA_E2E_BACKEND`; give the browser context a
+  `timezoneId` to see Lately's local days. e2e stubs `/api/home` by pathname (`isHome` in
+  `e2e/console.ts`), since the URL now carries `?tz=`.
 - `accessibility.spec.ts` *the add dialog over the library* fails about one run in four on the
-  base commit too (contrast probe inside the add dialog); `heavy-library` probes likewise
-  under parallel load. Rerun alone before suspecting a change.
+  base commit too; rerun alone before suspecting a change.
 
 ## Earlier state (release 2.9.0)
 
