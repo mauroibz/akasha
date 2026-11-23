@@ -6,8 +6,46 @@ export function localDate(day: string): Date {
   return new Date(year, (month || 1) - 1, date || 1);
 }
 
-/** The most cells a month draws; the rest is a count. */
+/** The most cells a month draws before the strip is measured; the rest is a count. */
 export const MONTH_CELLS = 4;
+
+/** The gap between covers, in px (Tailwind's `gap-1`). */
+const GAP = 4;
+
+export interface MonthFit {
+  /** Covers side by side in a month's column. */
+  columns: number;
+  /** The most cells (covers and goal slots) a month draws; the rest is a count. */
+  cells: number;
+  /** How tall each cover stands, or `null` before the strip is measured. */
+  coverHeight: number | null;
+}
+
+/**
+ * How a month's covers fill the room the strip has (Sprint 132). Beside Lately the
+ * year is as tall as Lately, and two columns of thumbnails left most of it empty:
+ * the fewest columns that show the busiest month whole, so covers are as large as
+ * the column allows; when even three columns cannot, three, and the rest a count.
+ * `box` is one month's cover area: its width and the height left under the labels.
+ */
+export function fitMonths(
+  box: { width: number; height: number },
+  most: number,
+): MonthFit {
+  if (box.width <= 0 || box.height <= 0)
+    return { columns: 2, cells: MONTH_CELLS, coverHeight: null };
+  let fit: MonthFit = { columns: 1, cells: 0, coverHeight: null };
+  for (const columns of [1, 2, 3]) {
+    const coverHeight = ((box.width - GAP * (columns - 1)) / columns) * 1.5;
+    const rows = Math.max(
+      1,
+      Math.floor((box.height + GAP) / (coverHeight + GAP)),
+    );
+    fit = { columns, cells: rows * columns, coverHeight };
+    if (fit.cells >= most) return fit;
+  }
+  return fit;
+}
 
 export interface MonthCell {
   month: number;

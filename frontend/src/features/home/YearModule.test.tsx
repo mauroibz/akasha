@@ -2,7 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { YearModule } from "./YearModule";
-import { yearCells } from "./year";
+import { fitMonths, MONTH_CELLS, yearCells } from "./year";
 import { emptyHome, fullHome, renderWithRouter, types } from "./testHome";
 
 const today = new Date(2026, 10, 22);
@@ -46,5 +46,35 @@ describe("YearModule", () => {
     const year = emptyHome().year!;
     renderWithRouter(<YearModule year={year} types={types} today={today} />);
     expect(screen.getByText(/Nothing finished yet in 2026/)).toBeVisible();
+  });
+
+  it("fills the height it is given with larger covers rather than leaving it empty", () => {
+    // Beside Lately on a wide screen: a 45 px month column and 250 px of strip.
+    const roomy = fitMonths({ width: 45, height: 250 }, 3);
+    expect(roomy.columns).toBe(1);
+    expect(roomy.cells).toBeGreaterThanOrEqual(3);
+    // Every month's covers stand in one column, as tall as the column is wide allows.
+    expect(roomy.coverHeight).toBeCloseTo(45 * 1.5);
+    // A short strip takes two columns before it hides a cover behind a count.
+    const short = fitMonths({ width: 45, height: 110 }, 3);
+    expect(short.columns).toBe(2);
+    expect(short.cells).toBeGreaterThanOrEqual(3);
+  });
+
+  it("shows more than four a month when there is room, and counts the rest", () => {
+    expect(
+      fitMonths({ width: 45, height: 600 }, 9).cells,
+    ).toBeGreaterThanOrEqual(8);
+    const crowded = fitMonths({ width: 45, height: 120 }, 24);
+    expect(crowded.columns).toBe(3);
+    expect(crowded.cells).toBeLessThan(24);
+  });
+
+  it("keeps the old two columns of four until it has been measured", () => {
+    expect(fitMonths({ width: 0, height: 0 }, 6)).toMatchObject({
+      columns: 2,
+      cells: MONTH_CELLS,
+      coverHeight: null,
+    });
   });
 });

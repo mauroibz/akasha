@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import type { HomeYear } from "@/api/home";
@@ -6,7 +7,7 @@ import { CoverImage } from "@/components/CoverImage";
 import { cn } from "@/lib/utils";
 
 import { HomeModule } from "./HomeModule";
-import { leadGoal, MONTH_CELLS, yearCells } from "./year";
+import { fitMonths, leadGoal, yearCells } from "./year";
 
 const initials = Array.from({ length: 12 }, (_, month) =>
   new Intl.DateTimeFormat("en", { month: "narrow" }).format(
@@ -22,7 +23,8 @@ const names = Array.from({ length: 12 }, (_, month) =>
 /**
  * The year (Sprint 130): twelve months, the year's covers in each, and from this
  * month on an empty slot for each thing the lead goal still needs. Other libraries'
- * finishes that month are a count beside them. Each cover opens its entry.
+ * finishes that month are a count beside them. Each cover opens its entry. The strip
+ * takes whatever height its row gives it, and the covers grow to fill it (Sprint 132).
  */
 export function YearModule({
   year,
@@ -42,10 +44,27 @@ export function YearModule({
     (type) => type.id === goal?.item_type,
   );
   const plural = (declared?.plural_label ?? "items").toLowerCase();
+  const area = useRef<HTMLDivElement>(null);
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const element = area.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const measure = () =>
+      setBox({ width: element.clientWidth, height: element.clientHeight });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const most = Math.max(
+    0,
+    ...cells.map((cell) => cell.covers.length + cell.empty),
+  );
+  const fit = fitMonths(box, Math.max(1, most));
   return (
     <HomeModule
       title={String(year.year)}
-      className={className}
+      className={cn("flex flex-col", className)}
       aside={
         <Link
           to="/diary"
@@ -76,66 +95,80 @@ export function YearModule({
           finished in {year.year}
         </p>
       )}
-      <ol className="grid min-w-0 grid-cols-12 gap-1">
-        {cells.map((cell) => {
-          const shown = cell.covers.slice(0, MONTH_CELLS);
-          const more = cell.covers.length - shown.length;
-          const room = Math.max(
-            0,
-            Math.min(cell.empty, MONTH_CELLS - shown.length),
-          );
-          return (
-            <li
-              key={cell.month}
-              aria-label={`${names[cell.month - 1]}: ${cell.covers.length + cell.others} finished`}
-              aria-current={cell.current ? "date" : undefined}
-              className="flex h-full min-w-0 flex-col items-stretch gap-1"
-            >
-              <div className="grid min-h-12 flex-1 grid-cols-1 content-end gap-1 min-[720px]:grid-cols-2">
-                {shown.map((cover) => (
-                  <Link
-                    key={cover.entry_id}
-                    to={`/books/${cover.entry_id}`}
-                    aria-label={cover.title}
-                    title={cover.title}
-                    className="block rounded-sm focus-ring"
-                  >
-                    <CoverImage
-                      src={cover.cover_url}
-                      alt=""
-                      className="aspect-[2/3] w-full rounded-sm object-cover"
-                      placeholderClassName="aspect-[2/3] w-full rounded-sm [&_svg]:hidden"
+      <div
+        className={cn(
+          "relative",
+          // An empty year keeps to a strip of month letters; a year with covers fills.
+          most > 0 ? "min-h-36 flex-1" : "min-h-12",
+        )}
+      >
+        <ol className="absolute inset-0 grid min-w-0 grid-cols-12 gap-1">
+          {cells.map((cell) => {
+            const shown = cell.covers.slice(0, fit.cells);
+            const more = cell.covers.length - shown.length;
+            const room = Math.max(
+              0,
+              Math.min(cell.empty, fit.cells - shown.length),
+            );
+            return (
+              <li
+                key={cell.month}
+                aria-label={`${names[cell.month - 1]}: ${cell.covers.length + cell.others} finished`}
+                aria-current={cell.current ? "date" : undefined}
+                className="flex min-h-0 min-w-0 flex-col items-stretch gap-1"
+              >
+                <div
+                  ref={cell.month === 1 ? area : undefined}
+                  className="grid min-h-0 flex-1 content-end gap-1 overflow-hidden"
+                  style={{
+                    gridTemplateColumns: `repeat(${fit.columns}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {shown.map((cover) => (
+                    <Link
+                      key={cover.entry_id}
+                      to={`/books/${cover.entry_id}`}
+                      aria-label={cover.title}
+                      title={cover.title}
+                      className="block rounded-sm focus-ring"
+                    >
+                      <CoverImage
+                        src={cover.cover_url}
+                        alt=""
+                        className="aspect-[2/3] w-full rounded-sm object-cover"
+                        placeholderClassName="aspect-[2/3] w-full rounded-sm [&_svg]:hidden"
+                      />
+                    </Link>
+                  ))}
+                  {Array.from({ length: room }, (_, index) => (
+                    <span
+                      key={`room-${index}`}
+                      aria-hidden="true"
+                      className="block aspect-[2/3] w-full rounded-sm border border-dashed border-primary/50"
                     />
-                  </Link>
-                ))}
-                {Array.from({ length: room }, (_, index) => (
-                  <span
-                    key={`room-${index}`}
-                    aria-hidden="true"
-                    className="block aspect-[2/3] w-full rounded-sm border border-dashed border-primary/50"
-                  />
-                ))}
-              </div>
-              <span
-                className={cn(
-                  "text-center text-[10px] tabular-nums text-muted-foreground",
-                  cell.current && "font-semibold text-primary",
-                )}
-                aria-hidden="true"
-              >
-                {initials[cell.month - 1]}
-              </span>
-              {/* Always drawn, so every month's letter sits on one line. */}
-              <span
-                className="h-3 text-center text-[10px] leading-3 tabular-nums text-muted-foreground"
-                aria-hidden="true"
-              >
-                {more + cell.others > 0 ? `+${more + cell.others}` : ""}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
+                  ))}
+                </div>
+                <span
+                  className={cn(
+                    "text-center text-[10px] tabular-nums text-muted-foreground",
+                    cell.current && "font-semibold text-primary",
+                  )}
+                  aria-hidden="true"
+                >
+                  {initials[cell.month - 1]}
+                </span>
+                {/* Always drawn, so every month's letter sits on one line. */}
+                <span
+                  className="h-3 text-center text-[10px] leading-3 tabular-nums text-muted-foreground"
+                  aria-hidden="true"
+                >
+                  {more + cell.others > 0 ? `+${more + cell.others}` : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
       {goal &&
       year.months.some((m) => m.count > (m.counts[goal.item_type] ?? 0)) ? (
         <p className="mt-2 text-xs text-muted-foreground">
