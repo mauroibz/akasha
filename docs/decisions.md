@@ -7356,3 +7356,21 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      Additions are counted per UTC hour and placed by local day, exact on whole-hour offsets.
 - Consequences: Sprint 133's recommendation sources can cite the same reason shape; Sprint 136
   adds embeddings as one more signal in `ranking.py`.
+
+## DEC-187 — The model source is hosted, by API key, in three provider kinds
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 135 planned a local model on the owner's GPU. The owner: "the model should be
+  configurable via API key, support both openai compatible, claude API and gemini. assume a
+  claude key for testing, do not run it locally."
+- Decision: amends DEC-183 point 7.
+  1. The model source selects a provider by configuration (`anthropic`, `gemini`, `openai` for
+     any OpenAI-compatible endpoint) and authenticates with an API key. Nothing runs locally.
+  2. Claude is the reference provider for tests.
+  3. Embeddings (Sprint 136) support Gemini and OpenAI-compatible endpoints only, because the
+     Claude API offers no embeddings; with only a Claude key they are off.
+  4. Where no key is present in the development environment, fixtures follow each API's
+     documented response shape and are marked unrecorded, with a script to re-record them; the
+     live check is the owner's, after the line. This is an owner-directed exception to the
+     recorded-real-responses rule, limited to these two sources.

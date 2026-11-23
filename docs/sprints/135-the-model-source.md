@@ -8,8 +8,9 @@
 
 ## Objective
 
-A language model behind any OpenAI-compatible endpoint, local or hosted, can be a recommendation
-source for every domain, with its candidates shown only after the domain resolves them.
+A hosted language model, chosen by configuration and an API key, can be a recommendation source
+for every domain, with its candidates shown only after the domain resolves them. Three provider
+kinds are supported: the Claude API, Gemini, and any OpenAI-compatible endpoint (DEC-187).
 
 ## Required context
 
@@ -18,41 +19,49 @@ source for every domain, with its candidates shown only after the domain resolve
 
 ## Deliverables
 
-1. Configuration: `AKASHA_RECS_MODEL_URL` (base URL), `AKASHA_RECS_MODEL`, optional
-   `AKASHA_RECS_MODEL_KEY`, and a daily call budget. Unset means `not_configured`.
-2. `model` source: builds a compact prompt from the seed (or profile: top scores, recent
+1. Configuration: `AKASHA_RECS_MODEL_PROVIDER` (`anthropic` | `gemini` | `openai`),
+   `AKASHA_RECS_MODEL` (model id), `AKASHA_RECS_MODEL_KEY` (falling back to the provider's
+   conventional variable: `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`), optional
+   `AKASHA_RECS_MODEL_URL` for OpenAI-compatible endpoints, and a daily call budget. No key means
+   `not_configured`. Defaults per provider are a current, inexpensive model; for Claude read the
+   `claude-api` skill for model ids and request shape rather than relying on memory.
+2. A `ModelClient` port with three adapters (Claude Messages API, Gemini `generateContent`,
+   OpenAI-compatible chat completions), each a thin HTTP adapter over the app's shared client:
+   same prompt in, text out, errors mapped to the provider-error types the app already has.
+   Keys never appear in logs or responses.
+3. `model` source: builds a compact prompt from the seed (or profile: top scores, recent
    finishes, dismissed, the pile's titles so it does not repeat them) for one domain, asks for
    strict JSON (`title`, `creator`, `year`, `reason`) with up to eight items, validates it, and
    returns candidates. A malformed reply fails the round with a recorded reason.
-3. Every domain declares `"model"` after its existing sources; a model candidate that the
+4. Every domain declares `"model"` after its existing sources; a model candidate that the
    domain's resolve cannot find is stored `unresolved` and never shown.
-4. The sheet's *Model* segment; Settings shows whether the source is configured and what it
-   sends (titles and scores, nothing else).
-5. Recordings: real responses from a real endpoint. Preferred: a local server on this machine
-   (Ollama or llama.cpp run from the scratchpad, no system install); a hosted one only with the
-   owner's key.
+5. The sheet's *Model* segment; Settings shows whether the source is configured, which provider
+   and model, and what it sends (titles, creators, years and scores, nothing else).
+6. Recordings: no model runs locally (owner, 2026-11-23). Claude is the reference provider.
+   `scripts/record_model_fixtures.py` records real replies for each provider whose key is present;
+   if no key is available in the environment, fixtures are written in each API's documented
+   response shape, marked `"recorded": false` in a sidecar, and the HANDOFF and Outcome say
+   that a live run with the owner's key is pending (owner-directed exception to the recorded-real
+   rule, DEC-187).
 
 ## Acceptance criteria
 
-1. Against a recorded reply, a book seed yields resolved candidates and drops an invented title
-   (tested with a recorded reply that contains one).
-2. Unset configuration: the segment says how to configure it; nothing fails.
-3. The prompt contains no data beyond titles, creators, years and scores (tested).
+1. Against a Claude-shaped reply, a book seed yields resolved candidates and drops an invented
+   title (tested with a reply that contains one); the same for Gemini and OpenAI shapes.
+2. Provider selection by configuration; no key: the segment says how to configure it; nothing
+   fails (tested).
+3. The prompt contains no data beyond titles, creators, years and scores (tested), and the key
+   never reaches a log line (tested).
 4. Budget exhaustion stops further calls (tested).
 
 ## Verification
 
-Per DEC-167; one live round against the real endpoint used for the recordings; a walkthrough of
-the *Model* segment.
+Per DEC-167; a live round against Claude if a key is present, otherwise recorded as pending; a
+walkthrough of the *Model* segment with a replayed transport.
 
 ## Explicit non-scope
 
-Embeddings (136); choosing a hosted provider for the owner.
-
-## Risks and decisions to surface
-
-If no real endpoint can be run, the sprint stays blocked rather than shipping hand-written
-recordings (AGENTS.md: external boundaries are proven against recorded real responses).
+Embeddings (136); running a model locally.
 
 ## Outcome
 

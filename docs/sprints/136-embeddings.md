@@ -22,7 +22,11 @@ embedding endpoint.
 
 ## Deliverables
 
-1. Configuration: `AKASHA_RECS_EMBEDDINGS_URL`, `AKASHA_RECS_EMBEDDINGS_MODEL`, optional key.
+1. Configuration: `AKASHA_RECS_EMBEDDINGS_PROVIDER` (`gemini` | `openai`, the latter covering
+   any OpenAI-compatible endpoint such as Voyage), `AKASHA_RECS_EMBEDDINGS_MODEL`,
+   `AKASHA_RECS_EMBEDDINGS_KEY` (falling back to the provider's conventional variable), optional
+   `AKASHA_RECS_EMBEDDINGS_URL`. The Claude API has no embeddings endpoint, so `anthropic` is not
+   a choice here; with only a Claude key, embeddings are off and everything else works (DEC-187).
 2. Migration `0038_item_embeddings`: `item_embeddings(item_id PK → items, model, dims, vector
    BLOB, text_hash, created_at)`. The text is title, creator, year, and the domain's declared
    descriptive fields (subjects, genres, synopsis) in a fixed order.
@@ -32,8 +36,8 @@ embedding endpoint.
    already a dependency, otherwise plain floats; a 10,000-item library must answer under 300 ms).
 5. The ranked pile gains a similarity signal ("Close to what you scored 9: …"); other sources'
    candidates, once enriched, are re-ranked by it.
-6. Recordings from a real embedding endpoint (the same local server as Sprint 135 if it serves
-   embeddings).
+6. Recordings from a real endpoint when a key is present; otherwise fixtures in the documented
+   response shape, marked unrecorded, as in Sprint 135. No model runs locally.
 
 ## Acceptance criteria
 
@@ -45,7 +49,7 @@ embedding endpoint.
 
 ## Verification
 
-Per DEC-167; a live pass with the real endpoint and a walkthrough of the segment and of *Up next*
+Per DEC-167; a live pass if a key is present (else recorded as pending) and a walkthrough of the segment and of *Up next*
 with the similarity signal. Then, because this closes the line, `make test` and the full
 Playwright suite before any release.
 
