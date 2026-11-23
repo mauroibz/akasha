@@ -1,7 +1,7 @@
 # Sprint 148 — Themes
 
 **Sprint:** 148
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 147
 **Owner:** Mauro

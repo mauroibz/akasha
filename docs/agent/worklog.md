@@ -7257,3 +7257,15 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Note for e2e: the goal's band and invitation are behind the *Goal* tab; a spec that opens
   `/diary` for them clicks it first.
 - Next: Sprint 147, every day.
+
+## 2026-11-23 — Sprint 147: every day (complete)
+
+- Done: migration 0040 and `/api/lit-days`; the edit route lights a day; `EveryDay.tsx` as the
+  Journal's first widget.
+- Verified: see the sprint's Outcome; a copy of the development library migrated with counts
+  unchanged.
+- Correction: Sprint 143 closed with `test_library_api.py`'s route list missing `/api/media`
+  (that file was not among the tests run then). Fixed in this sprint. A new route means three
+  tests: `test_isolation.py`, `test_app_shape.py` (regenerate its fixture) and
+  `test_library_api.py`.
+- Next: Sprint 148, themes, the last of the line.

@@ -5,9 +5,9 @@
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
 all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange), 143
-(your media), 144 (shelves as a view), 145 (shelves with a rule) and 146 (the Journal) are
-complete; **Sprint 147 (every day) is next**. Migration **0039** is
-new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
+(your media), 144 (shelves as a view), 145 (shelves with a rule), 146 (the Journal) and 147 (every
+day) are complete; **Sprint 148 (themes) is next**, the last. Migrations **0039** and **0040**
+are new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 
 What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<main>`; widths

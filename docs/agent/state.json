@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "147",
-  "active_sprint_file": "docs/sprints/147-every-day.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "146",
+  "project_status": "ready",
+  "active_sprint": "148",
+  "active_sprint_file": "docs/sprints/148-themes.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "147",
   "completed_sprints": [
     "001",
     "002",
@@ -152,8 +152,9 @@
     "143",
     "144",
     "145",
-    "146"
+    "146",
+    "147"
   ],
-  "started_at": "2026-11-23T14:23:43-03:00",
-  "updated_at": "2026-11-23T14:23:43-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T14:34:46-03:00"
 }

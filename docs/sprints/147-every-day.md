@@ -1,7 +1,7 @@
 # Sprint 147 — Every day
 
 **Sprint:** 147
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 146
 **Owner:** Mauro
@@ -57,8 +57,8 @@ A year view, streaks, reminders. Logging progress from the question (a later exp
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commits: `BACK` (the record, its API, the hook on progress
-and finishing), `FRONTH` (the widget).
+Completed 2026-11-23 (DEC-193). Commits: `d31dec9` (the record, its API, the hook on progress
+and finishing), `c915fc4` (the widget).
 
 - **The record.** Migration 0040, `lit_days`; past days lit from stored finish and start
   dates. `PATCH /api/entries/{id}` lights today when progress is logged and the finished day
