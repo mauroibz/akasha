@@ -180,6 +180,6 @@ DOMAIN = Domain(
             "name",
         ),
     ),
-    ranking=RankingSpec(affinity_fields=("genres",)),
+    ranking=RankingSpec(affinity_fields=("genres",), text_fields=("genres", "synopsis")),
     recommendation=ANIME_RECOMMENDATION,
 )

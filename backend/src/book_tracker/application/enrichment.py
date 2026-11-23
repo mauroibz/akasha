@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -94,6 +94,7 @@ class EnrichmentHandler:
         quota: ProviderQuota | None = None,
         cover_client: httpx.AsyncClient | None = None,
         data_dir: Path | None = None,
+        on_enriched: Callable[[int], object] | None = None,
     ) -> None:
         self.engine = engine
         self.providers = providers
@@ -101,6 +102,9 @@ class EnrichmentHandler:
         self.quota = quota
         self.cover_client = cover_client
         self.data_dir = data_dir
+        #: Told an item's id once a lookup filled something: its text may have
+        #: changed, so its embedding may be stale (Sprint 136).
+        self.on_enriched = on_enriched
         self.repo = JobRepository(engine)
 
     async def _fetch(
@@ -347,6 +351,8 @@ class EnrichmentHandler:
             if noted:
                 filled.append("notes")
 
+        if filled and self.on_enriched is not None:
+            await off_loop(self.on_enriched, item_id)
         return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
 
     def _fill_empty_fields(

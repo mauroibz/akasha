@@ -352,3 +352,20 @@ asks), `User-Agent: Akasha/0.1 (<contact address>)`:
 | `openlibrary_search_ficciones.json` | `Ficciones Jorge Luis Borges` — first row an edition of 1983 whose work was first published 1945; the model says 1944, within the year's tolerance once the original year counts. |
 | `openlibrary_search_los_detectives_salvajes.json` | `Los detectives salvajes Roberto Bolaño` — first row the 2005 edition of the 1998 novel. |
 | `openlibrary_search_invented_jardin.json` | `El jardín de los espejos quietos Aurelio Benavídez` — **no results**: the invented title is stored `unresolved` and never shown. |
+
+## Embeddings (Sprint 136, 2026-11-23)
+
+**These are not recordings either**, for the same reason and under the same exception
+(DEC-187 point 4): no `GEMINI_API_KEY` or `OPENAI_API_KEY` was present. Each reply is written
+in its API's documented shape, for the six books of `tests/embedding_library.py`, whose exact
+texts `embedding_fixtures.json` lists (a test fails if the text an item is embedded from
+changes). The vectors are fabricated from a few topic directions plus noise, so that the
+order `NEAREST_TO_RAYUELA` holds; a real model may order the books otherwise.
+`scripts/record_embedding_fixtures.py` replaces a provider's file with a real reply when its
+key is exported, and sets its entry to `true`.
+
+| File | Shape |
+|---|---|
+| `embeddings_gemini_batch_library.json` | Gemini `batchEmbedContents`: `embeddings[].values`, 768 each (the `outputDimensionality` asked for), in the order asked. |
+| `embeddings_openai_library.json` | OpenAI `/v1/embeddings`: `data[].{object, index, embedding}` (1,536 each), `model`, `usage`. Voyage answers the same shape. |
+| `embeddings_openai_error_401.json` | The documented error body for a refused key (`invalid_api_key`), which echoes part of the key: never copied into a message. |

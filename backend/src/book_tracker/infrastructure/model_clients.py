@@ -107,8 +107,16 @@ async def _post(
     headers: Mapping[str, str],
     body: Mapping[str, Any],
     attempts: int,
+    *,
+    timeout: float = MODEL_TIMEOUT_SECONDS,
+    key_setting: str = "AKASHA_RECS_MODEL_KEY",
+    model_setting: str = "AKASHA_RECS_MODEL",
 ) -> Mapping[str, Any]:
-    """POST through the shared boundary, every failure mapped to a `SourceError`."""
+    """POST through the shared boundary, every failure mapped to a `SourceError`.
+
+    The settings named are the ones a refusal tells a person to check: the model
+    source's by default, the embeddings' when `embedding_clients` posts (Sprint 136).
+    """
     name = _label(provider)
     try:
         return await bounded_json_object(
@@ -116,7 +124,7 @@ async def _post(
             url,
             params={},
             headers={"Content-Type": "application/json", **headers},
-            timeout=MODEL_TIMEOUT_SECONDS,
+            timeout=timeout,
             attempts=attempts,
             method="POST",
             json_body=body,
@@ -125,11 +133,11 @@ async def _post(
         status = error.response.status_code
         if status in (401, 403):
             raise SourceError(
-                f"{name} refused the key; check AKASHA_RECS_MODEL_KEY", code="unauthorized"
+                f"{name} refused the key; check {key_setting}", code="unauthorized"
             ) from None
         if status == 404:
             raise SourceError(
-                f"{name} does not know that model; check AKASHA_RECS_MODEL", code="not_found"
+                f"{name} does not know that model; check {model_setting}", code="not_found"
             ) from None
         if status == 429:
             raise SourceError(

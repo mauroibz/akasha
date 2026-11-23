@@ -175,6 +175,11 @@ DOMAIN = Domain(
             "escritora",
         ),
     ),
-    ranking=RankingSpec(series_field="series", series_in_title=True, affinity_fields=("subjects",)),
+    ranking=RankingSpec(
+        series_field="series",
+        series_in_title=True,
+        affinity_fields=("subjects",),
+        text_fields=("subjects", "description"),
+    ),
     recommendation=BOOK_RECOMMENDATION,
 )

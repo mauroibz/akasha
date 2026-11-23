@@ -505,6 +505,11 @@ def ranking_reads_fields_this_domain_declares(domain: Domain) -> None:
     for name in ranking.affinity_fields:
         assert name in fields, f"{domain.item_type} ranks by undeclared {name}"
         assert fields[name].groupable, f"{domain.item_type}'s {name} is not groupable"
+    # Sprint 136: an embedding's text reads these by name, as words.
+    assert len(set(ranking.text_fields)) == len(ranking.text_fields)
+    for name in ranking.text_fields:
+        assert name in fields, f"{domain.item_type} embeds undeclared {name}"
+        assert fields[name].type in ("text", "long_text"), f"{domain.item_type}: {name} is not text"
 
 
 @registry_check

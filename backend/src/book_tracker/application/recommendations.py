@@ -831,6 +831,7 @@ class SuggestionEnricher:
         rate_limiter: RateLimiter | None = None,
         cover_client: httpx.AsyncClient | None = None,
         data_dir: Path | None = None,
+        on_cached: Callable[[int], object] | None = None,
     ) -> None:
         self.engine = engine
         self.providers = providers
@@ -838,6 +839,9 @@ class SuggestionEnricher:
         self.rate_limiter = rate_limiter
         self.cover_client = cover_client
         self.data_dir = data_dir
+        #: Told a cached item's id, so its embedding is made (Sprint 136): re-ranking
+        #: a round reads it.
+        self.on_cached = on_cached
 
     def _serving(self, domain: Domain) -> dict[str, Provider]:
         serving = {
@@ -933,6 +937,8 @@ class SuggestionEnricher:
             logger.warning("resolved record names two cached items")
             return None
         await self._install_cover(repository, item_id, record)
+        if self.on_cached is not None:
+            await off_loop(self.on_cached, item_id)
         return item_id
 
     def _has_cover(self, item_id: int) -> bool:

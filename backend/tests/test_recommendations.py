@@ -199,10 +199,12 @@ def test_the_registry_reports_a_source_without_its_configuration() -> None:
 def test_the_registry_is_filled_from_configuration(tmp_path: Path) -> None:
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
 
-    def needs_a_token(settings: Settings, _client: Any) -> Any:
+    def needs_a_token(settings: Settings, _client: Any, _engine: Any) -> Any:
         return NotConfigured("keyed", "Set KEYED_TOKEN to turn it on")
 
-    registry = build_source_registry(configured, None, (needs_a_token, lambda _s, _c: FakeSource()))
+    registry = build_source_registry(
+        configured, None, (needs_a_token, lambda _s, _c, _e: FakeSource())
+    )
     assert registry.configured("fake") and not registry.configured("keyed")
     assert build_source_registry(configured, None).names() == ("tmdb", "model")
 

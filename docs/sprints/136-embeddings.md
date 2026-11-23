@@ -1,7 +1,7 @@
 # Sprint 136 — Embeddings
 
 **Sprint:** 136
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 54
 **Depends on:** 135
 **Owner:** Mauro

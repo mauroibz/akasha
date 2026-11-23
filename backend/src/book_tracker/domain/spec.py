@@ -348,6 +348,11 @@ class RankingSpec:
     #: Groupable fields whose values say what a work is about (subjects, genres): the
     #: person's recent high scores across a value lift waiting entries carrying it.
     affinity_fields: tuple[str, ...] = ()
+    #: Fields that say what a work is, in the order an item's embedding text carries
+    #: them after its title, creator and year (Sprint 136): subjects or genres, then a
+    #: description. Declared, so the shared text builder names no field; empty means
+    #: the title, creator and year alone.
+    text_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

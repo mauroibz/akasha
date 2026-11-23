@@ -1,0 +1,29 @@
+{
+  "recorded": false,
+  "note": "Written 2026-11-23 in each API's documented response shape: no GEMINI_API_KEY or OPENAI_API_KEY was present in the development environment (DEC-187 point 4). The vectors are fabricated from topic mixtures so that the order in tests/embedding_library.py holds; a real reply may order the books differently. scripts/record_embedding_fixtures.py replaces each provider's file with a real reply and sets its entry to recorded: true.",
+  "texts": [
+    "Rayuela\nBy Julio Cortázar\n1963\nSubjects: Argentine fiction, Experimental fiction, Paris",
+    "62: Modelo para armar\nBy Julio Cortázar\n1968\nSubjects: Argentine fiction, Experimental fiction, Paris",
+    "A Brief History of Time\nBy Stephen Hawking\n1988\nSubjects: Cosmology, Popular science",
+    "Ficciones\nBy Jorge Luis Borges\n1944\nSubjects: Argentine fiction, Short stories",
+    "The Hobbit\nBy J. R. R. Tolkien\n1937\nSubjects: Fantasy fiction, Dragons",
+    "Pedro Páramo\nBy Juan Rulfo\n1955\nSubjects: Mexican fiction, Experimental fiction"
+  ],
+  "files": {
+    "embeddings_gemini_batch_library.json": {
+      "provider": "gemini",
+      "recorded": false,
+      "shape": "Gemini v1beta models/{model}:batchEmbedContents, outputDimensionality 768"
+    },
+    "embeddings_openai_library.json": {
+      "provider": "openai",
+      "recorded": false,
+      "shape": "OpenAI /v1/embeddings, text-embedding-3-small (1536)"
+    },
+    "embeddings_openai_error_401.json": {
+      "provider": "openai",
+      "recorded": false,
+      "shape": "OpenAI error body, 401 invalid_api_key"
+    }
+  }
+}

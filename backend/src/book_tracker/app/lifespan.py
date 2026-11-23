@@ -24,7 +24,17 @@ from book_tracker.api.auth import (
     has_credentialed_user,
 )
 from book_tracker.app.providers import build_provider_catalog
-from book_tracker.app.recommendations import DEFAULT_RECOMMEND_LIMITS, build_source_registry
+from book_tracker.app.recommendations import (
+    DEFAULT_RECOMMEND_LIMITS,
+    build_embedding,
+    build_source_registry,
+)
+from book_tracker.application.embeddings import (
+    EMBED_JOB,
+    EmbedItemsHandler,
+    after_change,
+    request_if_needed,
+)
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.import_search import ImportSearchHandler
 from book_tracker.application.recommendations import (
@@ -246,6 +256,17 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
                 configured.tmdb_read_token,
                 configured.admin_password.get_secret_value() if configured.admin_password else "",
                 configured.setup_token.get_secret_value() if configured.setup_token else "",
+                *(
+                    secret.get_secret_value()
+                    for secret in (
+                        configured.recs_model_key,
+                        configured.recs_embeddings_key,
+                        configured.anthropic_api_key,
+                        configured.gemini_api_key,
+                        configured.openai_api_key,
+                    )
+                    if secret is not None
+                ),
             ),
         )
         # "tmp" is the image's TMPDIR (Sprint 128): uploads spool on the data volume, not in
@@ -311,6 +332,13 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
         app.state.provider_quota = ProviderQuota(
             app.state.engine, limits=configured.provider_daily_limits
         )
+        # Embeddings (Sprint 136): off without a Gemini or OpenAI-compatible key. When
+        # on, an item whose text became known (enriched, or cached for a suggestion) is
+        # embedded by the `embed_items` job, and the hourly pass catches the rest.
+        embedder = build_embedding(configured, provider_client, app.state.engine)
+        app.state.embedder = embedder
+        app.state.embedding_model = embedder.model if embedder is not None else None
+        text_changed = after_change(app.state.engine, app.state.embedding_model)
         enrichment_handler = EnrichmentHandler(
             app.state.engine,
             app.state.providers,
@@ -318,6 +346,7 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             quota=app.state.provider_quota,
             cover_client=provider_client,
             data_dir=configured.data_dir,
+            on_enriched=text_changed,
         )
         search_handler = ImportSearchHandler(
             app.state.engine,
@@ -328,7 +357,9 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
         # Recommendations (Sprint 133): sources by name from configuration; a round's
         # own request is counted per source, and resolving its candidates spends the
         # provider budgets above.
-        app.state.recommendation_sources = build_source_registry(configured, provider_client)
+        app.state.recommendation_sources = build_source_registry(
+            configured, provider_client, engine=app.state.engine
+        )
         suggestion_enricher = SuggestionEnricher(
             app.state.engine,
             app.state.providers,
@@ -336,6 +367,7 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             rate_limiter=rate_limiter,
             cover_client=provider_client,
             data_dir=configured.data_dir,
+            on_cached=text_changed,
         )
         recommend_handler = RecommendHandler(
             app.state.engine,
@@ -361,16 +393,23 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
                 ENRICH_SUGGESTION_JOB: EnrichSuggestionHandler(
                     app.state.engine, suggestion_enricher
                 ),
+                EMBED_JOB: EmbedItemsHandler(app.state.engine, embedder),
             },
             rate_limiter=rate_limiter,
             data_dir=configured.data_dir,
             # TMDB's six-month window (DEC-183 point 6): suggestions past their
             # source's retention are deleted on an idle pass, once an hour.
+            # Missing or stale vectors are queued from the same pass (Sprint 136).
             housekeeping=(
                 partial(
                     prune_expired_suggestions,
                     app.state.engine,
                     app.state.recommendation_sources,
+                ),
+                *(
+                    (partial(request_if_needed, app.state.engine, embedder.model),)
+                    if embedder is not None
+                    else ()
                 ),
             ),
         )
