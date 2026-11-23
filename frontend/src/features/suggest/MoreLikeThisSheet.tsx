@@ -207,16 +207,29 @@ export function MoreLikeThisSheet({
   const data = roundId !== null ? round.data : undefined;
 
   useJobEvent((event) => {
-    if (roundId === null || !data) return;
     const progress = event.progress as Record<string, unknown>;
-    const ours =
-      (event.kind === "recommend" && progress.round_id === roundId) ||
-      (event.kind === "enrich_suggestion" &&
-        data.suggestions.some((row) => row.id === progress.suggestion_id));
-    if (!ours) return;
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.suggestionRound(roundId),
-    });
+    // Every round this sheet asked for, not only the one shown: a round switched
+    // away from while it was still working is current when switched back to.
+    if (event.kind === "recommend") {
+      const asked = Object.values(rounds);
+      if (
+        typeof progress.round_id === "number" &&
+        asked.includes(progress.round_id)
+      )
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.suggestionRound(progress.round_id),
+        });
+      return;
+    }
+    if (
+      roundId !== null &&
+      data &&
+      event.kind === "enrich_suggestion" &&
+      data.suggestions.some((row) => row.id === progress.suggestion_id)
+    )
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.suggestionRound(roundId),
+      });
   });
 
   const replace = (saved: Suggestion) => {

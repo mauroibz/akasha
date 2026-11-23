@@ -380,6 +380,84 @@ describe("Choosing the source", () => {
     );
   });
 
+  it("keeps a round it switched away from current", async () => {
+    const listeners = new Set<JobListener>();
+    let tmdb = { ...round("enriching", [suggestion(11, "Yojimbo")]), id: 7 };
+    const model = {
+      ...round("done", [
+        suggestion(21, "Ran", {
+          source: "model",
+          round_id: 8,
+          enrichment: "enriched",
+          item_id: 50,
+        }),
+      ]),
+      id: 8,
+      source: "model",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        const body =
+          url.includes("source=model") || url.endsWith("/8") ? model : tmdb;
+        return new Response(JSON.stringify(body), {
+          status: init?.method === "POST" ? 202 : 200,
+        });
+      }),
+    );
+    renderWithRouter(
+      <JobEventsContext.Provider
+        value={{
+          jobs: [],
+          subscribe: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        }}
+      >
+        <MoreLikeThis seed={seed} types={withModel(true)} />
+      </JobEventsContext.Provider>,
+    );
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "More like Seven Samurai" }),
+    );
+    const sheet = screen.getByRole("dialog", {
+      name: "More like Seven Samurai",
+    });
+    await within(sheet).findByText("Finding the first few in your providers…");
+    await user.click(within(sheet).getByRole("radio", { name: "Model" }));
+    await within(sheet).findByText(/1 named by Model/);
+    // TMDB's round finishes while the model's is shown.
+    tmdb = {
+      ...round("done", [
+        suggestion(11, "Yojimbo", { enrichment: "enriched", item_id: 40 }),
+      ]),
+      id: 7,
+    };
+    act(() => {
+      for (const listener of listeners)
+        listener({
+          id: "job-1",
+          batch_id: null,
+          kind: "recommend",
+          state: "succeeded",
+          progress: { round_id: 7, status: "done" },
+          error: null,
+          error_code: null,
+          attempts: 1,
+          updated_at: "2026-11-23T10:00:05Z",
+        });
+    });
+    await user.click(within(sheet).getByRole("radio", { name: "TMDB" }));
+    expect(
+      await within(sheet).findByText(
+        /1 picked by TMDB in one request · 1 found so far/,
+      ),
+    ).toBeVisible();
+  });
+
   it("explains a model that is not configured and asks nothing of it", async () => {
     const posts: string[] = [];
     vi.stubGlobal(
