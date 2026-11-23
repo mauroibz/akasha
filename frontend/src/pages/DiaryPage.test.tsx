@@ -98,10 +98,12 @@ describe("DiaryPage with a gentle goal", () => {
   const months = [2, 1, 3, 2, 0, 2, 4, 1, 1, 1, 0, 0];
   const pick = (id: number, title: string, reason: "creator" | "waiting") => ({
     entry: entry(id, "book", title),
-    reason,
-    creator: reason === "creator" ? "Julio Cortázar" : null,
-    mean_score: reason === "creator" ? 9 : null,
-    since: reason === "waiting" ? "2024-03-01T00:00:00Z" : null,
+    score: reason === "creator" ? 1.5 : 0.4,
+    reasons: [
+      reason === "creator"
+        ? { signal: reason, text: "You rate Julio Cortázar 9.0 across 4" }
+        : { signal: reason, text: "Waiting since Mar 2024" },
+    ],
   });
 
   function stub(
@@ -224,11 +226,9 @@ describe("DiaryPage with a gentle goal", () => {
     const calls = stub([goal]);
     renderDiary();
     expect(
-      await screen.findByText(
-        "By Julio Cortázar, whose books you rate 9.0 on average.",
-      ),
+      await screen.findByText("You rate Julio Cortázar 9.0 across 4."),
     ).toBeVisible();
-    expect(screen.getByText("Waiting since March 2024.")).toBeVisible();
+    expect(screen.getByText("Waiting since Mar 2024.")).toBeVisible();
     expect(screen.queryByText("Stoner")).toBeNull();
 
     const user = (await import("@testing-library/user-event")).default.setup();

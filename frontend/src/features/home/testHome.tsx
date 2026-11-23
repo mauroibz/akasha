@@ -193,14 +193,19 @@ export function fullHome(): Home {
   home.next = [
     {
       entry: entry(10, "Mistborn", "book", { status: "to_read" }),
-      reason: "creator",
-      creator: "Brandon Sanderson",
-      mean_score: 8.5,
+      score: 3.4,
+      reasons: [
+        {
+          signal: "series",
+          text: "Next in Mistborn; you gave book 1 a 9",
+        },
+        { signal: "waiting", text: "Waiting since Sep 2025" },
+      ],
     },
     {
       entry: entry(11, "Mushishi", "anime", { status: "plan_to_watch" }),
-      reason: "waiting",
-      since: "2025-09-01",
+      score: 0.3,
+      reasons: [{ signal: "waiting", text: "Waiting since Sep 2025" }],
     },
   ];
   const year = home.year!;

@@ -156,6 +156,8 @@ ROUTE_POLICY = {
     # Sprint 131: one row per person, keyed by the requester.
     ("GET", "/api/home/layout"): "private-collection",
     ("PUT", "/api/home/layout"): "private-write",
+    # Sprint 132: ranks the requester's own pile from their own scores and goals.
+    ("GET", "/api/pile"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;

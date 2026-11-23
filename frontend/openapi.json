@@ -1726,60 +1726,6 @@
         "title": "GoalBody",
         "type": "object"
       },
-      "GoalPickResponse": {
-        "properties": {
-          "creator": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Creator"
-          },
-          "entry": {
-            "$ref": "#/components/schemas/EntryResponse"
-          },
-          "mean_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mean Score"
-          },
-          "reason": {
-            "enum": [
-              "creator",
-              "waiting"
-            ],
-            "title": "Reason",
-            "type": "string"
-          },
-          "since": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Since"
-          }
-        },
-        "required": [
-          "entry",
-          "reason"
-        ],
-        "title": "GoalPickResponse",
-        "type": "object"
-      },
       "GoalProgressResponse": {
         "properties": {
           "item_type": {
@@ -2268,60 +2214,6 @@
         "title": "HomeMonth",
         "type": "object"
       },
-      "HomeNext": {
-        "properties": {
-          "creator": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Creator"
-          },
-          "entry": {
-            "$ref": "#/components/schemas/EntryResponse"
-          },
-          "mean_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mean Score"
-          },
-          "reason": {
-            "enum": [
-              "creator",
-              "waiting"
-            ],
-            "title": "Reason",
-            "type": "string"
-          },
-          "since": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Since"
-          }
-        },
-        "required": [
-          "entry",
-          "reason"
-        ],
-        "title": "HomeNext",
-        "type": "object"
-      },
       "HomeQuestion": {
         "description": "One question from Play: an old score to look at again, else a gap to fill.",
         "properties": {
@@ -2395,7 +2287,7 @@
           },
           "next": {
             "items": {
-              "$ref": "#/components/schemas/HomeNext"
+              "$ref": "#/components/schemas/PilePick"
             },
             "title": "Next",
             "type": "array"
@@ -4028,6 +3920,58 @@
           "b"
         ],
         "title": "PairBody",
+        "type": "object"
+      },
+      "PilePick": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PileReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "entry",
+          "score",
+          "reasons"
+        ],
+        "title": "PilePick",
+        "type": "object"
+      },
+      "PileReason": {
+        "description": "One signal that fired, as a sentence naming its evidence.",
+        "properties": {
+          "signal": {
+            "enum": [
+              "series",
+              "creator",
+              "affinity",
+              "waiting",
+              "goal",
+              "set_aside"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "text"
+        ],
+        "title": "PileReason",
         "type": "object"
       },
       "PreviewResponse": {
@@ -8253,6 +8197,7 @@
     },
     "/api/goals/{item_type}/picks": {
       "get": {
+        "description": "This library's pile, ranked (Sprint 132): the same picks `/api/pile` gives.",
         "operationId": "goal_picks_api_goals__item_type__picks_get",
         "parameters": [
           {
@@ -8282,7 +8227,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/GoalPickResponse"
+                    "$ref": "#/components/schemas/PilePick"
                   },
                   "title": "Response Goal Picks Api Goals  Item Type  Picks Get",
                   "type": "array"
@@ -11617,6 +11562,99 @@
           }
         },
         "summary": "Now"
+      }
+    },
+    "/api/pile": {
+      "get": {
+        "description": "Waiting entries ranked from the library's own data; every library when no type.",
+        "operationId": "pile_api_pile_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ItemTypeName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PilePick"
+                  },
+                  "title": "Response Pile Api Pile Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Pile"
       }
     },
     "/api/revisit": {

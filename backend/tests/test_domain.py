@@ -162,6 +162,21 @@ def test_every_domain_declares_a_usable_status_vocabulary() -> None:
         assert all(status.hotkey for status in domain.statuses if status.choosable)
 
 
+def test_what_the_ranked_pile_reads_is_a_field_the_domain_declares() -> None:
+    """Sprint 132: a series field or a taste field the domain does not have reads nothing."""
+    for domain in DOMAINS.values():
+        fields = {spec.name: spec for spec in domain.fields}
+        ranking = domain.ranking
+        if ranking.series_field is not None:
+            series = fields.get(ranking.series_field)
+            assert series is not None, f"{domain.item_type} ranks by an undeclared series"
+            assert series.multiplicity == "one" and series.type == "text"
+        assert not ranking.series_in_title or ranking.series_field is not None
+        for name in ranking.affinity_fields:
+            assert name in fields, f"{domain.item_type} ranks by undeclared {name}"
+            assert fields[name].groupable, f"{domain.item_type}'s {name} is not groupable"
+
+
 def test_every_domain_declares_a_format_vocabulary() -> None:
     for domain in DOMAINS.values():
         values = [row.value for row in domain.formats]

@@ -103,17 +103,18 @@ export async function stubDiaryWithGoal(
       json: [
         {
           entry: entry(10, "The Dispossessed"),
-          reason: "creator",
-          creator: "Ursula K. Le Guin",
-          mean_score: 9,
-          since: null,
+          score: 1.6,
+          reasons: [
+            {
+              signal: "creator",
+              text: "You rate Ursula K. Le Guin 9.0 across 3",
+            },
+          ],
         },
         {
           entry: entry(11, "The Lathe of Heaven"),
-          reason: "waiting",
-          creator: null,
-          mean_score: null,
-          since: "2024-03-01T00:00:00Z",
+          score: 0.4,
+          reasons: [{ signal: "waiting", text: "Waiting since Mar 2024" }],
         },
       ],
     }),

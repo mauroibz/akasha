@@ -580,7 +580,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Goal Picks */
+    /**
+     * Goal Picks
+     * @description This library's pile, ranked (Sprint 132): the same picks `/api/pile` gives.
+     */
     get: operations["goal_picks_api_goals__item_type__picks_get"];
     put?: never;
     post?: never;
@@ -1410,6 +1413,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/pile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Pile
+     * @description Waiting entries ranked from the library's own data; every library when no type.
+     */
+    get: operations["pile_api_pile_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/revisit": {
     parameters: {
       query?: never;
@@ -2227,21 +2250,6 @@ export interface components {
        */
       suggest: boolean;
     };
-    /** GoalPickResponse */
-    GoalPickResponse: {
-      /** Creator */
-      creator?: string | null;
-      entry: components["schemas"]["EntryResponse"];
-      /** Mean Score */
-      mean_score?: number | null;
-      /**
-       * Reason
-       * @enum {string}
-       */
-      reason: "creator" | "waiting";
-      /** Since */
-      since?: string | null;
-    };
     /** GoalProgressResponse */
     GoalProgressResponse: {
       /** Item Type */
@@ -2410,21 +2418,6 @@ export interface components {
       /** Month */
       month: number;
     };
-    /** HomeNext */
-    HomeNext: {
-      /** Creator */
-      creator?: string | null;
-      entry: components["schemas"]["EntryResponse"];
-      /** Mean Score */
-      mean_score?: number | null;
-      /**
-       * Reason
-       * @enum {string}
-       */
-      reason: "creator" | "waiting";
-      /** Since */
-      since?: string | null;
-    };
     /**
      * HomeQuestion
      * @description One question from Play: an old score to look at again, else a gap to fill.
@@ -2451,7 +2444,7 @@ export interface components {
       lately: components["schemas"]["HomeLatelyRow"][] | null;
       lent: components["schemas"]["HomeLent"] | null;
       /** Next */
-      next: components["schemas"]["HomeNext"][];
+      next: components["schemas"]["PilePick"][];
       /** Now */
       now: components["schemas"]["EntryResponse"][];
       question: components["schemas"]["HomeQuestion"] | null;
@@ -3002,6 +2995,28 @@ export interface components {
       a: number;
       /** B */
       b: number;
+    };
+    /** PilePick */
+    PilePick: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Reasons */
+      reasons: components["schemas"]["PileReason"][];
+      /** Score */
+      score: number;
+    };
+    /**
+     * PileReason
+     * @description One signal that fired, as a sentence naming its evidence.
+     */
+    PileReason: {
+      /**
+       * Signal
+       * @enum {string}
+       */
+      signal:
+        "series" | "creator" | "affinity" | "waiting" | "goal" | "set_aside";
+      /** Text */
+      text: string;
     };
     /** PreviewResponse */
     PreviewResponse: {
@@ -5672,7 +5687,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["GoalPickResponse"][];
+          "application/json": components["schemas"]["PilePick"][];
         };
       };
       /** @description Unauthorized */
@@ -8068,6 +8083,65 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["EntryResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  pile_api_pile_get: {
+    parameters: {
+      query?: {
+        type?: components["schemas"]["ItemTypeName"] | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PilePick"][];
         };
       };
       /** @description Unauthorized */

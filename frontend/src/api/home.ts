@@ -13,7 +13,9 @@ export type HomeTidy = Schemas["HomeTidy"];
 export type HomeShelf = Schemas["HomeShelf"];
 
 /** The schema's entries, read as the library's own entry shape. */
-export type HomeNext = Omit<Schemas["HomeNext"], "entry"> & {
+export type PileReason = Schemas["PileReason"];
+/** A pick from the ranked pile (Sprint 132): Up next, a goal's picks, `/api/pile`. */
+export type HomeNext = Omit<Schemas["PilePick"], "entry"> & {
   entry: LibraryEntry;
 };
 export type HomeGreeting = Omit<Schemas["HomeGreeting"], "active"> & {

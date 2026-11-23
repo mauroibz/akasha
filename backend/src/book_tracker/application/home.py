@@ -21,6 +21,7 @@ from sqlalchemy.engine import Engine
 
 from book_tracker.application.goals import GoalService
 from book_tracker.application.library import LibraryService
+from book_tracker.application.ranking import rank_pile
 from book_tracker.domain.registry import DOMAINS
 
 #: How deep *Up next* goes.
@@ -133,7 +134,7 @@ class HomeService:
         return {
             "greeting": self._greeting(today, now, by_status, finished, goals),
             "now": now if shown("now") else [],
-            "next": self._next(goals) if shown("next") else [],
+            "next": self._next(today) if shown("next") else [],
             "year": self._year(today, finished, goals) if shown("year") else None,
             "domains": self._domains(by_status, histogram, best) if shown("libraries") else [],
             "lately": self._lately() if shown("lately") else None,
@@ -313,31 +314,13 @@ class HomeService:
         mine = {goal["item_type"]: goal for goal in goals.list_goals()}
         return [mine[item_type] for item_type in DOMAINS if item_type in mine]
 
-    def _next(self, goals: GoalService) -> list[dict[str, Any]]:
-        """Five from the pile: each domain's goal-picks order, the domains taken in turn.
-
-        A placeholder order until Sprint 132 ranks the pile.
-        """
-        queues = [
-            goals.pick_reasons(item_type, limit=NEXT_LIMIT)
-            for item_type, domain in DOMAINS.items()
-            if any(status.planned for status in domain.statuses)
-        ]
-        chosen: list[dict[str, Any]] = []
-        while len(chosen) < NEXT_LIMIT and any(queues):
-            for queue in queues:
-                if queue and len(chosen) < NEXT_LIMIT:
-                    chosen.append(queue.pop(0))
-        entries = self.library.get_entries([pick["entry_id"] for pick in chosen])
+    def _next(self, today: date) -> list[dict[str, Any]]:
+        """Five from the pile, every library's ranked together (Sprint 132)."""
+        ranked = rank_pile(self.engine, self.user_id, None, NEXT_LIMIT, today=today)
+        entries = self.library.get_entries([pick["entry_id"] for pick in ranked])
         return [
-            {
-                "entry": entry,
-                "reason": pick["reason"],
-                "creator": pick.get("creator"),
-                "mean_score": pick.get("mean_score"),
-                "since": pick.get("since"),
-            }
-            for pick, entry in zip(chosen, entries, strict=True)
+            {"entry": entry, "score": pick["score"], "reasons": pick["reasons"]}
+            for pick, entry in zip(ranked, entries, strict=True)
         ]
 
     def _year(self, today: date, finished: Sequence[Any], goals: GoalService) -> dict[str, Any]:

@@ -1,7 +1,7 @@
 # Sprint 132 — The ranked pile
 
 **Sprint:** 132
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 54
 **Depends on:** 131
 **Owner:** Mauro

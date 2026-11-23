@@ -11,7 +11,8 @@ describe("UpNext", () => {
   it("shows three picks small and five large", () => {
     const picks = Array.from({ length: 5 }, (_, index) => ({
       entry: entry(60 + index, `Pick ${index}`, "book", { status: "to_read" }),
-      reason: "waiting" as const,
+      score: 0,
+      reasons: [],
     }));
     const { unmount } = renderWithRouter(
       <UpNext picks={picks} pile={41} types={types} size="S" />,
@@ -22,12 +23,14 @@ describe("UpNext", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(5);
   });
 
-  it("lists the pile in order, each with why it is there", () => {
+  it("lists the pile in order, each with its strongest reason under it", () => {
     const home = fullHome();
     renderWithRouter(<UpNext picks={home.next} pile={41} types={types} />);
     const items = screen.getAllByRole("listitem");
     expect(items[0]).toHaveTextContent("Mistborn");
-    expect(items[0]).toHaveTextContent("Brandon Sanderson averages 8.5");
+    expect(items[0]).toHaveTextContent("Next in Mistborn; you gave book 1 a 9");
+    // One reason a pick: the strongest, not every signal that fired.
+    expect(items[0]).not.toHaveTextContent("Waiting since");
     expect(items[1]).toHaveTextContent("Mushishi");
     expect(items[1]).toHaveTextContent("Waiting since Sep 2025");
   });
@@ -57,8 +60,8 @@ describe("UpNext", () => {
   it("offers the finish sheet where the domain has nothing to be under way in", async () => {
     const film = {
       entry: entry(12, "Paris, Texas", "movie", { status: "watchlist" }),
-      reason: "waiting" as const,
-      since: "2025-01-01",
+      score: 0.3,
+      reasons: [{ signal: "waiting" as const, text: "Waiting since Jan 2025" }],
     };
     renderWithRouter(<UpNext picks={[film]} pile={1} types={types} />);
     expect(

@@ -21,6 +21,7 @@ from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
+from book_tracker.api.pile import router as pile_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.app.body_limits import install_body_limits
 from book_tracker.app.cloudflare_access import install_cloudflare_access
@@ -134,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(library_router, responses=auth_responses)
     app.include_router(goals_router, responses=auth_responses)
     app.include_router(home_router, responses=auth_responses)
+    app.include_router(pile_router, responses=auth_responses)
     app.include_router(providers_router, responses=auth_responses)
     app.include_router(imports_router, responses=auth_responses)
     app.include_router(catalog_router, responses=auth_responses)

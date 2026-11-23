@@ -1,7 +1,7 @@
 """Sprint 103: gentle goals, underneath (DEC-169).
 
 A goal per person and domain, progress by month of finish date with months counting
-together, and picks drawn from the domain's declared planned status.
+together, and picks drawn from the domain's ranked pile (Sprint 132).
 """
 
 from pathlib import Path
@@ -111,11 +111,16 @@ async def test_progress_counts_by_month_of_finish_date(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_picks_come_from_the_planned_status_with_a_reason(tmp_path: Path) -> None:
+async def test_picks_are_the_ranked_pile_with_reasons(tmp_path: Path) -> None:
+    """Since Sprint 132 a goal's picks are its library's ranked pile (`test_ranking.py`)."""
     async with _fixture(tmp_path) as fx:
-        # Two rated books by a favourite, so a waiting book by her is a creator pick.
-        for title, score in (("Loved 1", 9), ("Loved 2", 8)):
-            created = fx.repository.create_or_get_entry(title=title, creators=["Le Guin"])
+        # Two rated books by a favourite, above this reader's average.
+        for title, score, creator in (
+            ("Loved 1", 9, "Le Guin"),
+            ("Loved 2", 8, "Le Guin"),
+            ("Fine", 6, "Else"),
+        ):
+            created = fx.repository.create_or_get_entry(title=title, creators=[creator])
             _set(fx, created.entry_id, status="read", score=score)
         favourite = fx.repository.create_or_get_entry(
             title="Waiting by Le Guin", creators=["Le Guin"]
@@ -130,14 +135,16 @@ async def test_picks_come_from_the_planned_status_with_a_reason(tmp_path: Path) 
 
         picks = _goals(fx).picks("book", limit=5)
 
-        assert [(pick["entry"]["item"]["title"], pick["reason"]) for pick in picks] == [
-            ("Waiting by Le Guin", "creator"),
-            ("Waiting longest", "waiting"),
-            ("Waiting less", "waiting"),
+        assert [pick["entry"]["item"]["title"] for pick in picks] == [
+            "Waiting by Le Guin",
+            "Waiting longest",
+            "Waiting less",
         ]
-        assert picks[0]["creator"] == "Le Guin"
-        assert picks[0]["mean_score"] == 8.5
-        assert picks[1]["since"] == "2023-03-01T00:00:00Z"
+        assert picks[0]["reasons"][0] == {
+            "signal": "creator",
+            "text": "You rate Le Guin 8.5 across 2",
+        }
+        assert picks[1]["reasons"] == [{"signal": "waiting", "text": "Waiting since Mar 2023"}]
         assert _goals(fx).picks("book", limit=5) == picks
 
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from book_tracker.api.identity import CurrentUser, current_user
 from book_tracker.api.library import ERRORS, EntryResponse, library_for
+from book_tracker.api.pile import PilePick
 from book_tracker.application.home import HomeService
 from book_tracker.application.home_layout import HomeLayoutService, defaults
 
@@ -53,14 +54,6 @@ class HomeGreeting(BaseModel):
     #: Entries waiting in a status their domain declares `planned`.
     pile: int
     goals: list[HomeGoalCount]
-
-
-class HomeNext(BaseModel):
-    entry: EntryResponse
-    reason: Literal["creator", "waiting"]
-    creator: str | None = None
-    mean_score: float | None = None
-    since: str | None = None
 
 
 class HomeCover(BaseModel):
@@ -170,7 +163,8 @@ class HomeResponse(BaseModel):
 
     greeting: HomeGreeting
     now: list[EntryResponse]
-    next: list[HomeNext]
+    #: The pile ranked across libraries (Sprint 132): five, each with its reasons.
+    next: list[PilePick]
     year: HomeYear | None
     domains: list[HomeDomainTile]
     lately: list[HomeLatelyRow] | None

@@ -19,6 +19,7 @@ from book_tracker.domain.spec import (
     FormatSpec,
     ListColumnSpec,
     ProgressSpec,
+    RankingSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -163,4 +164,5 @@ DOMAIN = Domain(
             "escritora",
         ),
     ),
+    ranking=RankingSpec(series_field="series", series_in_title=True, affinity_fields=("subjects",)),
 )

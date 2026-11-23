@@ -22,28 +22,17 @@ const columns: Record<number, string> = {
   5: "min-[720px]:grid-cols-5",
 };
 
-function since(day: string | null | undefined): string | null {
-  if (!day) return null;
-  const [year, month] = day.split("-").map(Number);
-  if (!year || !month) return null;
-  const name = new Intl.DateTimeFormat("en", { month: "short" }).format(
-    new Date(year, month - 1, 1),
-  );
-  return `Waiting since ${name} ${year}`;
-}
-
+/** The strongest reason the ranking gave; the rest stay with the pile. */
 function reason(pick: HomeNext): string | null {
-  if (pick.reason === "creator" && pick.creator)
-    return `${pick.creator} averages ${pick.mean_score ?? ""}`.trim();
-  return since(pick.since);
+  return pick.reasons[0]?.text ?? null;
 }
 
 /**
- * What comes next (Sprint 130): five from the pile, each with why it is there and
- * *Start*, which moves it to its domain's under-way status. The order is the goal
- * picks' until Sprint 132 ranks the pile. A domain with no under-way status (a film
- * is watched or not) offers *Finished* instead, through the finish sheet. Covers in a row; on a phone the row
- * scrolls inside the module, never the page.
+ * What comes next (Sprints 130, 132): the pile ranked across libraries, each pick
+ * with the strongest reason the ranking found and *Start*, which moves it to its
+ * domain's under-way status. A domain with no under-way status (a film is watched or
+ * not) offers *Finished* instead, through the finish sheet. Covers in a row; on a
+ * phone the row scrolls inside the module, never the page.
  */
 export function UpNext({
   picks,
@@ -118,7 +107,7 @@ export function UpNext({
                   {pick.entry.item.title}
                 </p>
                 {why ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
+                  <p className="line-clamp-3 text-xs text-muted-foreground">
                     {why}
                   </p>
                 ) : null}

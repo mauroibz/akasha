@@ -127,9 +127,10 @@ const home = {
   next: [
     {
       entry: pile,
-      reason: "creator",
-      creator: "Brandon Sanderson",
-      mean_score: 8.5,
+      score: 1.4,
+      reasons: [
+        { signal: "creator", text: "You rate Brandon Sanderson 8.5 across 4" },
+      ],
     },
   ],
   year: {

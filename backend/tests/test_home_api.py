@@ -157,8 +157,19 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
 
 
 @pytest.mark.anyio
-async def test_the_five_sections_read_the_library(tmp_path: Path) -> None:
-    today = date.today()
+async def test_the_five_sections_read_the_library(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Late November of this year, whatever today is: how far a goal is from its pace,
+    # which the ranked pile reads, depends on the day of the year.
+    today = date(date.today().year, 11, 23)
+
+    class _Today(date):
+        @classmethod
+        def today(cls) -> _Today:
+            return cls(today.year, today.month, today.day)
+
+    monkeypatch.setattr("book_tracker.api.home.date", _Today)
     year = today.year
     started = (today - timedelta(days=31)).isoformat()
     async with _client(tmp_path) as (app, client):
@@ -200,12 +211,15 @@ async def test_the_five_sections_read_the_library(tmp_path: Path) -> None:
 
     nexts = body["next"]
     assert len(nexts) == 5
-    assert all(row["reason"] in {"creator", "waiting"} for row in nexts)
-    # The goal picks' order, per domain, taken in turn: the longest-waiting book and
-    # the watchlisted film lead.
-    assert nexts[0]["entry"]["id"] == pile[0]
-    assert nexts[1]["entry"]["item"]["title"] == "Later"
-    assert [row["entry"]["id"] for row in nexts[2:]] == pile[1:4]
+    # The pile ranked across libraries (Sprint 132): both goals are short of their
+    # pace and lift alike, so the longest waiting leads: the film, then the books.
+    assert nexts[0]["entry"]["item"]["title"] == "Later"
+    assert [row["entry"]["id"] for row in nexts[1:]] == pile[:4]
+    assert nexts[0]["reasons"][0] == {
+        "signal": "goal",
+        "text": "Toward 6 movies this year; 1 so far",
+    }
+    assert nexts[1]["reasons"][0]["text"] == "Toward 24 books this year; 2 so far"
 
     months = {month["month"]: month for month in body["year"]["months"]}
     assert months[3]["count"] == 2
