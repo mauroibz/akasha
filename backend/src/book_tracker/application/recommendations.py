@@ -843,17 +843,21 @@ class SuggestionEnricher:
         await self._install_cover(repository, item_id, record)
         return item_id
 
+    def _has_cover(self, item_id: int) -> bool:
+        with self.engine.connect() as connection:
+            return bool(
+                connection.execute(
+                    text("SELECT cover_path FROM items WHERE id = :id"), {"id": item_id}
+                ).scalar()
+            )
+
     async def _install_cover(
         self, repository: DomainRepository, item_id: int, record: SearchCandidate
     ) -> None:
         """The record's cover, when the cached item has none: wanting it later is whole."""
         if self.cover_client is None or self.data_dir is None:
             return
-        with self.engine.connect() as connection:
-            has_cover = connection.execute(
-                text("SELECT cover_path FROM items WHERE id = :id"), {"id": item_id}
-            ).scalar()
-        if has_cover:
+        if await off_loop(self._has_cover, item_id):
             return
         data_dir = self.data_dir
         for url in ([record.cover_url] if record.cover_url else []) + list(
