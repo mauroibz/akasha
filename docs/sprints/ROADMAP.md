@@ -1937,6 +1937,12 @@ whole, recorded as **DEC-183**; the design is
   every domain declares `model`, its picks shown only once found; the sheet's segment is a
   choice; Settings → Suggestions; albums want onto the wishlist; see the sprint's Outcome.]
 - **[136 — Embeddings](136-embeddings.md)**: similarity re-ranking and *From your library*.
+  [Closed 2026-11-23 (DEC-191). Four criteria met against documented-shape replies of Gemini and
+  an OpenAI-compatible endpoint (no key in the environment: **the live check is pending, the
+  owner's**); migration 0038; `embed_items` with a one-minute sweep; the `library` source for
+  every domain; the pile's `similarity` signal; rounds read in order of likeness; see the
+  sprint's Outcome. This closes DEC-183's line: `make test` and the full Playwright suite are
+  the release's.]
 
 ## Not scheduled
 

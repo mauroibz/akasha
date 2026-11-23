@@ -2,33 +2,42 @@
 
 ## Where the project stands
 
-**2026-11-23, Sprint 135 closed.** On branch `home-and-recommendations` (local, not pushed).
-A hosted model suggests things for every library (DEC-187, DEC-190): `AKASHA_RECS_MODEL_PROVIDER`
-(`anthropic` default, `gemini`, `openai`), `AKASHA_RECS_MODEL`, `AKASHA_RECS_MODEL_KEY` (or
-`ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY`), `AKASHA_RECS_MODEL_URL`. Books,
-anime and albums take the model alone; films and series take TMDB, then the model. The sheet's
-source segment is a choice; a model's picks are shown only once found; Settings → Suggestions
-says what is on and what is sent. DEC-183 is the plan (Sprints 130–136, `FINAL_SPRINT` 136).
-**Sprint 136 is next and `ready`**: embeddings.
+**2026-11-23, Sprint 136 closed; DEC-183's line (Sprints 130–136) is complete and the project
+state is `complete`.** On branch `home-and-recommendations` (local, not pushed, not merged, no
+tag). What the line adds over 2.9.0: Home at `/` (the library moved to `/library`), the ranked
+pile, *More like this* with three sources (TMDB, a hosted model, *From your library*), Home's
+*More like this*, Settings → Suggestions. Migrations **0036–0038** are new since 2.9.0.
 
-**Pending, the owner's:** no model key was in the environment, so the model fixtures
-(`backend/tests/fixtures/providers/model_*`) are documented shapes marked unrecorded in
-`model_fixtures.json`, and no live round has run. With a key: `cd backend &&
-ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py`, then rerun
-`tests/test_model_recommendations.py` (a real reply may name other books: update the expected
-titles and record their Open Library searches in their own commit), then one *Model* round in
-the app. Gemini's and OpenAI's default model ids are the session's choice; confirm them.
+Sprint 136 (DEC-191): with a hosted embedding endpoint (`AKASHA_RECS_EMBEDDINGS_PROVIDER`
+`gemini` default or `openai`, `_MODEL`, `_KEY` or `GEMINI_API_KEY`/`OPENAI_API_KEY`, `_URL`),
+items carry a vector of their text (`item_embeddings`, migration 0038; `embed_items` jobs, a
+one-minute sweep for new items, the hourly pass for edits; 1,000 requests a day unless
+`AKASHA_PROVIDER_DAILY_LIMITS` says `{"embeddings": N}`). They give *From your library* (the
+nearest waiting entries), Up next's "Close to what you scored 9: …", and rounds read in order of
+likeness. Without a key nothing changes; a Claude key alone does not turn them on.
 
-Things to know for 136:
+**For the release (not run in this sprint, by instruction):** `make test`, the full Playwright
+suite, `make smoke-container`; version surfaces and release notes. New variables since 2.9.0:
+`AKASHA_RECOMMEND_DAILY_LIMITS`, `AKASHA_RECS_MODEL_PROVIDER`/`_MODEL`/`_KEY`/`_URL`,
+`AKASHA_RECS_EMBEDDINGS_PROVIDER`/`_MODEL`/`_KEY`/`_URL`, `ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`, `OPENAI_API_KEY` (all in `compose.yaml` and `.env.example`). The first start
+with an embeddings key embeds the whole library over the following minutes, 32 items a request.
 
-- Read "Notes from Sprint 135" in its sprint file.
-- `scripts/walkthrough.py --replay` works again (broken since Sprint 101); it replaces the
-  lifespan's client factory. `scratchpad/walk135/` has the run script, replay module and seed.
-- Export only `TMDB_READ_TOKEN` from `.env` for a walkthrough: the file also sets
-  `AKASHA_AUTH=on`. Vite on 5180 listens on `localhost`.
-- `accessibility.spec.ts` *the add dialog over the library* failed 2 of 3 on Sprint 134's base
-  too; rerun alone before suspecting a change.
-- Playwright ignores any path containing `scratchpad`, including a worktree placed there.
+**Pending, the owner's:** no model or embedding key was in the environment, so the fixtures
+(`model_*`, `embeddings_*` in `backend/tests/fixtures/providers/`) are documented shapes marked
+unrecorded, and no live round or embedding has run. With keys, from `backend/`:
+`ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py` and
+`GEMINI_API_KEY=… uv run python ../scripts/record_embedding_fixtures.py`, then rerun
+`tests/test_model_recommendations.py`, `tests/test_embeddings.py` and
+`tests/test_library_source.py` (a real reply may name or order things differently: update the
+expectations in their own commit), then one *Model* round and one *From your library* in the
+app. The default model ids for Gemini and OpenAI (both kinds) are the sessions' choices; confirm
+them.
+
+Seen in Sprint 136's walkthrough and left (pre-existing): an add from Open Library can store a
+foreign edition's title ("Bai nian gu du" for *Cien años de soledad*, `original_year` 1999) or
+no creators (*The Hobbit*); `/api/auth/me` 404s with auth off (console noise); Settings lists
+Model before TMDB; "Found in your providers" on every found row; MusicBrainz 503s under a burst.
 
 ## Earlier state (release 2.9.0)
 
@@ -106,8 +115,11 @@ Waiting on the owner:
 
 ## Next session
 
-Sprint 136 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
-../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
-fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
-owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e
-stubs `/api/loans?open=true` by default so it cannot leak into specs. The board runs 2.7.0 until the owner upgrades it.
+No sprint is planned. The release step is the owner's (merge, `make test`, full Playwright,
+`make smoke-container`, version, notes, tag). Run checks under `set -o pipefail`.
+Walkthroughs: `uv run python ../scripts/walkthrough.py [--replay module]` from `backend/`, vite
+on 5180 with `AKASHA_E2E_BACKEND` (it listens on `localhost`); export only `TMDB_READ_TOKEN` from
+`.env` (it also sets `AKASHA_AUTH=on`); start a fresh backend after backend changes; stop
+servers by port (`fuser -k`). `accessibility.spec.ts` *the add dialog over the library* failed
+2 of 3 on Sprint 134's base; rerun alone before suspecting a change. Playwright ignores any
+path containing `scratchpad`. The board runs 2.7.0 until the owner upgrades it.

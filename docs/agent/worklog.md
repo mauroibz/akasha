@@ -7038,3 +7038,39 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Observed, left: "Found in your providers" on every model row; Settings lists Model before
   TMDB; MusicBrainz answers 503 under a burst (an album pick stayed pending, *Try again*).
 - Next: Sprint 136, embeddings. Owner: the live Claude check (record_model_fixtures.py).
+
+## 2026-11-23 — Sprint 136 (complete)
+- Done: embeddings (`eea2c12`): config, `embedding_clients.py`, migration 0038,
+  `application/embeddings.py`, `embed_items`, `RankingSpec.text_fields`; the `library` source
+  and the sheet's segment (`2659c7f`); the pile's `similarity` signal (`427c2fb`); a browser
+  case (`4356fdf`); walkthrough fixes: a one-minute sweep (`44d51b4`), the reason's wording
+  (`8d32488`); docs (`b35b095`). DEC-191. Final sprint: project state `complete`.
+- Keys: no `GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the process
+  environment. Embedding fixtures written in each API's documented shape, `"recorded": false`
+  in `embedding_fixtures.json`; vectors fabricated from topic directions for the six books of
+  `tests/embedding_library.py`. No live pass.
+- Verified: `test_embeddings.py` 33, `test_library_source.py` 8 (10,000 waiting items in
+  119-123 ms), `test_ranking.py` 20; touched-module set 544; Vitest related 348; Playwright
+  more-like-this + home 25; `make check`. Not run (the release's): `make test`, full Playwright.
+- Walkthrough: scratchpad `walk136/` (`replay_embeddings.py` answers Gemini's
+  `batchEmbedContents` with word-hashed 768-d vectors and logs `sent.jsonl`; everything else
+  live; `seed.py` adds 13 books and 4 films from live search; `TMDB_READ_TOKEN` exported alone
+  from `.env`, `GEMINI_API_KEY=walkthrough-dummy`), `frontend/e2e/scratchpad/walk136.mjs`,
+  vite on 5180. Seen: all 17 items embedded within 40 s of the seed (two jobs, 9 + 8; earlier
+  run 11 + 6); *From your library* on Rayuela lists 7 waiting books with covers, "7 on your
+  list, nearest first", *Open* lands on the entry; on Seven Samurai 3 waiting films; Up next's
+  first pick "Close to what you scored 8: Ficciones"; a TMDB round's 3 found films embedded
+  after their round (on_cached), their likeness order (0.61, 0.49, 0.44) equal to TMDB's so
+  nothing moved; Settings lists *From your library* On with Gemini and what is sent; 390 px
+  overflow 0. The word-hash replay is not a model: which book is "close" is not evidence of
+  quality.
+- Observed and fixed: no vector at all after seeding (an add from search queues no enrichment;
+  the hourly pass had run at start) — the one-minute sweep; every library row repeating "Close
+  to Rayuela" — "Waiting since Nov 2026".
+- Observed, left (pre-existing, not this sprint): the add from Open Library stored *Cien años
+  de soledad* as a Chinese edition titled "Bai nian gu du" with `original_year` 1999, and *The
+  Hobbit*'s edition with no creators (both visible in Lately and the embedded text);
+  `/api/auth/me` answers 404 with auth off (console noise); Settings lists Model before TMDB;
+  Up next's covers fade in after a full-page screenshot.
+- Next: none planned. Release: `make test`, full Playwright, `make smoke-container`. Owner:
+  the live embedding check (`record_embedding_fixtures.py`) and Sprint 135's Claude check.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 54,
-  "project_status": "in_progress",
-  "active_sprint": "136",
-  "active_sprint_file": "docs/sprints/136-embeddings.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "135",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "136",
   "completed_sprints": [
     "001",
     "002",
@@ -141,8 +141,9 @@
     "132",
     "133",
     "134",
-    "135"
+    "135",
+    "136"
   ],
-  "started_at": "2026-11-23T02:40:04-03:00",
-  "updated_at": "2026-11-23T02:40:04-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T03:15:40-03:00"
 }
