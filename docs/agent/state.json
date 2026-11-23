@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 57,
-  "project_status": "in_progress",
-  "active_sprint": "149",
-  "active_sprint_file": "docs/sprints/149-journal-gaps.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "148",
+  "project_status": "ready",
+  "active_sprint": "150",
+  "active_sprint_file": "docs/sprints/150-personalize.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "149",
   "completed_sprints": [
     "001",
     "002",
@@ -154,8 +154,9 @@
     "145",
     "146",
     "147",
-    "148"
+    "148",
+    "149"
   ],
-  "started_at": "2026-11-23T15:58:40-03:00",
-  "updated_at": "2026-11-23T15:58:40-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T16:03:15-03:00"
 }

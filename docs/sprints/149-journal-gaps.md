@@ -1,7 +1,7 @@
 # Sprint 149 — The Journal's two gaps
 
 **Sprint:** 149
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 57
 **Depends on:** 148
 **Owner:** Mauro
@@ -53,7 +53,7 @@ One per deliverable, then `[DOCS]` close.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-195). Commit: `HASH`.
+Completed 2026-11-23 (DEC-195). Commit: `cd6af4b`.
 
 - **The goal's medium.** Above the invitation the one chooser, "A goal for", lists every
   medium that records a finish: the person's own in their order, then the rest. The invitation

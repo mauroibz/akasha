@@ -7286,3 +7286,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   for the build, not a release.
 - Next: the owner's review. Open for them: the presets' names; DEC-194's choices on shelves;
   whether to release as 4.0.0.
+
+## 2026-11-23 — Sprint 149: the Journal's two gaps (complete)
+
+- Done: the owner's first look at the line planned as Sprints 149–150 (DEC-195). 149: the
+  goal's medium chooser; `DaySearch` in the day's question.
+- Verified: see the sprint's Outcome.
+- Running for the owner's review, outside the repository: the backend on port 8001 against a
+  copy of `data/` in the session scratchpad, Vite on 5173. The old 1.5.7 container still
+  holds 8000.
+- Next: Sprint 150, Personalize.
