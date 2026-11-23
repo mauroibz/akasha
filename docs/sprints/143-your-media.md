@@ -1,7 +1,7 @@
 # Sprint 143 — Your media
 
 **Sprint:** 143
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 142
 **Owner:** Mauro
@@ -57,7 +57,7 @@ Hiding a medium from import sources or export.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commits: `BACK` (storage, API, the front filtered), `FRONTH`
+Completed 2026-11-23 (DEC-193). Commits: `5af854e` (storage, API, the front filtered), `13c47fe`
 (the control, the choosers, the first-run question).
 
 - **Storage and API.** Migration 0039, `media_preferences`. `application/media.py` and

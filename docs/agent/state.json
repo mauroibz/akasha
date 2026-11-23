@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "143",
-  "active_sprint_file": "docs/sprints/143-your-media.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "142",
+  "project_status": "ready",
+  "active_sprint": "144",
+  "active_sprint_file": "docs/sprints/144-shelves-as-a-view.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "143",
   "completed_sprints": [
     "001",
     "002",
@@ -148,8 +148,9 @@
     "139",
     "140",
     "141",
-    "142"
+    "142",
+    "143"
   ],
-  "started_at": "2026-11-23T13:48:23-03:00",
-  "updated_at": "2026-11-23T13:48:23-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T13:59:03-03:00"
 }

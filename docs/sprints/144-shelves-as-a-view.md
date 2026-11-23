@@ -1,7 +1,7 @@
 # Sprint 144 — Shelves are a view
 
 **Sprint:** 144
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 143
 **Owner:** Mauro

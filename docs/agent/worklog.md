@@ -7216,3 +7216,16 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Note for e2e: `getByRole("button", { name: "Move X" })` also matches "Remove X"; use
   `exact: true`.
 - Next: Sprint 143, your media.
+
+## 2026-11-23 — Sprint 143: your media (complete)
+
+- Done: migration 0039 and `/api/media`; the front filtered to *Front* media; `YourMedia`,
+  `WhatDoYouKeep`, `useShownItemTypes`.
+- Verified: see the sprint's Outcome; a copy of the development library migrated with counts
+  unchanged.
+- Deviations: the derived default before a choice; the registry endpoint unfiltered. In the
+  Outcome.
+- Note: `e2e/console.ts` now stubs `/api/media` (no preference) and the front's new payload.
+  A unit test whose fetch stub never answers unknown URLs must answer `/api/media`, or the
+  Library waits for it.
+- Next: Sprint 144, shelves as a view.
