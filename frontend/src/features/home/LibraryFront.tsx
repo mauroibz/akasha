@@ -12,6 +12,7 @@ import {
   type ModuleSize,
 } from "@/api/home";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { YourMedia } from "@/features/media/YourMedia";
 import { queryKeys } from "@/api/keys";
 import { cn } from "@/lib/utils";
 
@@ -238,6 +239,8 @@ export function LibraryFront() {
           onDone={() => setArranging(false)}
         />
       )}
+      {/* The same moment decides which media there are and in what order. */}
+      {arranging && <YourMedia />}
       {/* What follows is the whole library: said once, so the showcases above do
           not read as its first rows. */}
       <h2 className="pt-2 font-display text-xl font-medium">Everything</h2>

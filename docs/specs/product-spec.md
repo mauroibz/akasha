@@ -846,6 +846,18 @@ last resorts, *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`); 
 navigation item. What an import left to sort is a link in the shell, "N to sort", absent at
 zero.
 
+**Your media** (Sprint 143, DEC-193). Each person has their own ordered list of media, each
+*Front*, *Kept* or *Off*. The order is the order of every chooser: the Library's strip, the
+bar's web search, Insights, tiers, the rank list, shelves. *Front* media feed the front of the
+Library — what is under way, *Lately*, *Up next* and the entry and goal the greeting names;
+*Kept* media are in the library and the choosers and out of the front; *Off* media are in no
+chooser and no band, and nothing of them is deleted: an entry of one still opens from a link,
+still exports and still reads in its medium's own words. Until a person chooses, the media
+they hold are in front and the rest are off, so an empty medium nobody used is not shown;
+someone who holds nothing sees every medium and, on the empty Library, the one question "What
+do you keep?". The control is in *Arrange* and in Settings: two arrows to move a medium and a
+three-way choice, each change stored at once.
+
 **The front of the Library** (Sprint 141; Home's content from Sprints 130–138 without what
 repeated the Library). Above the grid, on the plain Library only (a search or a filter puts it
 away), over one `GET /api/home` that reads stored data only. The grid does not wait for it,

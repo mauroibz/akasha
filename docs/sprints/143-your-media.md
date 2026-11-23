@@ -57,4 +57,48 @@ Hiding a medium from import sources or export.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commits: `BACK` (storage, API, the front filtered), `FRONTH`
+(the control, the choosers, the first-run question).
+
+- **Storage and API.** Migration 0039, `media_preferences`. `application/media.py` and
+  `GET`/`PUT /api/media`. `GET /api/item-types` is unchanged.
+- **Applied.** `useShownItemTypes` orders and filters the choosers on the Library, the bar,
+  Insights, tiers, the rank list and shelves. `GET /api/home` reads `now`, `lately`, `next`
+  and the greeting's entry and goal from *Front* media only.
+- **The control.** `YourMedia` in Arrange (below the tray) and in Settings: two arrows per
+  medium and Front/Kept/Off, announced, stored at once; the Library's strip and front follow
+  without a reload. `WhatDoYouKeep` on the empty Library for someone who holds nothing and has
+  not chosen.
+
+Acceptance: 1 by `test_media.py` (front only; kept and off still listed and counted), the
+`library.spec.ts` strip test and the walkthrough; 2 by `test_media.py`; 3 by `test_media.py`
+(isolation, and the route table in `test_isolation.py`); 4 by `test_app_shape.py`, unchanged in
+what it forbids, with the two routes added to its fixture.
+
+Verification: backend `test_media` 10, with `test_home_api`, `test_home_layout`,
+`test_app_shape`, `test_isolation`, `test_ranking`, `test_recommendations` 151 passed; Vitest
+641 passed; Playwright chromium and heavy-library, full run, 239 passed and 2 skipped by
+design; `make check`. A copy of the development library migrated 0038 to 0039 on start: 22
+items, 19 entries and 5 shelves before and after, integrity ok, no foreign-key violations.
+Walked through at 1440 and 390 px: without a choice the list read Books and Albums in front
+and Anime, Movies and Series off ("nothing yet"), and the strip showed only the two held;
+moving Albums first and setting Books to Kept reordered the strip at once, the Library opened
+on Albums, and *On now* (a book) left the front. No overflow, no console errors.
+
+Deviations:
+
+- Without a stored choice the default is derived: held media in front, the rest off, and
+  everything in front when nothing is held. The sprint said an unnamed medium is "appended as
+  Kept if it has entries"; that still holds once a list is stored. Deriving the first answer
+  is what removes the three empty tabs the owner saw, without their doing anything.
+- The registry endpoint does not filter. An *Off* medium's entries must still open and read in
+  their own words, so choosers filter on the client and labels use the whole registry.
+- The Add form's medium select and the importers still list every medium: adding the first
+  item of a medium by hand or by import is how it comes to be held.
+- The greeting's counts (entries, the pile) are still of the whole library.
+- Moving is two arrow buttons per row, not a drag: five rows.
+
+Observed, left: Arrange is long on a phone (the tray, then the media).
+
+Impact on later sprints: 146's Journal tabs take `useShownItemTypes`. 147 defaults "which
+media count" to the *Front* ones via `MediaService.front()`.

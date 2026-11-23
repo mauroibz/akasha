@@ -90,6 +90,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { LibraryFront } from "@/features/home/LibraryFront";
 import { SaveView } from "@/features/library/SaveView";
 import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
+import { WhatDoYouKeep } from "@/features/media/YourMedia";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 // The confirm dialog is the only place `/` needs the form stack (react-hook-form
@@ -232,7 +234,13 @@ export function LibraryPage() {
   }, [search, filters.query, setSearchParams]);
 
   const itemTypes = useItemTypes();
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  // The media the strip offers are the person's, in their order (Sprint 143); the
+  // registry itself stays whole, for labels and vocabularies.
+  const shownTypes = useShownItemTypes();
+  const domains = useMemo(
+    () => domainsFrom(shownTypes.data),
+    [shownTypes.data],
+  );
   /**
    * Whether the library can be asked for rows yet.
    *
@@ -245,7 +253,7 @@ export function LibraryPage() {
    * not be the reason the library is blank.
    */
   const domainReady =
-    filters.types.length > 0 || (!itemTypes.isPending && domains.length === 0);
+    filters.types.length > 0 || (!shownTypes.isPending && domains.length === 0);
   const library = useInfiniteQuery({
     queryKey: queryKeys.library.list(filters),
     queryFn: ({ pageParam, signal }) =>
@@ -308,7 +316,7 @@ export function LibraryPage() {
    */
   useEffect(() => {
     if (searchParams.has("type")) return;
-    if (itemTypes.isPending) return;
+    if (shownTypes.isPending) return;
     if (!domains.length) return;
     const remembered = readDomainPreference();
     const chosen = domains.some((type) => type.id === remembered)
@@ -322,7 +330,7 @@ export function LibraryPage() {
       },
       { replace: true },
     );
-  }, [searchParams, setSearchParams, domains, itemTypes.isPending]);
+  }, [searchParams, setSearchParams, domains, shownTypes.isPending]);
   // One domain at a time is the whole point of the strip, so the filter carries at
   // most one value even though the API accepts a repeated parameter.
   const selectedDomain = filters.types[0] ?? "";
@@ -1129,6 +1137,8 @@ export function LibraryPage() {
                 another app.
               </EmptyState>
             )}
+            {/* Asked once, of someone starting out (Sprint 143, DEC-193). */}
+            <WhatDoYouKeep className="mx-auto mt-12 max-w-xl" />
           </section>
         ))}
       {/* The crossfade is on the container and nowhere else. `mode="wait"` is

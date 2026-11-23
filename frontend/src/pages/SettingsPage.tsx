@@ -12,6 +12,7 @@ import {
 } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { PageFrame } from "@/components/PageFrame";
+import { YourMedia } from "@/features/media/YourMedia";
 
 interface Option {
   value: ThemeChoice;
@@ -126,6 +127,11 @@ export function SettingsPage() {
         Kept in this browser, so a phone and a laptop can differ. Covers, scores
         and the amber dot look the same in both.
       </p>
+      <h2 className="mt-12 font-display text-3xl font-medium tracking-tight">
+        Your media
+      </h2>
+      {/* The same control Arrange shows on the Library (Sprint 143). */}
+      <YourMedia heading={false} className="mt-4" />
       <SuggestionSources />
       <ExportPanel embedded />
       {/* Upkeep (Sprint 112; *Tidy up* since Sprint 125): a data job, offered

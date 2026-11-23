@@ -10,6 +10,7 @@ import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 /**
  * Which score to put in order (Sprint 116, DEC-176): for one library, every score
@@ -17,7 +18,8 @@ import { PageFrame } from "@/components/PageFrame";
  */
 export function RankPage() {
   const itemTypes = useItemTypes();
-  const domains = domainsFrom(itemTypes.data);
+  const shownTypes = useShownItemTypes();
+  const domains = domainsFrom(shownTypes.data);
   const [chosen, setChosen] = useState<string | null>(null);
   const type = chosen ?? domains[0]?.id ?? "";
   const distribution = useScoreDistribution({ type });

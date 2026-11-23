@@ -43,6 +43,7 @@ import { useItemTypes } from "@/features/library/useItemTypes";
 import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { DomainStrip } from "@/components/DomainStrip";
 import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 /**
  * Ask the library a question it already has the answer to, from the fields items
@@ -62,7 +63,11 @@ export function InsightsPage() {
   }, []);
 
   const itemTypes = useItemTypes();
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  const shownTypes = useShownItemTypes();
+  const domains = useMemo(
+    () => domainsFrom(shownTypes.data),
+    [shownTypes.data],
+  );
   const [type, setType] = useState("");
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
   // Off by default: the library page keeps the remembered filters current in

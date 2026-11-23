@@ -43,11 +43,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useItemTypes } from "@/features/library/useItemTypes";
 import { readThemeChoice, resolveTheme, saveThemeChoice } from "@/lib/theme";
 import { DomainStrip } from "@/components/DomainStrip";
 import { cn } from "@/lib/utils";
 import { navigateWithTransition } from "@/lib/viewTransition";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 interface Action {
   id: string;
@@ -93,8 +93,9 @@ export function CommandBar({
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const itemTypes = useItemTypes();
-  const domains = Array.isArray(itemTypes.data) ? itemTypes.data : [];
+  // The media a web search is offered for: the person's, in their order (Sprint 143).
+  const shownTypes = useShownItemTypes();
+  const domains = Array.isArray(shownTypes.data) ? shownTypes.data : [];
   const [query, setQuery] = useState(initialQuery);
   const [domain, setDomain] = useState<string | null>(null);
   const [added, setAdded] = useState<Record<string, number>>({});

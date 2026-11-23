@@ -100,6 +100,10 @@ test("announces loading and then renders the populated library and inbox facet",
       if (String(request).startsWith("/api/home")) {
         return Promise.resolve(new Response("{}", { status: 200 }));
       }
+      // The person's media (Sprint 143): no preference, so the registry as declared.
+      if (String(request).startsWith("/api/media")) {
+        return Promise.resolve(new Response("{}", { status: 200 }));
+      }
       // The places for the location filter (Sprint 111): none written yet.
       if (String(request).startsWith("/api/locations")) {
         return Promise.resolve(new Response("[]", { status: 200 }));

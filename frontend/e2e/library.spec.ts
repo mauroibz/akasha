@@ -1008,6 +1008,47 @@ test("the shell's Library link lands on a library, from the library", async ({
   await expect(page).toHaveURL(/type=book/);
 });
 
+test("the strip lists the person's media in their order, without what is off, and opens on the first (Sprint 143)", async ({
+  page,
+}) => {
+  await stubItemTypes(page, [
+    bookItemType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
+  await page.route("**/api/media", (route) =>
+    route.fulfill({
+      json: {
+        chosen: true,
+        media: [
+          { item_type: "anime", label: "Anime", presence: "front", held: true },
+          { item_type: "book", label: "Books", presence: "kept", held: true },
+          { item_type: "album", label: "Albums", presence: "off", held: true },
+          { item_type: "movie", label: "Movies", presence: "off", held: false },
+          {
+            item_type: "series",
+            label: "Series",
+            presence: "kept",
+            held: false,
+          },
+        ],
+      },
+    }),
+  );
+  await seedLibrary(page, 20);
+  await page.goto("/");
+  const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
+  await expect(strip.getByRole("radio")).toHaveText([
+    "Anime",
+    "Book",
+    "Series",
+  ]);
+  await expect(strip.getByRole("radio", { name: "Anime" })).toBeChecked();
+  await expect(page).toHaveURL(/type=anime/);
+});
+
 test("the library fits a phone with five domains, and the domain strip scrolls within itself (DEC-134)", async ({
   page,
 }) => {

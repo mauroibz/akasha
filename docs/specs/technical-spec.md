@@ -985,6 +985,19 @@ The product-spec route list is authoritative, with these refinements:
     `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
     `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays. *Want* on
     an item already held (a `library` pick) records the answer and adds nothing.
+- `GET /api/media` and `PUT /api/media` (Sprint 143, DEC-193): `{media: [{item_type, presence:
+  front|kept|off, label, held}], chosen}`, the person's media in their order, stored per person
+  in `media_preferences` (migration 0039, one JSON row keyed by `user_id`, cascading with the
+  user). Every registered domain appears once. A stored list is read leniently: an unregistered
+  type is dropped, and one it does not name is appended, `kept` if the person holds a
+  non-`unsorted` entry of it, else `off`. With nothing stored (`chosen: false`) held media are
+  `front` and the rest `off`, or all `front` when nothing is held. A write naming an
+  unregistered type (`unknown_medium`) or one twice (`duplicate_medium`) is refused, and stores
+  the whole normalized list. `GET /api/item-types` is unaffected and stays the whole registry;
+  the client orders and filters choosers with `features/media/useMedia.ts`. `GET /api/home`
+  restricts `now`, `lately`, `next` and the greeting's `active` and `goals` to `front` media,
+  reading the timeline and the pile eight times deeper when some are not, so the bands still
+  fill. No rule names a medium (6.6).
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
   `user_id`, cascading with the user). The module keys are `next` (L, shown), `question` (S,

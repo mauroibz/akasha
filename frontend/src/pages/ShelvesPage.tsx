@@ -20,6 +20,7 @@ import { OpeningCover } from "@/features/shelves/OpeningCover";
 import { cn } from "@/lib/utils";
 import { DomainStrip } from "@/components/DomainStrip";
 import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 type ShelfSort = "size" | "recent" | "name";
 
@@ -54,7 +55,11 @@ export function ShelvesPage() {
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   const itemTypes = useItemTypes();
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  const shownTypes = useShownItemTypes();
+  const domains = useMemo(
+    () => domainsFrom(shownTypes.data),
+    [shownTypes.data],
+  );
   const shelves = useQuery({
     queryKey: queryKeys.shelves,
     queryFn: getShelves,

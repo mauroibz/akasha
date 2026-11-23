@@ -16,7 +16,6 @@ import { Loading } from "@/components/ui/skeleton";
 import { DomainStrip } from "@/components/DomainStrip";
 import { domainsFrom } from "@/features/library/labels";
 import { defaultLibraryFilters } from "@/features/library/library";
-import { useItemTypes } from "@/features/library/useItemTypes";
 import { TypesetCover } from "@/features/shelves/OpeningCover";
 import {
   boardFrom,
@@ -30,6 +29,7 @@ import {
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { PageFrame } from "@/components/PageFrame";
+import { useShownItemTypes } from "@/features/media/useMedia";
 
 /** Every scored entry of one library, all pages of it. */
 async function everyScored(type: string, signal?: AbortSignal) {
@@ -56,8 +56,8 @@ async function everyScored(type: string, signal?: AbortSignal) {
  * is a proposal, listed and written only on *Apply*, as `time` in the score history.
  */
 export function TiersPage() {
-  const itemTypes = useItemTypes();
-  const domains = domainsFrom(itemTypes.data);
+  const shownTypes = useShownItemTypes();
+  const domains = domainsFrom(shownTypes.data);
   const navigate = useNavigate();
   const type = useParams().type ?? domains[0]?.id ?? "";
   const queryClient = useQueryClient();
