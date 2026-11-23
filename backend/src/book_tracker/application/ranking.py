@@ -44,7 +44,7 @@ from book_tracker.domain.spec import Domain
 SERIES_WEIGHT = 3.0
 SERIES_FULL_AT = 8.0
 #: The next after one still under way waits a little behind one ready to start.
-SERIES_UNDER_WAY = 0.75
+SERIES_UNDER_WAY = 0.5
 #: A series whose scores average below this is not pushed.
 SERIES_MIN_MEAN = 6.0
 #: Points per score point a creator stands above the person's mean, before shrinking.
