@@ -7304,3 +7304,10 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Verified: see the sprint's Outcome. `make test`'s full backend run was not repeated for
   149–150: the nine backend files around the change ran, 196 passed.
 - Next: the owner's review. Nothing is released; the version surfaces read 3.1.0.
+
+## 2026-11-23 — Correction to Sprint 150's close
+
+- `make check` failed on lint when Sprint 150 was closed (an unused helper left in
+  `e2e/home.spec.ts`); the command that ran it piped its output, which hid the exit status.
+  Fixed in the commit after the close, and `make check` rerun green. Run `make check` on its
+  own line.

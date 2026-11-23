@@ -238,15 +238,6 @@ async function stubLayout(page: Page) {
   return store;
 }
 
-/** The modules on screen, in order, by their `data-module`. */
-function shown(page: Page) {
-  return page
-    .locator("[data-module]")
-    .evaluateAll((nodes) =>
-      nodes.map((node) => node.getAttribute("data-module")),
-    );
-}
-
 async function stubHome(page: Page) {
   const patches: Array<{ id: string; body: Record<string, unknown> }> = [];
   await page.route("**/api/item-types", (route) =>
