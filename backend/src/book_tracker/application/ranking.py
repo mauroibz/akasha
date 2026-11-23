@@ -181,7 +181,7 @@ def rank_pile(
     for candidate in candidates:
         _waiting_signal(candidate, today)
         _set_aside_signal(candidate, today)
-    ranked = sorted(candidates, key=lambda c: (-round(c.score, 6), c.entry_id))[:limit]
+    ranked = _in_rounds(sorted(candidates, key=lambda c: (-round(c.score, 6), c.entry_id)))[:limit]
     return [
         {
             "entry_id": candidate.entry_id,
@@ -193,6 +193,26 @@ def rank_pile(
         }
         for candidate in ranked
     ]
+
+
+def _in_rounds(ranked: list[_Candidate]) -> list[_Candidate]:
+    """Every creator's best before any creator's second (DEC-192).
+
+    The scores stand; only the order changes, so one prolific creator cannot fill the top
+    of the pile. Within a creator the score's order holds. An entry without a creator is
+    a creator of its own.
+    """
+    seen: dict[tuple[str, str], int] = defaultdict(int)
+    rounds: list[int] = []
+    for candidate in ranked:
+        if candidate.creator_key:
+            key = (candidate.item_type, candidate.creator_key)
+            rounds.append(seen[key])
+            seen[key] += 1
+        else:
+            rounds.append(0)
+    order = sorted(range(len(ranked)), key=lambda index: (rounds[index], index))
+    return [ranked[index] for index in order]
 
 
 def _planned(domain: Domain) -> list[str]:

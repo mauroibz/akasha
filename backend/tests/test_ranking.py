@@ -416,6 +416,39 @@ async def test_something_set_aside_lately_is_pushed_down(tmp_path: Path) -> None
 
 
 @pytest.mark.anyio
+async def test_one_creator_does_not_fill_the_top_of_the_pile(tmp_path: Path) -> None:
+    """DEC-192: every creator's best waiting entry comes before any creator's second."""
+    async with _app(tmp_path) as app:
+        for index in range(4):
+            _entry(app, f"Loved {index}", "read", creators=("Stephen King",), score=9)
+        for index in range(3):
+            _entry(app, f"Fine {index}", "read", creators=(f"Fine {index}",), score=6)
+        king = [
+            _entry(
+                app,
+                f"King {index}",
+                "to_read",
+                creators=("Stephen King",),
+                date_added=f"202{index}-01-01T00:00:00Z",
+            )
+            for index in range(5)
+        ]
+        others = [
+            _entry(app, f"Other {index}", "to_read", creators=(f"Author {index}",))
+            for index in range(3)
+        ]
+
+        ranked = _rank(app)
+        alone = _rank(app, limit=4)
+
+    # The oldest King leads on its score; the other authors follow before a second King.
+    assert _ids(ranked)[:4] == [king[0], *others]
+    # Within one creator the order is still the score's: the longer waiting first.
+    assert _ids(ranked)[4:] == king[1:]
+    assert _ids(alone) == [king[0], *others]
+
+
+@pytest.mark.anyio
 async def test_the_order_is_stable_and_ties_break_on_entry_id(tmp_path: Path) -> None:
     async with _app(tmp_path) as app:
         ids = [
