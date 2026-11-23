@@ -58,6 +58,33 @@ export const test = base.extend<{
       );
       // Sprint 098: nothing under way, and an empty diary, unless a spec says so.
       await page.route("**/api/now", (route) => route.fulfill({ json: [] }));
+      // Home (Sprint 130): an empty library, unless a spec says otherwise.
+      await page.route("**/api/home", (route) =>
+        route.fulfill({
+          json: {
+            greeting: {
+              today: "2026-11-22",
+              active: null,
+              entries: 0,
+              pile: 0,
+              goals: [],
+            },
+            now: [],
+            next: [],
+            year: {
+              year: 2026,
+              months: Array.from({ length: 12 }, (_, index) => ({
+                month: index + 1,
+                count: 0,
+                counts: {},
+                covers: [],
+              })),
+              goals: [],
+            },
+            domains: [],
+          },
+        }),
+      );
       // Shelves asks what is lent out (Sprint 122).
       await page.route("**/api/loans?open=true", (route) =>
         route.fulfill({ json: [] }),
