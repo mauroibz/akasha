@@ -159,6 +159,10 @@ ROUTE_POLICY = {
     # Sprint 143: one list per person, keyed by the requester.
     ("GET", "/api/media"): "private-collection",
     ("PUT", "/api/media"): "private-write",
+    # Sprint 147: a person's own days, naming their own entries only.
+    ("GET", "/api/lit-days"): "private-collection",
+    ("PUT", "/api/lit-days/{day}"): "private-write",
+    ("DELETE", "/api/lit-days/{day}"): "private-write",
     # Sprint 132: ranks the requester's own pile from their own scores and goals.
     ("GET", "/api/pile"): "private-collection",
     # Sprint 133: a round is seeded by the requester's own entry; rounds and

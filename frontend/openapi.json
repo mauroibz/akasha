@@ -3401,6 +3401,57 @@
         "title": "JobProgressResponse",
         "type": "object"
       },
+      "LightBody": {
+        "properties": {
+          "entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 24,
+            "title": "Entry Ids",
+            "type": "array"
+          }
+        },
+        "title": "LightBody",
+        "type": "object"
+      },
+      "LitDay": {
+        "properties": {
+          "day": {
+            "title": "Day",
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/EntryResponse"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "day",
+          "entries"
+        ],
+        "title": "LitDay",
+        "type": "object"
+      },
+      "LitDaysResponse": {
+        "properties": {
+          "days": {
+            "items": {
+              "$ref": "#/components/schemas/LitDay"
+            },
+            "title": "Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "days"
+        ],
+        "title": "LitDaysResponse",
+        "type": "object"
+      },
       "LoanCreateBody": {
         "properties": {
           "lent_on": {
@@ -11721,6 +11772,245 @@
           }
         },
         "summary": "Refresh Item"
+      }
+    },
+    "/api/lit-days": {
+      "get": {
+        "description": "The lit days of a week or a month; at most 62 days at a time.",
+        "operationId": "list_lit_days_api_lit_days_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "maxLength": 10,
+              "title": "From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "maxLength": 10,
+              "title": "To",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LitDaysResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "List Lit Days"
+      }
+    },
+    "/api/lit-days/{day}": {
+      "delete": {
+        "description": "Take everything off a day.",
+        "operationId": "unlight_day_api_lit_days__day__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Unlight Day"
+      },
+      "put": {
+        "description": "Light a day by hand, saying what it was for or nothing; a day to come is refused.",
+        "operationId": "light_day_api_lit_days__day__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "title": "Day",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LightBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LitDay"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Light Day"
       }
     },
     "/api/loans": {

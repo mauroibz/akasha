@@ -527,6 +527,24 @@
    ]
   ],
   [
+   "/api/lit-days",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/lit-days/{day}",
+   [
+    "PUT"
+   ]
+  ],
+  [
+   "/api/lit-days/{day}",
+   [
+    "DELETE"
+   ]
+  ],
+  [
    "/api/pile",
    [
     "GET"

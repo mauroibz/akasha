@@ -1358,6 +1358,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/lit-days": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Lit Days
+     * @description The lit days of a week or a month; at most 62 days at a time.
+     */
+    get: operations["list_lit_days_api_lit_days_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lit-days/{day}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Light Day
+     * @description Light a day by hand, saying what it was for or nothing; a day to come is refused.
+     */
+    put: operations["light_day_api_lit_days__day__put"];
+    post?: never;
+    /**
+     * Unlight Day
+     * @description Take everything off a day.
+     */
+    delete: operations["unlight_day_api_lit_days__day__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/loans": {
     parameters: {
       query?: never;
@@ -2953,6 +2997,23 @@ export interface components {
       };
       /** State */
       state: string;
+    };
+    /** LightBody */
+    LightBody: {
+      /** Entry Ids */
+      entry_ids?: number[];
+    };
+    /** LitDay */
+    LitDay: {
+      /** Day */
+      day: string;
+      /** Entries */
+      entries: components["schemas"]["EntryResponse"][];
+    };
+    /** LitDaysResponse */
+    LitDaysResponse: {
+      /** Days */
+      days: components["schemas"]["LitDay"][];
     };
     /** LoanCreateBody */
     LoanCreateBody: {
@@ -8136,6 +8197,185 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["ItemResponse"];
         };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  list_lit_days_api_lit_days_get: {
+    parameters: {
+      query: {
+        from: string;
+        to: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LitDaysResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  light_day_api_lit_days__day__put: {
+    parameters: {
+      query?: {
+        tz?: string | null;
+      };
+      header?: never;
+      path: {
+        day: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LightBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LitDay"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  unlight_day_api_lit_days__day__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        day: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
       /** @description Unauthorized */
       401: {
