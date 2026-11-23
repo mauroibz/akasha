@@ -7196,3 +7196,12 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Warning: the first implementation commit of this sprint was made by mistake with one test
   red; it was amended before anything else was built on it.
 - Next: Sprint 141, the library at `/`.
+
+## 2026-11-23 — Sprint 141: the library is the home (complete)
+
+- Done: the Library at `/` with its front; Home's page and seven modules deleted; the home
+  payload and layout pruned (`1a41bf2`). Product spec 7 and technical spec 7 rewritten for
+  Sprints 140–141.
+- Verified: see the sprint's Outcome.
+- Deviations: showcase defaults, capped cover size, the *Everything* heading. In the Outcome.
+- Next: Sprint 142, Arrange.

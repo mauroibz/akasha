@@ -4,8 +4,8 @@
 
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
-all ten sprints to be built. Sprints 139 (one frame) and 140 (one bar) are complete; **Sprint 141 (the library at `/`) is
-next**. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
+all ten sprints to be built. Sprints 139 (one frame), 140 (one bar) and 141 (the library at `/`) are complete; **Sprint
+142 (Arrange) is next**. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 
 What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<main>`; widths
@@ -13,7 +13,7 @@ What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<m
 underlined tabs, each held by `src/test/frame.test.ts`. A new page uses all three.
 
 What 140 left: the navigation is places only; `AppShell` draws the bar as a field except on
-`/library` (a path check 141 must move to `/`), and "N to sort" in both headers; *Add* and
+`/` (the Library has its own), and "N to sort" in both headers; *Add* and
 *Import* are reached from the bar's footer.
 
 The owner's choices that are not obvious from the proposal's first sections: the Library keeps
@@ -27,6 +27,11 @@ in one skippable step: "simple and calm".
 16–17 accessibility tests fail, on `main` too. Run Playwright with
 `AKASHA_E2E_BACKEND=http://127.0.0.1:9`. The repository has an old stash (`stash@{0}`,
 made on `adc4de4`); leave it. Metadata providers are unreachable from the agent's sandbox.
+
+What 141 left: `/` is the Library and `/library` redirects. `features/home/LibraryFront.tsx`
+draws the greeting, *On now*, *Lately* and the showcases above the grid from `GET /api/home`;
+the showcase keys are `next`, `question`, `suggested`, `year:<type>`, `shelf:<id>`.
+`features/home/EditHome.tsx` is still the dialog; 142 replaces it.
 
 ## Earlier state (release 3.1.0)
 

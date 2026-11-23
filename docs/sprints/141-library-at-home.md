@@ -1,7 +1,7 @@
 # Sprint 141 — The library is the home
 
 **Sprint:** 141
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 140
 **Owner:** Mauro
@@ -59,4 +59,54 @@ Arranging in place and new showcases (142). Media order (143). The Shelves view 
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commit: `1a41bf2`.
+
+- **`/` is the Library.** `/library` redirects to `/` with its query and hash. The navigation
+  is Library, Shelves, Insights, Diary; the phone's tab bar is Library, the bar's button,
+  Shelves, Insights. Internal links point at `/`.
+- **The front** (`features/home/LibraryFront.tsx`) sits where the *Now* strip sat, on the plain
+  Library only: the greeting (a second-level heading now), *On now* (Home's module, replacing
+  the Library's strip, which is deleted), *Lately* as one row of covers, the showcases in the
+  existing 12-column packing, then an *Everything* heading over the grid. It draws nothing
+  while loading, on an error, on a malformed answer and for an empty library.
+- **Showcases** are `next`, `question`, `suggested` and the two families. `now`, `lately`,
+  `libraries`, `shelves`, `tidy`, `lent` and the all-media `year` are no longer modules; their
+  components and payload sections are deleted. A 3.1 layout naming them loads, without them.
+- **`GET /api/home`** always reads `greeting`, `now` and `lately`; `year`, `domains`, `tidy`,
+  `shelves` and `lent` are removed, with their queries.
+- *Edit home* is unchanged apart from listing fewer rows; 142 replaces it.
+
+Acceptance: 1 by `LibraryFront.test.tsx` and `e2e/home.spec.ts`; 2 by `App.test.tsx` and the
+e2e redirect test; 3 by `test_home_layout.py` (a stored 3.1 layout) and the front's tests;
+4 by `library.spec.ts` in the heavy-library project (DOM budget unchanged), the home and
+accessibility specs, and `test_home_api.py`'s budget test with every showcase shown.
+
+Verification: backend `test_home_layout`, `test_home_api`, `test_app_shape`, `test_isolation`
+83 passed; Vitest 631 passed; Playwright chromium and heavy-library, full run 223 passed with
+17 expecting the old address, then those files 230 passed and `home`, `library`,
+`accessibility` 95 passed; `make check`. Looked at on a copy of the development library at
+1440 px in *Paper* and 390 px in *Ink*: greeting, one book under way, eight covers in Lately,
+*Up next* beside *Your 2026 books*, then the grid. No overflow, no console errors.
+
+Deviations:
+
+- Only *Up next* and the libraries' years are shown by default; *One question* and *More like
+  this* default to hidden. On Home they were shown. With all of them above it the grid started
+  two screens down. A stored layout keeps what its owner chose.
+- A cover in *Up next* and *More like this* is capped at 152 px. With two picks in a wide
+  showcase each was 380 px across (the judgement call the 3.0 handoff recorded).
+- An *Everything* heading was added above the grid; the medium tabs stay in the sticky toolbar
+  at the top rather than beside that heading, because that toolbar must keep its height while
+  the grid scrolls (DEC-139's rule for the virtualizer).
+- *Lately* says "Added +2" under a cover where the list said "Added X and 2 more".
+- The greeting's counts are unchanged (entries, the goal, the pile, *Edit home*).
+
+Observed, left: *On now* is still a bordered box holding one large entry and smaller ones
+beside it, where the mockup draws equal cards; with one thing under way most of the box is
+empty at 1440 px. The medium tabs read as if they governed *On now* and *Lately*, which are
+across media. Both are for 142–143 to settle with Arrange and the media order.
+
+Impact on later sprints: 142 replaces `EditHome` and adds the `insight:` family to
+`application/home_layout.py`. 143 filters `now`, `lately` and `next` to *Front* media in
+`application/home.py`. 146 needs chores' own counts for *Tidy up*: `/api/home` no longer has
+`tidy`.
