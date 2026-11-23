@@ -1,7 +1,7 @@
 # Sprint 146 — Journal
 
 **Sprint:** 146
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 145
 **Owner:** Mauro

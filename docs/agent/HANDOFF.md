@@ -5,8 +5,8 @@
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
 all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange), 143
-(your media) and 144 (shelves as a view) are complete; **Sprint 145 (shelves with a rule) is
-next**. Migration **0039** is
+(your media), 144 (shelves as a view) and 145 (shelves with a rule) are complete; **Sprint 146
+(the Journal) is next**. Migration **0039** is
 new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 

@@ -7239,3 +7239,12 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   `/lent` do not redirect, *Pin to library* stays. For the owner's attention in the final
   report.
 - Next: Sprint 145, shelves with a rule.
+
+## 2026-11-23 — Sprint 145: shelves with a rule (complete)
+
+- Done: saved views drawn as shelves (`features/shelves/useRuleShelves.ts`), *Save as a
+  shelf*, *Stop keeping*.
+- Verified: see the sprint's Outcome.
+- Deviations: no migration; saved views stay in their own table. The line now has two
+  migrations planned (0039 done, lit days to come), not three.
+- Next: Sprint 146, the Journal.

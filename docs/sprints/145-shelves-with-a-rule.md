@@ -1,7 +1,7 @@
 # Sprint 145 — Shelves with a rule
 
 **Sprint:** 145
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 144
 **Owner:** Mauro
@@ -55,7 +55,7 @@ A rule builder beyond the Library's existing filters.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commit: `HASH`.
+Completed 2026-11-23 (DEC-193). Commit: `3c502f4`.
 
 Baseline as observed at activation: saved views already exist (Sprint 100): `saved_views`
 keeps the Library's URL query under a name per person, `GET`/`POST`/`DELETE /api/views`, made
