@@ -5,6 +5,7 @@ import { queryKeys } from "@/api/keys";
 import {
   patchEntry,
   type EntryFormat,
+  type EntryStatus,
   type EntryPatch,
   type ItemType,
   type LibraryEntry,
@@ -47,6 +48,8 @@ function yesterday(): string {
 export function FinishDialog(props: {
   entry: LibraryEntry | null;
   types: ItemType[] | undefined;
+  /** The finished status chosen, where a domain has more than one; else its first. */
+  status?: EntryStatus;
   onClose: () => void;
   onFinished?: (saved: LibraryEntry) => void;
 }) {
@@ -57,17 +60,19 @@ export function FinishDialog(props: {
 function Sheet({
   entry,
   types,
+  status,
   onClose,
   onFinished,
 }: {
   entry: LibraryEntry;
   types: ItemType[] | undefined;
+  status?: EntryStatus;
   onClose: () => void;
   onFinished?: (saved: LibraryEntry) => void;
 }) {
   const queryClient = useQueryClient();
   const type = entry.item.type;
-  const finished = statusWith(type, types, "finished");
+  const finished = status ?? statusWith(type, types, "finished");
   const dated = hasEntryField(type, types, "date_finished");
   const formats =
     (entry.formats ?? []).length === 0

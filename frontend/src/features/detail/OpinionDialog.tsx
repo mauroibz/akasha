@@ -13,6 +13,7 @@ import {
 } from "@/features/library/labels";
 import type { EntryFieldName } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { localDay } from "@/features/progress/outline";
 import { FormatPicker } from "@/features/library/FormatPicker";
 import { Button } from "@/components/ui/button";
 import {
@@ -112,7 +113,22 @@ export function OpinionDialog({
                 <StatusSelect
                   statuses={statusesFor(entry.item.type, itemTypes.data)}
                   value={field.value}
-                  onValueChange={field.onChange}
+                  onValueChange={(status) => {
+                    field.onChange(status);
+                    // Finished, and no day yet: today, shown and editable (DEC-192).
+                    const finishing = statusesFor(
+                      entry.item.type,
+                      itemTypes.data,
+                    ).find((row) => row.value === status)?.finished;
+                    if (
+                      finishing &&
+                      has("date_finished") &&
+                      !form.getValues("date_finished")
+                    )
+                      form.setValue("date_finished", localDay(new Date()), {
+                        shouldDirty: true,
+                      });
+                  }}
                   label="Status"
                 />
               )}

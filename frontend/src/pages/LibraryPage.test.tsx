@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
+import { localDay } from "@/features/progress/outline";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -1796,6 +1797,93 @@ test("a card's status change can be undone (Sprint 109)", async () => {
   expect(bodies).toEqual([{ status: "reading" }, { status: "read" }]);
 });
 
+const bookTypes = [
+  {
+    id: "book",
+    label: "Book",
+    plural_label: "Books",
+    fields: [],
+    statuses: [
+      { value: "read", label: "Read", choosable: true, finished: true },
+      {
+        value: "reading",
+        label: "Reading",
+        choosable: true,
+        in_progress: true,
+      },
+      { value: "to_read", label: "To read", choosable: true, planned: true },
+    ],
+    default_status: "to_read",
+    entry_fields: ["date_started", "date_finished", "reread_count"],
+    entry_field_labels: {},
+    progress: null,
+    formats: [],
+    entry_panel_label: "Your reading data",
+    chooses_covers: false,
+  },
+];
+
+function stubFinishing(bodies: unknown[]) {
+  const reading = {
+    ...populated,
+    items: [{ ...populated.items[0], status: "reading", score: null }],
+  };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        bodies.push(body);
+        return new Response(JSON.stringify({ ...reading.items[0], ...body }));
+      }
+      if (String(request).startsWith("/api/item-types"))
+        return new Response(JSON.stringify(bookTypes));
+      return new Response(JSON.stringify(reading));
+    }),
+  );
+}
+
+test("a card set to Read asks when, in the finish sheet (DEC-192)", async () => {
+  const bodies: Array<Record<string, unknown>> = [];
+  stubFinishing(bodies);
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  await user.click(within(row).getByRole("combobox"));
+  await user.click(await screen.findByRole("option", { name: /^Read(?!ing)/ }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "You finished Rayuela",
+  });
+  expect(bodies).toHaveLength(0);
+  expect(within(sheet).getByRole("button", { name: "Today" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await user.click(within(sheet).getByRole("button", { name: "Finish" }));
+  await waitFor(() => expect(bodies).toHaveLength(1));
+  expect(bodies[0]).toMatchObject({
+    status: "read",
+    date_finished: localDay(new Date()),
+  });
+});
+
+test("cancelling the finish sheet leaves the card as it was (DEC-192)", async () => {
+  const bodies: Array<Record<string, unknown>> = [];
+  stubFinishing(bodies);
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  await user.click(within(row).getByRole("combobox"));
+  await user.click(await screen.findByRole("option", { name: /^Read(?!ing)/ }));
+  const sheet = await screen.findByRole("dialog", {
+    name: "You finished Rayuela",
+  });
+  await user.click(within(sheet).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(bodies).toHaveLength(0);
+  expect(within(row).getByRole("combobox")).toHaveTextContent(/Reading/);
+});
+
 test("the library filters by where things are and by what is lent (Sprint 111)", async () => {
   const fetchMock = vi.fn(async (request: string | URL | Request) => {
     const url = String(request);
@@ -1854,7 +1942,7 @@ test("Home's Tidy up opens the library on what has no score yet (Sprint 131)", a
   );
 });
 
-test("finishing a scored entry from its card asks whether the score holds (Sprint 115)", async () => {
+test("finishing a scored entry from its card asks whether the score holds (Sprint 115, DEC-192)", async () => {
   const bookType = {
     id: "book",
     label: "Book",
@@ -1905,12 +1993,15 @@ test("finishing a scored entry from its card asks whether the score holds (Sprin
   const row = await screen.findByRole("article", { name: "Rayuela" });
   await user.click(within(row).getByRole("combobox"));
   await user.click(await screen.findByRole("option", { name: "Read" }));
-  const still = await screen.findByRole("dialog", { name: "Still an 8?" });
-  await user.click(within(still).getByRole("button", { name: "Keep 8" }));
+  // The finish sheet asks it now, in the same sheet as when (DEC-192).
+  const sheet = await screen.findByRole("dialog", {
+    name: "You finished Rayuela",
+  });
+  expect(within(sheet).getByText("Still an 8?")).toBeVisible();
+  await user.click(within(sheet).getByRole("button", { name: "Finish" }));
   await waitFor(() =>
     expect(bodies).toEqual([
-      { status: "read" },
-      { score: 8, score_reason: "time" },
+      { status: "read", score: 8, score_reason: "time" },
     ]),
   );
 });
