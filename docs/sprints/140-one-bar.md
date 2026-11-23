@@ -1,7 +1,7 @@
 # Sprint 140 — One bar
 
 **Sprint:** 140
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 139
 **Owner:** Mauro
@@ -27,6 +27,7 @@ Observed 2026-11-23 while writing the proposal (section 2); re-observe at activa
 2. **Library first, then the web.** Results list matching entries (open), then provider candidates with **Add**, which files under the medium's default status and offers the other statuses in place. Links and ISBNs resolve as today.
 3. **The Library filters as you type.** On `/library` (and `/` after 141) the same field drives the grid's query; the toolbar's field and *Search* button are removed.
 4. **Two last resorts in the footer.** *Enter it by hand* opens `/add`; *Bring a whole list* opens `/import`. Both leave the navigation; the routes stay. The Inbox count shows beside the Library's count as "N to sort".
+5. **The bar's medium chooser** is drawn as `DomainStrip` draws one (moved from Sprint 139, whose Outcome says why).
 
 ## Acceptance criteria
 

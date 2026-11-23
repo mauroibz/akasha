@@ -1167,6 +1167,16 @@ Design tokens:
 - visible focus rings and touch targets at least 44 px where practical;
 - all motion disabled/reduced under `prefers-reduced-motion`.
 
+One frame (Sprint 139, DEC-193), each written once and held by `src/test/frame.test.ts`:
+
+- `components/PageFrame.tsx` is the only `<main>` inside the shell. A page names a width
+  (`wide`, 1440 px, for a screen of covers; `reading`, 960 px, for text and forms; `focus`,
+  576 px, for a screen that holds one thing at a time) and passes only spacing that is its own;
+- `components/DomainStrip.tsx` is the only medium chooser, drawn as underlined tabs;
+- `components/Cover.tsx` is a cover in a list: three sizes, one caption (title, creator, score).
+  The Library's virtualised card, the decks and the dialogs that choose or crop a cover keep
+  their own drawing.
+
 Cross-cutting behavior:
 
 - Query keys include every server filter/sort value.

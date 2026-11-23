@@ -2,6 +2,30 @@
 
 ## Where the project stands
 
+**2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
+139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
+all ten sprints to be built. Sprint 139 (one frame) is complete; **Sprint 140 (one bar) is
+next**. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
+to release applied to the 3.0 line only.
+
+What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<main>`; widths
+`wide`, `reading`, `focus`), `components/Cover.tsx`, and `components/DomainStrip.tsx` as
+underlined tabs, each held by `src/test/frame.test.ts`. A new page uses all three.
+
+The owner's choices that are not obvious from the proposal's first sections: the Library keeps
+the first mockup's drawing (cards for *Now*, a row for *Lately*); the stronger style (boards, a
+bookplate, a lamp) was rejected. The Journal opens on a widget switcher (*Every day*, *Play*,
+*Goal*), not on notes. *Every day* shows a week or a month and asks what a lit day was for,
+in one skippable step: "simple and calm".
+
+**Environment warning:** a local Akasha 1.5.7 container (`akasha-akasha-1`) listens on
+127.0.0.1:8000, where the Playwright dev server proxies unstubbed `/api` calls; with it up,
+16–17 accessibility tests fail, on `main` too. Run Playwright with
+`AKASHA_E2E_BACKEND=http://127.0.0.1:9`. The repository has an old stash (`stash@{0}`,
+made on `adc4de4`); leave it. Metadata providers are unreachable from the agent's sandbox.
+
+## Earlier state (release 3.1.0)
+
 **2026-11-23, 3.1.0 released and running on the board** (#42, tag `v3.1.0`; no migration). The owner reviewed 3.0.0 on the board and
 asked for six changes (DEC-192), built as Sprints 137 (finishing records when; *Mark as read*;
 the pile in rounds by creator; `/pile`, the pile as a list) and 138 (Home's module families: a

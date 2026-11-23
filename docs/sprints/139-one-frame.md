@@ -1,7 +1,7 @@
 # Sprint 139 — One frame
 
 **Sprint:** 139
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 138
 **Owner:** Mauro
@@ -58,4 +58,48 @@ Moving or merging any screen (140–146). New copy. Theme presets (148).
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commit: `0f70383`.
+
+- **Widths.** `PageFrame` owns `<main>`; 24 files moved onto it. Wide: Library, a shelf,
+  Shelves, Inbox, tiers, Home. Reading: Add, Import, Insights, Diary, the year review, Settings,
+  people, the pile, Lent out, the rank list and deck, chores, detail, export. The four list pages
+  that were 768 px are now 960 px; the Library is 1440 px, was 1600 px.
+- **Chooser.** `DomainStrip` is drawn as underlined tabs and replaces the hand-written
+  radiogroups on Insights and Shelves; the Library, tiers, the rank list and a shelf already
+  used it and take the new look.
+- **Cover.** `Cover` (sizes `s`, `m`, `l`; caption with title, creator and score) on a shelf,
+  the Diary, the timeline, the year review, the pile, Lent out, *Up next*, *More like this* and
+  *One question*.
+- **Headers.** The pages that survive DEC-193 already shared `PageHeader`; nothing to change.
+
+Acceptance: 1 and 2 by `src/test/frame.test.ts` (sources); 3 by the same test and
+`Cover.test.tsx`; 4 by Playwright.
+
+Verification: Vitest 649 passed (96 files); `make check`; Playwright chromium and
+heavy-library, 239 passed and 2 skipped by design, after one assertion changed (below); the
+Library, a shelf, Shelves, Insights, the Diary and the pile looked at in the running app on a
+copy of the development library at 1440 and 390 px in *Paper*, and the Library, a shelf and
+Insights in *Ink*. No overflow and no console errors.
+
+Deviations:
+
+- A third width, `focus` (576 px), for the screens that hold one thing at a time: the gaps and
+  five-minute games and the not-found page. At 960 px a single card would stretch. Recorded in
+  the technical spec.
+- "A square medium is square" is dropped. Every medium's cover is drawn 2:3 everywhere today and
+  the registry declares no shape; adding one is a domain-contract change that belongs to its own
+  sprint.
+- The command bar's chooser is left as it is. It is a search scope with its own label and a
+  toggle-button contract the bar's specs depend on, and Sprint 140 rebuilds the bar. Moved to
+  140.
+- One e2e assertion changed: `library.spec.ts` asserted that five media overflow the strip at
+  390 px. As tabs they fit, so it now asserts the strip would scroll inside its own box
+  (`overflow-x: auto`) and stays within the screen.
+- One implementation commit where three were planned: the page files are shared by the width
+  and the cover changes.
+
+Observed, left: a shelf's caption puts the score at the right edge with nothing beside it when
+an item has no creator (*Tokio blues* on the development library).
+
+Impact on later sprints: 140 takes the command bar's chooser. 141 and 146 build their screens
+on `PageFrame`, `Cover` and `DomainStrip`.

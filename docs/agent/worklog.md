@@ -7169,3 +7169,19 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   capabilities, bound to 192.168.100.240:4441 only; `/api/home` and `/api/pile` 401 without a
   session; no error lines in the log.
 - Next: the owner's new work.
+
+## 2026-11-23 — Sprint 139: one frame (complete)
+
+- Done: the owner's request for a unified UX, proposed (`docs/library-first-proposal.md`, mockup
+  beside it), accepted as DEC-193 and planned as Sprints 139–148 on branch `library-first-4.0`
+  (`5627828`). Sprint 139: `PageFrame`, `Cover`, one `DomainStrip` look (`0f70383`).
+- Verified: see the sprint's Outcome (Vitest 649, Playwright 239 passed, `make check`, a look
+  at six screens in both themes at 1440 and 390 px).
+- Deviations: a third width (`focus`); no square covers; the command bar's chooser moved to
+  140; one e2e assertion changed. All in the Outcome.
+- Walkthrough tooling, in the session scratchpad and not tracked: a script that serves the
+  backend on a copy of `data/` (port 8791) with Vite on 5191, and
+  `frontend/e2e/scratchpad/shots.mjs <outdir> <theme> name=/path …` for screenshots at both
+  widths. Providers are unreachable from this sandbox: the bar's web results cannot be looked
+  at live here.
+- Next: Sprint 140, one bar.
