@@ -60,7 +60,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
 | Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
-| List rendering | TanStack Virtual + keyset pagination on `/` and the triage surface | Calibre libraries reach thousands of rows |
+| List rendering | TanStack Virtual + keyset pagination on `/library` and the triage surface | Calibre libraries reach thousands of rows |
 | Auth | Optional, off by default (2.0). With auth on: accounts, per-user libraries, 400-day sessions. Exposure rule unchanged until all four hold: auth on, TLS in front, cookie `Secure`, setup completed before publishing (DEC-180) | Delivered as DEC-146; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
@@ -772,7 +772,7 @@ dashboard" looks like.
 A Calibre import can produce several thousand rows, and triage is a dense
 table of exactly those. Plain React rendering will visibly stutter past ~500.
 
-- **TanStack Virtual** on both `/` and triage. Only visible rows mount.
+- **TanStack Virtual** on both `/library` and triage. Only visible rows mount.
 - **TanStack Query with `infiniteQuery`** against the keyset cursor (§6), page
   size 100, prefetch the next page when the user scrolls within 200px of the
   bottom.
@@ -813,7 +813,19 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — The library.** The primary screen and the one to get right. Since Sprint 029 it is
+**`/` — Home** (Sprint 130, DEC-183). The screen Akasha opens on: a 12-column grid of
+modules over one `GET /api/home` that reads stored data only. The greeting names the day,
+"Day N of" the entry most recently touched among those under way (when it has a start date)
+and the library's totals; *On now* holds what is under way with *+N* progress, *Finished*
+(the finish sheet) and *Set aside* (back to the domain's planned status); *Up next* holds five
+from the pile, each with why, and *Start* (or *Finished* where a domain has no under-way
+status); *Year* draws twelve months of covers and, from this month on, an empty slot for each
+thing the lead goal still needs, never marking a past month short; one tile per library
+opens `/library?type=…`. Below 720 px every module is full width in the same order. An empty
+library sees a first-run message. Sprint 131 adds the rest of the modules and *Edit home*.
+
+**`/library` — The library** (at `/` until Sprint 130; a `/` address carrying library
+parameters redirects here with them). The primary screen and the one to get right. Since Sprint 029 it is
 also **the screen you search from and the screen you add from** (DEC-065, DEC-073); adding
 something no provider lists is the only thing that still leaves it.
 
@@ -878,7 +890,7 @@ here is the one thing no provider can do for you.
   typed as the default domain whatever the client sends (DEC-067 row 6, DEC-073). Naming a
   domain here would show one domain's statuses and fields and then write another's row.
   Giving manual entry a real domain needs an API change and is unscheduled.
-- On success it returns to `/` with the new entry highlighted.
+- On success it returns to `/library` with the new entry highlighted.
 
 The confirm step itself — **what we already know** about the thing you clicked, everything
 the search returned rendered from the domain's field spec, at no cost and with nothing to

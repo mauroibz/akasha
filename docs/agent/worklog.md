@@ -6854,3 +6854,29 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   migration transaction, digest guard, library batching, durability and shutdown found nothing
   blocking; two import-resume edge cases are recorded in the handoff.
 - Next: the board upgrades to 2.9.0.
+
+## 2026-11-22 — Sprint 130 (complete)
+- Done: the library moved to `/library` and `/` became Home (`dafe022`); `GET /api/home`
+  (`527e6e1`); the module grid (`c1c8c34`); `e2e/home.spec.ts` (`749359a`). DEC-184 records the
+  choices the sprint left open (phone bar, link destinations, per-status tile counts, `next`
+  interleaving, *Set aside*, the movie *Finished* fallback, no past month marked short).
+- Verified: focused backend tests (home 6, goals, isolation, now/diary, batching, app shape,
+  conformance), `npx vitest related` 298, `make check`, Playwright 13 updated specs + auth 6 +
+  home 10. `/api/home` 117 ms median on 10,000 entries (test) and 19 ms on the walkthrough
+  library.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by a scratchpad script with 346 generic
+  entries over five domains and covers copied from the scratchpad (never committed), a book goal
+  of two a month; vite on 5180. Screenshots at 1440 and 390 in Ink and Paper: scroll width 0,
+  only console error the auth-off 404 on `/api/auth/me`. Exercised: *Start* on the first pile
+  entry moved it into On now; *Finished* through the sheet removed it from On now and the goal
+  read 9 / 24; the Anime tile opened `/library?type=anime`; `/?type=album&status=owned` landed on
+  `/library?type=album&status=owned` with the library rendering.
+- Observed and fixed during the walkthrough: month letters in the year sat at different heights
+  (now aligned); Up next had no action for a movie (now *Finished*); a tile's footer overflowed
+  at 390 (now wraps).
+- Observed, left: at full width the year module is short and wide with empty months (Lately
+  takes five of its columns in 131); on a phone On now's three pills wrap to two rows per entry,
+  so the module is tall; "Day 32 of" names the most recently touched entry under way even when
+  the goal shown is for another library. `heavy-library` probes failed once per run under
+  parallel Playwright load, passed alone (DEC-114 class).
+- Next: Sprint 131, the remaining modules and Edit home.

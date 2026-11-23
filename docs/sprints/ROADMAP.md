@@ -1908,6 +1908,8 @@ whole, recorded as **DEC-183**; the design is
 
 - **[130 — Home: the module grid](130-home-the-module-grid.md)**: `/` is Home, the library moves
   to `/library`; `GET /api/home`; On now, Up next, Year, library tiles.
+  [Closed 2026-11-22 (DEC-184). Six criteria met; `/api/home` 117 ms median on 10,000 entries;
+  Import left the phone's bar; see the sprint's Outcome.]
 - **[131 — Home: the remaining modules, and Edit home](131-home-the-rest-and-edit.md)**: Lately,
   Tidy up, One question, Shelves, Lent out; a stored per-user layout.
 - **[132 — The ranked pile](132-the-ranked-pile.md)**: recommendations leave the non-goals; the

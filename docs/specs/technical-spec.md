@@ -730,6 +730,21 @@ The product-spec route list is authoritative, with these refinements:
 - Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
+- `GET /api/home` (Sprint 130, DEC-183) is Home's one read, from stored data only — no
+  provider is consulted, and a test fails if one is. Five sections:
+  `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, the first entry of `/now` with
+  `day`, 1 on its `date_started` and `null` without one; `entries`, every entry but `unsorted`;
+  `pile`, entries in a status their domain declares `planned`; `goals`, per domain with a goal
+  in registry order, `{item_type, target, count}` for the current year); `now`, `/now`'s
+  entries; `next`, up to five `{entry, reason, creator, mean_score, since}` in each domain's
+  goal-picks order with the domains taken in turn (a placeholder until Sprint 132), for every
+  domain declaring a `planned` status; `year`, twelve `{month, count, counts, covers}` for the
+  current year by `date_finished` (at most 24 `covers` a month, each `{entry_id, item_id,
+  item_type, title, cover_url, score}`) and each goal's `{item_type, period, count, target,
+  done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry, in registry
+  order: `count`, `status_counts` per status in declared order, `scores` (ten bins),
+  `mean_score`, up to three best-scored `covers` and `without_cover`. Answers in under 150 ms
+  on a 10,000-entry library (measured 117 ms median in its test).
 - `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
   most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
   month with per-domain counts (Sprint 098).

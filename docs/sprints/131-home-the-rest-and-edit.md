@@ -1,7 +1,7 @@
 # Sprint 131 — Home: the remaining modules, and Edit home
 
 **Sprint:** 131
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 54
 **Depends on:** 130
 **Owner:** Mauro
@@ -14,7 +14,10 @@ them, with the layout stored on the server.
 ## Required context
 
 - DEC-183; the proposal §2 and the mockup's *On the phone, and editing* section.
-- Sprint 130's Outcome and `features/home/`, `application/home.py`, `api/home.py`.
+- Sprint 130's Outcome and DEC-184; `features/home/` (`layout.ts` holds the module keys
+  `now`, `next`, `year`, `libraries` and the column spans; the year spans 12 until Lately takes
+  the five columns beside it at 7), `application/home.py`, `api/home.py`, and the empty
+  `/api/home` stub every e2e spec gets from `e2e/console.ts`.
 - The sources: `/diary/timeline` (Lately), `/duplicates`, the covers deck and finished-unscored
   queries behind `/deck` (Tidy up), `features/play` and `features/questions` (One question),
   `/shelves`, `/loans`.

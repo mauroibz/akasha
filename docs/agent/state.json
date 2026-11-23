@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 54,
-  "project_status": "in_progress",
-  "active_sprint": "130",
-  "active_sprint_file": "docs/sprints/130-home-the-module-grid.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "129",
+  "project_status": "ready",
+  "active_sprint": "131",
+  "active_sprint_file": "docs/sprints/131-home-the-rest-and-edit.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "130",
   "completed_sprints": [
     "001",
     "002",
@@ -135,8 +135,9 @@
     "126",
     "127",
     "128",
-    "129"
+    "129",
+    "130"
   ],
-  "started_at": "2026-11-22T21:11:17-03:00",
-  "updated_at": "2026-11-22T21:11:17-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-22T21:43:19-03:00"
 }

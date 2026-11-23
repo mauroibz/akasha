@@ -7228,3 +7228,33 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
 - Consequences: new tables for the home layout and for suggestions; a `recommend` job kind; the
   product spec's non-goals and the technical spec gain the recommendation contract as each sprint
   lands.
+
+## DEC-184 — Home's first grid: choices the sprint file left open (Sprint 130)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: Sprint 130 built `/` as Home and moved the library to `/library` (DEC-183). Several
+  details were not settled by the sprint file or the proposal.
+- Decision:
+  1. **The phone's bar keeps five: Home, Library, Add, Shelves, Insights.** Import leaves it
+     (desktop only, like Diary); the command bar and Home's first-run message reach it.
+  2. **Library-meaning links go to `/library`; app-start links stay on `/`.** Back controls,
+     the add confirmation, saved views, insights rows, deleting an entry, *View X's library* and
+     *Return to your library* open the library. Signing in, setup, a 404's other exits and
+     `/share` land on Home.
+  3. **Tiles carry counts per status, not per category.** The client draws the bar's colour from
+     each status's declared flag (finished, in progress, planned, abandoned, other), so the
+     category is still the registry's answer and the tile can name the domain's own words.
+  4. **`next` interleaves domains.** Each domain with a `planned` status gives its goal-picks
+     order; the domains are taken in turn, five in all. The picks query now reads at most twice
+     the limit per source, which gives the same picks.
+  5. **Set aside moves an entry to its domain's `planned` status.** No domain declares a "paused"
+     status; *on hold* exists only in two domains and is not a declared flag.
+  6. **A domain with no `in_progress` status (movies) offers *Finished* in Up next**, through the
+     finish sheet, rather than a *Start* it cannot honour.
+  7. **The year never marks a past month short** (DEC-169): empty slots appear only from the
+     current month on, at the goal's pace, and all of them together are at most what the goal
+     still needs. The lead goal is the first in registry order; other libraries' finishes are a
+     `+N` under the month.
+- Consequences: Sprint 131's stored layout names the module keys `now`, `next`, `year` and
+  `libraries` from `features/home/layout.ts`.

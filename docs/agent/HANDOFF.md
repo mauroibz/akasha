@@ -2,6 +2,27 @@
 
 ## Where the project stands
 
+**2026-11-22, Sprint 130 closed.** On branch `home-and-recommendations` (local, not pushed):
+`/` is Home and the library is `/library`. Home reads one `GET /api/home` (stored data only):
+greeting, On now, Up next, the year, one tile per library. DEC-183 is the plan (Sprints
+130–136, `FINAL_SPRINT` 136); DEC-184 records Sprint 130's open choices. **Sprint 131 is
+next and `ready`**: Lately, Tidy up, One question, Shelves, Lent out, and *Edit home* with a
+stored layout (migration 0036). No migration in 130.
+
+Things to know for 131:
+
+- Module keys and spans are in `frontend/src/features/home/layout.ts`; `HomePage` renders them
+  in order. Year spans 12 until Lately sits beside it.
+- `e2e/console.ts` stubs an empty `/api/home` for every spec; `e2e/home.spec.ts` stubs a full
+  one and is the place for edit/reorder/hide tests.
+- Walkthrough: `scripts/walkthrough.py --keep` then seed a realistic library; Sprint 130's
+  seeder lives only in the session scratchpad (generic titles, covers copied from local files);
+  write a fresh one rather than looking for it.
+- `heavy-library` Playwright probes fail intermittently under parallel load; rerun the project
+  alone before suspecting a change.
+
+## Earlier state (release 2.9.0)
+
 **2026-11-22:** Sprints 128–129 are merged to `main` (#38, #40) and **released as v2.9.0**
 (tag `v2.9.0`, notes in `docs/operations/release-notes-v2.9.md`). Migrations 0034–0035 are
 new. The project state is `complete`; no sprint is planned.
@@ -76,7 +97,7 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. Run checks under `set -o pipefail`. Walkthroughs: `uv run python
+Sprint 131 (see the top). Run checks under `set -o pipefail`. Walkthroughs: `uv run python
 ../scripts/walkthrough.py` from `backend/`, vite on 5180 with `AKASHA_E2E_BACKEND`; start a
 fresh backend after backend changes; stop servers by port (`fuser -k`). Port 8000 may hold the
 owner's check server on a copy of their library (`AKASHA_DATA_DIR` in the scratchpad); e2e

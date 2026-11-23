@@ -1,7 +1,7 @@
 # Sprint 130 — Home: the module grid
 
 **Sprint:** 130
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 54
 **Depends on:** 129
 **Owner:** Mauro
@@ -108,4 +108,59 @@ modules; `[TEST]` e2e; `[DOCS]` close.
 
 ## Outcome
 
-_Not started._
+Completed 2026-11-22. Commits: `dafe022` (the move), `527e6e1` (`/api/home`), `c1c8c34` (the
+grid), `749359a` (e2e), and the closing documentation commit.
+
+Delivered:
+
+- `/` is Home (`features/home/HomePage.tsx`); `pages/HomePage.tsx` became `pages/LibraryPage.tsx`
+  at `/library`, unchanged. A `/` URL with any library parameter (`libraryQueryKeys` in
+  `features/library/library.ts`) redirects to `/library` with them. Navigation leads with
+  *Home*; the command bar gains *Go to Home*. Library-meaning links (back controls, add
+  confirmation, saved views, insights rows, delete, *View X's library*, *Return to your
+  library*) point at `/library`.
+- `GET /api/home` (`api/home.py`, `application/home.py`): greeting, now, next, year, domains,
+  as the technical spec §7.1 now records. `GoalService.picks` split into `pick_reasons` (ids and
+  reasons, read for any domain with a pile) and hydration; each source reads at most twice the
+  limit. `LibraryService.get_entries` is the public batch read.
+- `features/home/`: `GreetingBar`, `OnNow`, `UpNext`, `YearModule` (with `year.ts`),
+  `LibraryTiles`, `HomeModule`, `useHomeWrite`, `layout.ts` (static spans: now 5, next 7, year
+  12, libraries 12). `FinishDialog` also invalidates Home; `stepFor` moved to
+  `features/progress/outline.ts` so the Now strip and Home share it.
+- OpenAPI and `api/schema.d.ts` regenerated; `tests/fixtures/app_shape.json` and the isolation
+  route policy name the new route.
+
+Acceptance criteria:
+
+1. `/` shows Home, `/library` the library, `/?type=anime` lands on `/library?type=anime`:
+   `App.test.tsx` (four new route tests), `library.test.ts` (`libraryRedirect`), and
+   `e2e/home.spec.ts` (the redirect with filters).
+2. Five sections from stored data with zero provider calls (providers and the HTTP client
+   replaced by ones that fail the test), per user with auth on (Bruno sees none of the admin's
+   entries, goals or finishes), 401 without a session: `tests/test_home_api.py`, 6 tests;
+   10,000 entries answer in 117 ms median of five.
+3. Each module renders from the payload, an empty library shows *Your desk is ready*, and the
+   actions change the entry (progress, *Set aside*, *Finished*, *Start*, the movie *Finished*
+   fallback): `features/home/*.test.tsx` (22 tests) and e2e *Start* and *Finished*.
+4. Tiles come from the payload, which iterates the registry; no `item_type ==` above it
+   (`application/home.py` names no domain or status beyond `unsorted`, which §6.6 makes
+   universal). Conformance suite 204 passed.
+5. No horizontal scroll and no serious axe violations at 390 and 1440 px in Ink and Paper:
+   four e2e tests; the walkthrough measured scroll width 0 in all four.
+6. The 13 e2e specs that opened `/` now open `/library` and pass (128 passed, 2 skipped live
+   metadata); `auth.spec.ts` needed two further changes (the post-setup URL carries the
+   remembered `?type=`; sign-in lands on Home).
+
+Verification: backend `test_home_api`, `test_goals`, `test_isolation`, `test_now_and_diary`,
+`test_library_batching`, `test_app_shape`, `test_domain_conformance` all passed; `npx vitest
+related` on every changed frontend file (41 files, 298 tests) passed; `make check` green;
+Playwright: the 13 updated specs, `auth.spec.ts` (6) and `home.spec.ts` (10) passed. The
+`heavy-library` project failed one different load-sensitive test in each of three runs while
+other Playwright work ran, then passed twice in a row on this branch and twice on the base
+commit (`changing sort crossfades…`, `…DOM budget with web results…`): the known DEC-114 class.
+
+Deviations (DEC-184): Import is off the phone's bottom bar; tiles carry counts per status rather
+than per category (the client colours by declared flag); `next` interleaves domains; *Set aside*
+means the domain's planned status; Up next offers *Finished* for a domain with no under-way
+status; the year marks no past month short. The year spans 12 columns until Sprint 131's Lately
+sits beside it.
