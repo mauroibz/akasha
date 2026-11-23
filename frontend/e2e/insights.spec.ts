@@ -273,7 +273,7 @@ test("a row opens in place, and the library says what it was opened into", async
   const row = page.getByRole("button", { name: /^Julio Cortázar: 7 books/ });
   await row.click();
   await expect(page.getByText("Rayuela")).toBeVisible();
-  await expect(page).toHaveURL(/\/insights$/);
+  await expect(page).toHaveURL(/\/journal#patterns$/);
 
   await page.getByRole("link", { name: /Open all 7 in the library/ }).click();
   await expect(

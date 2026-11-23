@@ -1,7 +1,7 @@
 # Sprint 146 — Journal
 
 **Sprint:** 146
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 56
 **Depends on:** 145
 **Owner:** Mauro
@@ -56,4 +56,40 @@ The *Every day* widget (147).
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193). Commit: `HASH`.
+
+- **`/journal`.** `pages/JournalPage.tsx`: the header, the widget, *Timeline*, *Patterns*.
+  `DiaryPage` and `InsightsPage` take `embedded` and are drawn inside it without their frame,
+  title, goal block and games. `/diary` and `/insights` redirect to `/journal#timeline` and
+  `/journal#patterns`, which take the focus; `/diary/:year/review` is unchanged.
+- **The widget** (`features/journal/JournalWidgets.tsx`): tabs with arrow keys, one widget
+  mounted at a time, the last used remembered in the browser. *Play*: the games, plus links to
+  *Tidy up*, the rank list and tiers. *Goal*: this year's goal bands, or the invitation. A
+  third widget is one more entry in the page's list.
+- **Navigation.** Library and Journal; on a phone Library, the bar's button, Journal. The
+  games, the decks, the showcases and the command bar point at the Journal.
+
+Acceptance: 1 and 3 by `JournalPage.test.tsx` and the redirected e2e specs; 2 by the Play
+widget's test and `e2e/play.spec.ts`; 4 by `e2e/accessibility.spec.ts`.
+
+Verification: Vitest 653 passed; Playwright chromium and heavy-library, full run 224 passed
+with 15 expecting the old screens, then 239 passed and 2 skipped by design; `make check`.
+Looked at on a copy of the development library at 1440 and 390 px in *Paper* and at 1440 px
+in *Ink*: four games in Play, the year's two finishes in the timeline, the patterns below;
+`/diary` landed on the timeline. No overflow, no console errors.
+
+Deviations:
+
+- The header is the title "Journal" with one line under it, not a sentence about the person's
+  data: the Patterns part already opens with that sentence, and two would repeat.
+- The widget does not remember across devices (the browser's storage, as the theme is).
+- Play asks its questions of the first medium in the person's order, as Insights asked them of
+  the medium its tabs showed.
+- One e2e wait changed: the goal dialog's accessibility test waited for every animation on
+  the page to end; it now waits for the dialog's own, because a part of the Journal that spec
+  does not stub keeps a loading skeleton pulsing.
+
+Observed, left: the Journal is long (the full Insights page is its last part). *Timeline*
+shows one year at a time with the year chooser at the right of its heading.
+
+Impact on later sprints: 147 adds *Every day* as the first widget in `JournalPage.tsx`.

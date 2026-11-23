@@ -194,7 +194,7 @@ export function YearReviewPage() {
   return (
     <PageFrame width="reading">
       <Link
-        to="/diary"
+        to="/journal#timeline"
         className="text-sm font-medium text-muted-foreground hover:text-foreground focus-ring"
       >
         ← Diary

@@ -232,7 +232,7 @@ export function RankDeckPage() {
               <Link to="/rank">Order another score</Link>
             </Button>
             <Button asChild variant="secondary" className="rounded-full px-5">
-              <Link to="/insights">Back to Insights</Link>
+              <Link to="/journal">Back to the Journal</Link>
             </Button>
           </div>
         </section>

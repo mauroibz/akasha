@@ -36,7 +36,7 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Library", "Insights", "Diary"]) {
+    for (const label of ["Library", "Journal"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
         hidden: true,
@@ -44,7 +44,13 @@ describe("AppShell", () => {
       expect(links.length).toBeGreaterThanOrEqual(1);
     }
     // Shelves are a view of the Library since Sprint 144.
-    for (const label of [/^add$/i, /^import$/i, /^shelves$/i]) {
+    for (const label of [
+      /^add$/i,
+      /^import$/i,
+      /^shelves$/i,
+      /^insights$/i,
+      /^diary$/i,
+    ]) {
       expect(
         screen.queryAllByRole("link", { name: label, hidden: true }),
       ).toHaveLength(0);
@@ -77,7 +83,8 @@ describe("AppShell", () => {
     const labels = Array.from(phone.querySelectorAll("a, button")).map((el) =>
       el.getAttribute("aria-label"),
     );
-    expect(labels).toEqual(["Library", "Search or add", "Insights"]);
+    // Two places and the bar between them (Sprint 146, the mockup's phone).
+    expect(labels).toEqual(["Library", "Search or add", "Journal"]);
   });
 
   it("shows the bar as a field on every screen but the Library, which has its own (Sprint 140)", () => {

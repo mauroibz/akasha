@@ -65,8 +65,8 @@ describe("ChoresPage (Sprint 112; Tidy up since Sprint 125)", () => {
     ).toBeNull();
     expect(within(list).queryByRole("link", { name: /old scores/ })).toBeNull();
     expect(
-      screen.getByRole("link", { name: "They're at the top of Insights" }),
-    ).toHaveAttribute("href", "/insights");
+      screen.getByRole("link", { name: "They're in the Journal, under Play" }),
+    ).toHaveAttribute("href", "/journal");
     const covers = within(list).getByRole("link", { name: /Find a cover/ });
     expect(covers).toHaveAttribute("href", "/deck/covers");
     expect(await within(covers).findByText("12")).toBeVisible();

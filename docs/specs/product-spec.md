@@ -838,8 +838,8 @@ during Sprints 130–140 while a separate Home held `/`, redirects here with wha
 carried). The primary screen and the one to get right: the screen Akasha opens on, **the screen
 you search from and the screen you add from** (DEC-065, DEC-073).
 
-**Navigation** (Sprints 140–144). The shell lists places only: *Library*, *Insights*,
-*Diary*; shelves are a view of the Library. Finding and adding is the bar: on the Library it is the Library's own
+**Navigation** (Sprints 140–146). The shell lists two places, *Library* and *Journal*;
+shelves are a view of the Library, and the Diary, Insights and the games are the Journal. Finding and adding is the bar: on the Library it is the Library's own
 field; on every other screen the shell draws it as a field that opens the command bar (⌘K), and
 on a phone it is the filled button in the middle of the tab bar. The bar's footer holds the two
 last resorts, *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`); neither is a
@@ -1098,7 +1098,17 @@ without status or score on them (Sprint 105), with rename and delete, and links 
 shelf in the Library, one per medium it holds, where it can be sorted, filtered and edited
 (DEC-194).
 
-**Play, at the top of `/insights`** (Sprint 125, DEC-179). The decks asked as questions about
+**`/journal` — the Journal** (Sprint 146, DEC-193). One screen for what were the Diary,
+Insights and the games; `/diary` and `/insights` redirect to its *Timeline* and *Patterns*. It
+opens on **one widget at a time**, chosen by tabs and remembered in the browser: *Play* (the
+games described next, asked of the medium the person keeps first, with links to *Tidy up*, the
+rank list and tiers) and *Goal* (this year's goals with their slots and picks, or the
+invitation to set one). Then **Timeline**, the Diary described below without its goal; then
+**Patterns**, the Insights sections per medium. The owner chose widgets over a page to write
+on. The descriptions of Play, the Diary and Insights that follow are of those parts.
+
+**Play, a widget of the Journal** (Sprint 125, DEC-179; at the top of `/insights` until
+Sprint 146). The decks asked as questions about
 the owner's own books, each with its covers and shown only when it has something to ask:
 *Which 8 is your best 8?* (the rank deck, for the shown library's most shared score), *Is
 Tokio blues still a 10?* (the revisit deck), *The pile* (the planned deck) and *Fill in the

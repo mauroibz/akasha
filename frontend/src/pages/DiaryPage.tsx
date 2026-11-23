@@ -34,7 +34,7 @@ function monthName(month: string): string {
  * A gentle goal leads the page (Sprint 104, DEC-169; Sprint 127, DEC-179): slots the
  * year's covers fill, and a few picks. Without one, an invitation with three paces.
  */
-export function DiaryPage() {
+export function DiaryPage({ embedded = false }: { embedded?: boolean } = {}) {
   const navigate = useNavigate();
   const [year, setYear] = useState<number | undefined>(undefined);
   // Every year as one timeline (Sprint 118), beside the year-by-year view.
@@ -68,94 +68,103 @@ export function DiaryPage() {
     (a, b) => finishedOf(b.id).length - finishedOf(a.id).length,
   )[0];
 
+  const yearChoice =
+    years.length > 0 ? (
+      <div role="group" aria-label="Year" className="flex flex-wrap gap-1.5">
+        <button
+          type="button"
+          aria-pressed={everyYear}
+          onClick={() => setEveryYear(true)}
+          className={cn(
+            "rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-ring",
+            everyYear
+              ? "bg-primary/15 text-primary"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          All years
+        </button>
+        {years.map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={!everyYear && option === shown}
+            onClick={() => {
+              setEveryYear(false);
+              setYear(option);
+            }}
+            className={cn(
+              "rounded-full px-3 py-1.5 text-sm font-medium tabular-nums transition-colors focus-ring",
+              !everyYear && option === shown
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    ) : undefined;
+
   return (
-    <PageFrame width="reading">
-      <PageHeader
-        title="Diary"
-        lede="What you finished, month by month."
-        actions={
-          years.length > 0 ? (
-            <div
-              role="group"
-              aria-label="Year"
-              className="flex flex-wrap gap-1.5"
-            >
-              <button
-                type="button"
-                aria-pressed={everyYear}
-                onClick={() => setEveryYear(true)}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors focus-ring",
-                  everyYear
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                All years
-              </button>
-              {years.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  aria-pressed={!everyYear && option === shown}
-                  onClick={() => {
-                    setEveryYear(false);
-                    setYear(option);
-                  }}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium tabular-nums transition-colors focus-ring",
-                    !everyYear && option === shown
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          ) : undefined
-        }
-      />
+    <Shell embedded={embedded}>
+      {embedded ? (
+        // Inside the Journal (Sprint 146): the year choice alone, under its heading.
+        <div className="flex justify-end">{yearChoice}</div>
+      ) : (
+        <PageHeader
+          title="Diary"
+          lede="What you finished, month by month."
+          actions={yearChoice}
+        />
+      )}
       {everyYear ? (
         <Timeline types={types} />
       ) : (
         <>
-          {goals.data?.map((goal) => (
-            <GoalBand
-              key={goal.item_type}
-              goal={goal}
-              year={goalYear}
-              types={types}
-              finished={finishedOf(goal.item_type)}
-              onChange={() => setEditing({ open: true, goal })}
-            />
-          ))}
-          {/* No goal: the Diary opens with an invitation (Sprint 127). */}
-          {goals.data?.length === 0 && invited && thisYear && (
-            <GoalInvite
-              domain={invited}
-              done={finishedOf(invited.id).length}
-              year={goalYear}
-              onOther={() => setEditing({ open: true })}
-            />
+          {/* The goal leads the Diary's own page; in the Journal it is a widget. */}
+          {!embedded && (
+            <>
+              {goals.data?.map((goal) => (
+                <GoalBand
+                  key={goal.item_type}
+                  goal={goal}
+                  year={goalYear}
+                  types={types}
+                  finished={finishedOf(goal.item_type)}
+                  onChange={() => setEditing({ open: true, goal })}
+                />
+              ))}
+              {/* No goal: the Diary opens with an invitation (Sprint 127). */}
+              {goals.data?.length === 0 && invited && thisYear && (
+                <GoalInvite
+                  domain={invited}
+                  done={finishedOf(invited.id).length}
+                  year={goalYear}
+                  onOther={() => setEditing({ open: true })}
+                />
+              )}
+              {goals.data && goals.data.length > 0 && canSetGoal && (
+                <p className="mt-6 text-sm text-muted-foreground">
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ open: true })}
+                    className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
+                  >
+                    Add a goal for another library
+                  </button>
+                </p>
+              )}
+              <GoalDialog
+                open={editing.open}
+                onOpenChange={(open) =>
+                  setEditing((value) => ({ ...value, open }))
+                }
+                types={types}
+                initial={editing.goal}
+              />
+            </>
           )}
-          {goals.data && goals.data.length > 0 && canSetGoal && (
-            <p className="mt-6 text-sm text-muted-foreground">
-              <button
-                type="button"
-                onClick={() => setEditing({ open: true })}
-                className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
-              >
-                Add a goal for another library
-              </button>
-            </p>
-          )}
-          <GoalDialog
-            open={editing.open}
-            onOpenChange={(open) => setEditing((value) => ({ ...value, open }))}
-            types={types}
-            initial={editing.goal}
-          />
           {diary.isPending ? (
             <Loading
               label="Loading your diary…"
@@ -237,6 +246,21 @@ export function DiaryPage() {
           )}
         </>
       )}
-    </PageFrame>
+    </Shell>
+  );
+}
+
+/** The page's own frame, or none inside the Journal, which has one (Sprint 146). */
+function Shell({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  return embedded ? (
+    <div>{children}</div>
+  ) : (
+    <PageFrame width="reading">{children}</PageFrame>
   );
 }

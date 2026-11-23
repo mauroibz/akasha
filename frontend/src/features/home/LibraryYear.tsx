@@ -111,10 +111,10 @@ function HomeModuleFrame({
       className={className}
       aside={
         <Link
-          to="/diary"
+          to="/journal#timeline"
           className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
         >
-          Diary →
+          Journal →
         </Link>
       }
     >

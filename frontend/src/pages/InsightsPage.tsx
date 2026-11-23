@@ -56,11 +56,14 @@ import { useShownItemTypes } from "@/features/media/useMedia";
  * than its data. Which key earns which form is still a judgement about this
  * library (`orderKeys`), never a domain name.
  */
-export function InsightsPage() {
+export function InsightsPage({
+  embedded = false,
+}: { embedded?: boolean } = {}) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    headingRef.current?.focus();
-  }, []);
+    // Inside the Journal (Sprint 146) the page's own heading takes the focus.
+    if (!embedded) headingRef.current?.focus();
+  }, [embedded]);
 
   const itemTypes = useItemTypes();
   const shownTypes = useShownItemTypes();
@@ -246,17 +249,20 @@ export function InsightsPage() {
   }
 
   return (
-    <PageFrame width="reading" className="pb-24 pt-8 md:pt-12">
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="font-display text-5xl font-medium tracking-tight focus:outline-none md:text-6xl"
-      >
-        Insights
-      </h1>
-
-      {/* The decks as games, first thing on the page (Sprint 125, DEC-179). */}
-      <PlaySection type={type} types={itemTypes.data} />
+    <Shell embedded={embedded}>
+      {!embedded && (
+        <>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="font-display text-5xl font-medium tracking-tight focus:outline-none md:text-6xl"
+          >
+            Insights
+          </h1>
+          {/* The decks as games, first thing on the page (Sprint 125, DEC-179). */}
+          <PlaySection type={type} types={itemTypes.data} />
+        </>
+      )}
 
       <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 border-b border-border">
         {domains.length > 1 && (
@@ -318,6 +324,23 @@ export function InsightsPage() {
           {sections.map((render, index) => render(index + 1))}
         </>
       )}
+    </Shell>
+  );
+}
+
+/** The page's own frame, or none inside the Journal, which has one (Sprint 146). */
+function Shell({
+  embedded,
+  children,
+}: {
+  embedded: boolean;
+  children: React.ReactNode;
+}) {
+  return embedded ? (
+    <div>{children}</div>
+  ) : (
+    <PageFrame width="reading" className="pb-24 pt-8 md:pt-12">
+      {children}
     </PageFrame>
   );
 }

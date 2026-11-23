@@ -72,7 +72,7 @@ const groups: Array<{ title: string; test: (module: string) => boolean }> = [
   { title: "A year", test: (module) => module.startsWith("year:") },
   { title: "A shelf", test: (module) => module.startsWith("shelf:") },
   {
-    title: "A number from Insights",
+    title: "A number from the Journal",
     test: (module) => module.startsWith("insight:"),
   },
 ];

@@ -221,10 +221,10 @@ export function CommandBar({
       },
       {
         id: "diary",
-        label: "Go to Diary",
+        label: "Go to the Journal",
         words: "diary journal finished history month year",
         icon: <BookOpen />,
-        run: () => go("/diary"),
+        run: () => go("/journal#timeline"),
       },
       {
         id: "chores",
@@ -239,7 +239,7 @@ export function CommandBar({
         words:
           "play games best still want pile revisit old scores gaps fill in",
         icon: <Gamepad2 />,
-        run: () => go("/insights"),
+        run: () => go("/journal"),
       },
       {
         id: "rank",
@@ -264,10 +264,10 @@ export function CommandBar({
       },
       {
         id: "insights",
-        label: "Go to Insights",
-        words: "insights stats statistics charts",
+        label: "Go to the Journal's patterns",
+        words: "insights stats statistics charts patterns journal",
         icon: <ChartBar />,
-        run: () => go("/insights"),
+        run: () => go("/journal#patterns"),
       },
       {
         id: "import",

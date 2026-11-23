@@ -990,6 +990,8 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await stubDiaryWithGoal(page);
     await page.goto("/diary");
+    // The goal is a widget of the Journal since Sprint 146; `/diary` lands there.
+    await page.getByRole("tab", { name: "Goal" }).click();
     await expect(page.getByRole("region", { name: /books$/ })).toBeVisible();
     await expect(page.getByText("The Dispossessed")).toBeVisible();
     await expectNoSeriousViolations(page, `diary with a goal (${scheme})`);
@@ -1000,9 +1002,18 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(
       page.getByRole("dialog", { name: "A gentle goal" }),
     ).toBeVisible();
-    // The dialog fades in; axe samples colour, so wait until nothing moves.
+    // The dialog fades in; axe samples colour, so wait until it has stopped moving.
+    // Only the dialog: the Journal around it (Sprint 146) may still be loading a part
+    // this spec does not stub, and a skeleton pulses for as long as it does.
     await expect
-      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .poll(() =>
+        page.evaluate(
+          () =>
+            document
+              .querySelector('[role="dialog"]')
+              ?.getAnimations({ subtree: true }).length ?? 0,
+        ),
+      )
       .toBe(0);
     await expectNoSeriousViolations(page, `goal dialog (${scheme})`);
   });
@@ -1015,6 +1026,8 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await stubDiaryWithGoal(page, []);
     await page.goto("/diary");
+    // The goal is a widget of the Journal since Sprint 146; `/diary` lands there.
+    await page.getByRole("tab", { name: "Goal" }).click();
     await expect(
       page.getByRole("region", { name: "Want something to aim at this year?" }),
     ).toBeVisible();

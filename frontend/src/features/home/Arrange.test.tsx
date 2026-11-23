@@ -149,7 +149,7 @@ describe("arranging the Library (Sprint 142, DEC-193)", () => {
     render(<Harness onChange={vi.fn()} />);
     const tray = screen.getByRole("region", { name: "Add a showcase" });
     expect(within(tray).getByText("A shelf")).toBeVisible();
-    expect(within(tray).getByText("A number from Insights")).toBeVisible();
+    expect(within(tray).getByText("A number from the Journal")).toBeVisible();
     expect(
       within(tray).getByRole("button", { name: "Add Shelf: Horror" }),
     ).toHaveTextContent(/^Horror$/);

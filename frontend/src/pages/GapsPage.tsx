@@ -32,7 +32,7 @@ export function GapsPage() {
   return (
     <PageFrame width="focus" className="pb-24 pt-8">
       <PageHeader
-        back={{ to: "/insights", label: "Insights" }}
+        back={{ to: "/journal", label: "Journal" }}
         eyebrow="Play"
         title="Fill in the gaps"
         count={
@@ -48,7 +48,7 @@ export function GapsPage() {
       ) : !current ? (
         <EmptyState title="That's every gap for now" className="mt-10">
           Back to{" "}
-          <Link to="/insights" className="underline underline-offset-4">
+          <Link to="/journal" className="underline underline-offset-4">
             Insights
           </Link>
           .

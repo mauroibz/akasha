@@ -97,10 +97,10 @@ export function ChoresPage() {
       <p className="mt-8 text-sm text-muted-foreground">
         Looking for the games, like which of your 8s is best?{" "}
         <Link
-          to="/insights"
+          to="/journal"
           className="inline-flex min-h-11 items-center font-medium text-primary-text underline-offset-4 hover:underline focus-ring"
         >
-          They're at the top of Insights
+          They're in the Journal, under Play
         </Link>
       </p>
     </PageFrame>

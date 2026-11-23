@@ -125,7 +125,7 @@ export function FivePage() {
   return (
     <PageFrame width="focus" className="pb-24 pt-8">
       <PageHeader
-        back={{ to: "/insights", label: "Insights" }}
+        back={{ to: "/journal", label: "Journal" }}
         eyebrow="Play"
         title="Five minutes"
         count={
@@ -434,7 +434,7 @@ function End({ changes, letGo }: { changes: string[]; letGo: LibraryEntry[] }) {
         )}
         <Button
           className="rounded-full px-5"
-          onClick={() => navigate("/insights")}
+          onClick={() => navigate("/journal")}
         >
           Back to Insights
         </Button>

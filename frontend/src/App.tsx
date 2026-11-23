@@ -49,8 +49,8 @@ const ImportPage = lazy(async () => ({
 const ShelfPage = lazy(async () => ({
   default: (await import("@/pages/ShelfPage")).ShelfPage,
 }));
-const InsightsPage = lazy(async () => ({
-  default: (await import("@/pages/InsightsPage")).InsightsPage,
+const JournalPage = lazy(async () => ({
+  default: (await import("@/pages/JournalPage")).JournalPage,
 }));
 const TriagePage = lazy(async () => ({
   default: (await import("@/pages/TriagePage")).TriagePage,
@@ -96,9 +96,6 @@ const PilePage = lazy(async () => ({
 }));
 const LentPage = lazy(async () => ({
   default: (await import("@/pages/LentPage")).LentPage,
-}));
-const DiaryPage = lazy(async () => ({
-  default: (await import("@/pages/DiaryPage")).DiaryPage,
 }));
 const SettingsPage = lazy(async () => ({
   default: (await import("@/pages/SettingsPage")).SettingsPage,
@@ -203,7 +200,12 @@ function PrivateRoutes({
               element={<Navigate to="/?view=shelves" replace />}
             />
             <Route path="/shelves/:slug" element={<ShelfPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
+            {/* Insights and the Diary are parts of the Journal since Sprint 146. */}
+            <Route path="/journal" element={<JournalPage />} />
+            <Route
+              path="/insights"
+              element={<Navigate to="/journal#patterns" replace />}
+            />
             <Route path="/settings" element={<SettingsPage />} />
             {/* The Inbox is its own page since Sprint 096 (proposal I3), no longer
                 a tab of the import screen. */}
@@ -211,7 +213,10 @@ function PrivateRoutes({
             <Route path="/inbox/deck" element={<TriageDeckPage />} />
             {/* The phone's share sheet (Sprint 097): opens the command bar. */}
             <Route path="/share" element={<SharePage />} />
-            <Route path="/diary" element={<DiaryPage />} />
+            <Route
+              path="/diary"
+              element={<Navigate to="/journal#timeline" replace />}
+            />
             <Route path="/diary/:year/review" element={<YearReviewPage />} />
             <Route path="/lent" element={<LentPage />} />
             <Route path="/pile" element={<PilePage />} />

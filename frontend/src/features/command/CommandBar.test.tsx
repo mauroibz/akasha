@@ -67,7 +67,7 @@ function renderBar() {
           <Routes>
             <Route path="/" element={<p>Library page</p>} />
             <Route path="/books/:id" element={<p>Detail page</p>} />
-            <Route path="/insights" element={<p>Insights page</p>} />
+            <Route path="/journal" element={<p>Journal page</p>} />
             <Route path="/import" element={<p>Import page</p>} />
           </Routes>
           <Where />
@@ -246,9 +246,10 @@ describe("CommandBar", () => {
       async () => new Response("[]"),
     );
     const input = await renderBar();
+    // The old name still finds the place it became (Sprint 146).
     await userEvent.type(input, "insights");
     await userEvent.keyboard("{Enter}");
-    expect(await screen.findByText("Insights page")).toBeInTheDocument();
+    expect(await screen.findByText("Journal page")).toBeInTheDocument();
   });
 
   it("opens a saved view as the library filtered the way it was saved", async () => {

@@ -295,7 +295,7 @@ test("navigation shell exposes every destination at desktop width", async ({
   await stubEntry(page);
   await page.goto("/library");
   // Places only since Sprint 140 (DEC-193): Add and Import are in the bar's footer.
-  for (const label of ["Library", "Insights", "Diary"]) {
+  for (const label of ["Library", "Journal"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();

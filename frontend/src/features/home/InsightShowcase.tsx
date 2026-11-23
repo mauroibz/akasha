@@ -132,10 +132,10 @@ export function InsightShowcase({
       title={label}
       aside={
         <Link
-          to="/insights"
+          to="/journal#patterns"
           className="underline-offset-4 hover:text-foreground hover:underline focus-ring"
         >
-          Insights →
+          Journal →
         </Link>
       }
     >
