@@ -1987,3 +1987,58 @@ test("finishing a scored entry from its card asks whether the score holds (Sprin
     ]),
   );
 });
+
+test("Shelves is a view of the library: the boards in place of the list, in the address (Sprint 144)", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request) => {
+      const url = String(request);
+      if (url === "/api/shelves")
+        return new Response(
+          JSON.stringify([
+            {
+              id: 1,
+              name: "Favorites",
+              slug: "favorites",
+              entry_count: 0,
+              preview: [],
+              members_by_type: {},
+            },
+          ]),
+        );
+      if (url.startsWith("/api/entries"))
+        return new Response(JSON.stringify(populated));
+      return new Response("[]");
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  await screen.findByText("Rayuela");
+  await user.click(screen.getByRole("button", { name: "Shelves view" }));
+  expect(
+    await screen.findByRole("link", { name: "Favorites" }),
+  ).toHaveAttribute("href", "/shelves/favorites");
+  expect(screen.getByRole("region", { name: "Shelves" })).toBeVisible();
+  expect(screen.queryByText("Rayuela")).toBeNull();
+
+  await user.click(screen.getByRole("button", { name: "Grid view" }));
+  expect(await screen.findByText("Rayuela")).toBeVisible();
+  expect(screen.queryByRole("region", { name: "Shelves" })).toBeNull();
+});
+
+test("a link to the shelves view opens on it (Sprint 144)", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request) =>
+      String(request).startsWith("/api/entries")
+        ? new Response(JSON.stringify(populated))
+        : new Response("[]"),
+    ),
+  );
+  renderPage("/?view=shelves");
+  expect(await screen.findByRole("region", { name: "Shelves" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Shelves view" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});

@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
-import { ShelvesPage } from "./ShelvesPage";
+import { ShelvesView } from "./ShelvesView";
 
 const bookType = {
   id: "book",
@@ -33,7 +33,7 @@ function renderPage() {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <ShelvesPage />
+        <ShelvesView />
         <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -86,9 +86,11 @@ function stubApi(
   rows: unknown[] = shelves,
   types: unknown[] = [bookType],
   loans: unknown[] = [],
+  pile: unknown[] = [],
 ) {
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
     const url = String(input);
+    if (url.startsWith("/api/pile")) return new Response(JSON.stringify(pile));
     if (url.startsWith("/api/loans"))
       return new Response(JSON.stringify(loans));
     if (url === "/api/item-types") return new Response(JSON.stringify(types));
@@ -114,7 +116,42 @@ const loan = (id: number, person: string, title: string, lentOn: string) => ({
   },
 });
 
-describe("ShelvesPage: what is lent out (Sprint 122)", () => {
+describe("ShelvesView: the pile is a shelf too (Sprint 144)", () => {
+  const pick = (id: number, title: string) => ({
+    entry: {
+      id,
+      status: "to_read",
+      score: null,
+      item: { id, type: "book", title, year: 1965, cover_url: null },
+    },
+    score: 1,
+    reasons: [],
+  });
+
+  it("stands what is waiting as the first ledge, opening its own list", async () => {
+    stubApi(shelves, [bookType], [], [pick(7, "Dune"), pick(8, "Solaris")]);
+    renderPage();
+    const ledge = (await waitFor(() => {
+      const row = document.querySelector('[data-shelf-row="pile"]');
+      expect(row).not.toBeNull();
+      return row;
+    })) as HTMLElement;
+    expect(
+      within(ledge).getByRole("link", { name: "The pile" }),
+    ).toHaveAttribute("href", "/pile");
+    expect(ledge).toHaveTextContent(/2 waiting · Dune is likeliest next/);
+    expect([...document.querySelectorAll("[data-shelf-row]")][0]).toBe(ledge);
+  });
+
+  it("draws no pile when nothing is waiting", async () => {
+    stubApi();
+    renderPage();
+    await screen.findByRole("link", { name: "Favorites" });
+    expect(document.querySelector('[data-shelf-row="pile"]')).toBeNull();
+  });
+});
+
+describe("ShelvesView: what is lent out (Sprint 122)", () => {
   it("stands open loans as the first ledge, with who has the longest out", async () => {
     stubApi(
       shelves,
@@ -150,7 +187,7 @@ describe("ShelvesPage: what is lent out (Sprint 122)", () => {
   });
 });
 
-describe("ShelvesPage", () => {
+describe("ShelvesView", () => {
   it("reads the room back in a sentence, and each shelf in a line", async () => {
     stubApi();
     renderPage();

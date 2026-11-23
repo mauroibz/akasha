@@ -275,7 +275,7 @@ test("shelf management creates, renames, and deletes shelves", async ({
   await page.getByRole("button", { name: /delete shelf/i }).click();
 
   // Back on the board, the shelf is gone.
-  await expect(page).toHaveURL("/shelves");
+  await expect(page).toHaveURL(/view=shelves/);
   await expect(page.getByText("Space Opera")).toHaveCount(0);
 });
 
@@ -295,24 +295,22 @@ test("navigation shell exposes every destination at desktop width", async ({
   await stubEntry(page);
   await page.goto("/library");
   // Places only since Sprint 140 (DEC-193): Add and Import are in the bar's footer.
-  for (const label of ["Library", "Shelves", "Insights", "Diary"]) {
+  for (const label of ["Library", "Insights", "Diary"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();
   }
   await expect(page.getByRole("link", { name: /^triage$/i })).toHaveCount(0);
   // Navigate to each
-  await page
-    .getByRole("link", { name: /shelves/i })
-    .first()
-    .click();
-  await expect(page).toHaveURL("/shelves");
+  // Shelves are a view of the Library since Sprint 144, reached from its view switch.
+  await expect(page.getByRole("link", { name: /^shelves$/i })).toHaveCount(0);
+  await page.getByRole("button", { name: "Shelves view" }).click();
+  await expect(page).toHaveURL(/view=shelves/);
+  await expect(page.getByRole("region", { name: "Shelves" })).toBeVisible();
   await expect(page.getByRole("link", { name: /^(add|import)$/i })).toHaveCount(
     0,
   );
-  await page
-    .getByRole("button", { name: /search your library, or add something/i })
-    .click();
+  await page.keyboard.press("ControlOrMeta+k");
   await page.getByRole("link", { name: "Bring a whole list" }).click();
   await expect(page).toHaveURL("/import");
   await page.keyboard.press("ControlOrMeta+k");

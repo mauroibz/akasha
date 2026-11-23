@@ -142,7 +142,7 @@ export function ShelfPage() {
         setPinnedSlug(null);
       }
       void cache.invalidateQueries({ queryKey: queryKeys.shelves });
-      navigate("/shelves");
+      navigate("/?view=shelves");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -173,7 +173,7 @@ export function ShelfPage() {
         <PageHeader title="Shelf not found" />
         <p className="mt-4 text-muted-foreground">
           This shelf may have been deleted.{" "}
-          <Link to="/shelves" className="text-primary underline">
+          <Link to="/?view=shelves" className="text-primary underline">
             Back to shelves
           </Link>
         </p>
@@ -187,7 +187,7 @@ export function ShelfPage() {
   return (
     <PageFrame width="wide">
       <Link
-        to="/shelves"
+        to="/?view=shelves"
         className="focus-ring inline-flex min-h-11 items-center text-sm font-medium hover:text-primary"
       >
         ← Shelves
@@ -230,6 +230,23 @@ export function ShelfPage() {
       <p className="mt-4 max-w-[44ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
         {shelfSentence(shelf, itemTypes.data)}
       </p>
+      {/* The same shelf with the Library's own controls (Sprint 144, DEC-193): sort,
+          filters, status and score on the card. Here it stays covers to look at
+          (Sprint 105). One link per medium it holds, as the Library shows one. */}
+      {domainsHeld.length > 0 && (
+        <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span>Sort and filter it in the library:</span>
+          {domainsHeld.map((domain) => (
+            <Link
+              key={domain.id}
+              to={`/?type=${encodeURIComponent(domain.id)}&shelf=${encodeURIComponent(shelf.slug)}`}
+              className="font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
+            >
+              {domain.plural_label ?? domain.label}
+            </Link>
+          ))}
+        </p>
+      )}
       {Object.keys(formatCounts).length > 0 && (
         <p className="mt-2 text-sm text-muted-foreground">
           {Object.entries(formatCounts)

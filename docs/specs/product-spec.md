@@ -838,8 +838,8 @@ during Sprints 130–140 while a separate Home held `/`, redirects here with wha
 carried). The primary screen and the one to get right: the screen Akasha opens on, **the screen
 you search from and the screen you add from** (DEC-065, DEC-073).
 
-**Navigation** (Sprints 140–141). The shell lists places only: *Library*, *Shelves*,
-*Insights*, *Diary*. Finding and adding is the bar: on the Library it is the Library's own
+**Navigation** (Sprints 140–144). The shell lists places only: *Library*, *Insights*,
+*Diary*; shelves are a view of the Library. Finding and adding is the bar: on the Library it is the Library's own
 field; on every other screen the shell draws it as a field that opens the command bar (⌘K), and
 on a phone it is the filled button in the middle of the tab bar. The bar's footer holds the two
 last resorts, *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`); neither is a
@@ -1083,8 +1083,16 @@ is explicit, and keyboard-first throughout.
   the last card. The end of a round shows what was filed and offers the passed cards
   again. Discard is not on the card.
 
-**`/shelves` — Shelf management.** List, rename, delete, counts. Open loans stand as the first
-ledge, *Lent out*, with who has had something longest; it opens `/lent` (Sprint 122).
+**Shelves — a view of the Library** (`/?view=shelves`; a screen of its own at `/shelves` until
+Sprint 144, DEC-193, and that address redirects). The Library's view switch reads *Grid ·
+Table · Shelves*; *Shelves* draws the boards in place of the list, with the sentence about them,
+the sort, the medium filter and *New shelf*, and puts the front of the Library away. Two
+shelves are the application's own and stand first: *The pile*, what is waiting with the
+likeliest next named, opening `/pile`; and *Lent out*, with who has had something longest,
+opening `/lent` (Sprint 122). A shelf's own page (`/shelves/{slug}`) stays covers to look at,
+without status or score on them (Sprint 105), with rename and delete, and links to the same
+shelf in the Library, one per medium it holds, where it can be sorted, filtered and edited
+(DEC-194).
 
 **Play, at the top of `/insights`** (Sprint 125, DEC-179). The decks asked as questions about
 the owner's own books, each with its covers and shown only when it has something to ask:

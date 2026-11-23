@@ -217,7 +217,7 @@ export function CommandBar({
         label: "Go to Shelves",
         words: "shelves shelf lists",
         icon: <Bookmark />,
-        run: () => go("/shelves"),
+        run: () => go("/?view=shelves"),
       },
       {
         id: "diary",

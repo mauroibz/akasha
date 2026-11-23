@@ -36,7 +36,7 @@ export function LentPage() {
   return (
     <PageFrame width="reading">
       <PageHeader
-        back={{ to: "/shelves", label: "Shelves" }}
+        back={{ to: "/?view=shelves", label: "Shelves" }}
         title="Lent out"
         lede="What other people have, and since when."
         count={rows.length || undefined}

@@ -1,6 +1,5 @@
 import {
   BookOpen,
-  Bookmark,
   ChartBar,
   LibraryBig,
   LogOut,
@@ -57,7 +56,7 @@ const navItems: readonly NavItem[] = [
   { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
   // No Add and no Import since Sprint 140 (DEC-193): the bar finds and adds, and its
   // footer holds the form and the importer. The navigation is places only.
-  { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
+  // Shelves are a view of the Library since Sprint 144, not a place beside it.
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
   // Sprint 098: what you finished, month by month.
   {

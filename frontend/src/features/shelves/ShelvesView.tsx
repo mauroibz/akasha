@@ -19,8 +19,8 @@ import { useItemTypes } from "@/features/library/useItemTypes";
 import { OpeningCover } from "@/features/shelves/OpeningCover";
 import { cn } from "@/lib/utils";
 import { DomainStrip } from "@/components/DomainStrip";
-import { PageFrame } from "@/components/PageFrame";
 import { useShownItemTypes } from "@/features/media/useMedia";
+import { getPile, type HomeNext } from "@/api/home";
 
 type ShelfSort = "size" | "recent" | "name";
 
@@ -44,7 +44,7 @@ const searchFrom = 8;
  * Deleting a shelf still only removes the tag; that is said on the shelf's own
  * page, where deleting happens.
  */
-export function ShelvesPage() {
+export function ShelvesView() {
   const cache = useQueryClient();
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -74,6 +74,13 @@ export function ShelvesPage() {
     retry: false,
   });
   const lent = Array.isArray(loans.data) ? loans.data : [];
+  // The pile is a shelf too (Sprint 144): the same read its own page makes.
+  const pile = useQuery({
+    queryKey: [...queryKeys.pile, PILE_DEPTH],
+    queryFn: ({ signal }) => getPile(PILE_DEPTH, signal),
+    retry: false,
+  });
+  const waiting = Array.isArray(pile.data) ? pile.data : [];
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -133,18 +140,22 @@ export function ShelvesPage() {
   );
 
   return (
-    <PageFrame width="wide" className="pb-24 pt-8 md:pt-12">
+    // A view of the Library since Sprint 144 (DEC-193), not a screen of its own: the
+    // Library's frame and title are around it, so this opens with a second-level
+    // heading and the sentence that was the page's lede.
+    <section aria-labelledby="shelves-heading" className="pb-16 pt-8">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div>
-          <h1
+          <h2
+            id="shelves-heading"
             ref={headingRef}
             tabIndex={-1}
-            className="font-display text-6xl font-normal leading-[0.95] tracking-[-0.02em] focus:outline-none md:text-8xl"
+            className="font-display text-xl font-medium focus:outline-none"
           >
             Shelves
-          </h1>
+          </h2>
           {all.length > 0 && (
-            <p className="mt-4 max-w-[40ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
+            <p className="mt-2 max-w-[40ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
               {capital(spelled(all.length))}{" "}
               {all.length === 1 ? "shelf" : "shelves"},{" "}
               <span className="text-primary">
@@ -276,6 +287,9 @@ export function ShelvesPage() {
       )}
 
       <ol className="mt-6">
+        {/* The two shelves the application keeps for you (Sprint 144): what is
+            waiting, and what is with other people. Each opens its own list. */}
+        {waiting.length > 0 && <PileRow picks={waiting} />}
         {lent.length > 0 && <LentRow loans={lent} />}
         {room.map((shelf) => (
           <ShelfRow
@@ -286,9 +300,12 @@ export function ShelvesPage() {
           />
         ))}
       </ol>
-    </PageFrame>
+    </section>
   );
 }
+
+/** The whole pile, as its own page reads it. */
+const PILE_DEPTH = 1000;
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -360,6 +377,33 @@ function fits(index: number, lead: boolean): string | false {
  * The open loans as a ledge (Sprint 122): longest out first, as the list orders
  * them, and the line names who has had something longest.
  */
+/** The pile as a shelf: what is waiting, the likeliest next first, opening its list. */
+function PileRow({ picks }: { picks: HomeNext[] }) {
+  const shelf: ShelfWithCount = {
+    id: 0,
+    name: "The pile",
+    slug: "pile",
+    entry_count: picks.length,
+    preview: picks.slice(0, 8).map((pick) => ({
+      entry_id: pick.entry.id,
+      title: pick.entry.item.title,
+      year: pick.entry.item.year ?? null,
+      score: pick.entry.score ?? null,
+      cover_url: pick.entry.item.cover_url ?? null,
+    })),
+  };
+  return (
+    <ShelfRow
+      shelf={shelf}
+      types={undefined}
+      lead={false}
+      href="/pile"
+      kind="Waiting for you"
+      line={`${picks.length} waiting · ${picks[0].entry.item.title} is likeliest next`}
+    />
+  );
+}
+
 function LentRow({ loans }: { loans: LoanWithEntry[] }) {
   const longest = loans[0];
   const shelf: ShelfWithCount = {

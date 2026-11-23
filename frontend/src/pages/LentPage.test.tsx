@@ -46,7 +46,7 @@ describe("LentPage (Sprint 111)", () => {
     renderPage();
     expect(
       await screen.findByRole("link", { name: "← Shelves" }),
-    ).toHaveAttribute("href", "/shelves");
+    ).toHaveAttribute("href", "/?view=shelves");
   });
 
   it("lists what is out, longest out first, and takes one back", async () => {

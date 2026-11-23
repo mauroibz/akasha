@@ -46,9 +46,6 @@ const DetailPage = lazy(async () => ({
 const ImportPage = lazy(async () => ({
   default: (await import("@/pages/ImportPage")).ImportPage,
 }));
-const ShelvesPage = lazy(async () => ({
-  default: (await import("@/pages/ShelvesPage")).ShelvesPage,
-}));
 const ShelfPage = lazy(async () => ({
   default: (await import("@/pages/ShelfPage")).ShelfPage,
 }));
@@ -200,7 +197,11 @@ function PrivateRoutes({
             <Route path="/add" element={<AddPage />} />
             <Route path="/books/:entryId" element={<DetailPage />} />
             <Route path="/import" element={<ImportPage />} />
-            <Route path="/shelves" element={<ShelvesPage />} />
+            {/* Shelves are a view of the Library since Sprint 144 (DEC-193). */}
+            <Route
+              path="/shelves"
+              element={<Navigate to="/?view=shelves" replace />}
+            />
             <Route path="/shelves/:slug" element={<ShelfPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

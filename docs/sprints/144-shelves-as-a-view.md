@@ -1,7 +1,7 @@
 # Sprint 144 — Shelves are a view
 
 **Sprint:** 144
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 56
 **Depends on:** 143
 **Owner:** Mauro
@@ -56,4 +56,34 @@ Shelves with a rule (145).
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193, amended by DEC-194). Commit: `HASH`.
+
+- **The Shelves view.** The Library's view switch is *Grid · Table · Shelves*. *Shelves* is in
+  the address (`?view=shelves`), draws `features/shelves/ShelvesView.tsx` (the former page:
+  the boards, the sentence, sort, the medium filter, *New shelf*) in place of the list, and
+  puts the front away. `/shelves` redirects to it; the navigation is Library, Insights, Diary.
+- **Built-in shelves.** *The pile* stands first in the view, then *Lent out*; each opens its
+  own page.
+- **A shelf's page** goes back to the Shelves view and links to the same shelf in the Library,
+  one link per medium held.
+
+Acceptance: 1 by `ShelvesView.test.tsx` (the existing tests, which already cover a mixed
+shelf's media, and the pile row) and `LibraryPage.test.tsx`; 3 in part (below); 4 by
+`e2e/shelves.spec.ts`, `e2e/editorial.spec.ts` and `e2e/accessibility.spec.ts`.
+
+Verification: Vitest 645 passed; Playwright chromium and heavy-library, full run 237 passed
+with 2 expecting the old navigation, then `editorial`, `shelves`, `suggested-shelves`, `lent`,
+`accessibility` 66 passed; `make check`. Looked at on a copy of the development library at
+1440 and 390 px: `/shelves` landed on the view with *The pile* first, then *Work*; a shelf's
+page with its link to the Library. No overflow, no console errors.
+
+Deviations (DEC-194):
+
+- Criterion 2, "changing a status or score on a shelf's page works as on the Library", is not
+  met by design: a shelf's page stays covers to look at, which the owner asked for in Sprint
+  105, and links to the Library for editing.
+- Criterion 3: `/shelves` redirects; `/pile` and `/lent` do not, and *Pin to library* stays.
+  The pile's ranking and a loan's person and date are not things the library's list has.
+
+Impact on later sprints: 145 adds rule shelves to `ShelvesView` and to the Library's
+*Save view*. 146 changes the phone's tab bar, which now holds Library, the bar and Insights.

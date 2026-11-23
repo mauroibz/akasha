@@ -1,4 +1,4 @@
-import { LayoutGrid, List, SlidersHorizontal } from "lucide-react";
+import { Bookmark, LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -88,6 +88,7 @@ import {
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LibraryFront } from "@/features/home/LibraryFront";
+import { ShelvesView } from "@/features/shelves/ShelvesView";
 import { SaveView } from "@/features/library/SaveView";
 import { PageFrame } from "@/components/PageFrame";
 import { useShownItemTypes } from "@/features/media/useMedia";
@@ -571,7 +572,20 @@ export function LibraryPage() {
       statuses: filters.statuses.filter((value) => kept.has(value)),
     });
   };
-  const setLibraryView = (next: LibraryView) => {
+  // The Shelves view is in the address (`?view=shelves`), so a link and the back
+  // button reach it; grid and table stay a remembered preference of the list.
+  const shelvesView = searchParams.get("view") === "shelves";
+  const setLibraryView = (next: LibraryView | "shelves") => {
+    setSearchParams(
+      (current) => {
+        const params = new URLSearchParams(current);
+        if (next === "shelves") params.set("view", "shelves");
+        else params.delete("view");
+        return params;
+      },
+      { replace: false },
+    );
+    if (next === "shelves") return;
     setView(next);
     localStorage.setItem(viewPreferenceKey, next);
   };
@@ -772,7 +786,7 @@ export function LibraryPage() {
           <SegmentedControl
             className="order-6 sm:order-none"
             ariaLabel="Library view"
-            value={view}
+            value={shelvesView ? "shelves" : view}
             onChange={setLibraryView}
             options={[
               {
@@ -797,6 +811,19 @@ export function LibraryPage() {
                   </>
                 ),
                 ariaLabel: "Table view",
+              },
+              {
+                value: "shelves",
+                label: (
+                  <>
+                    <Bookmark
+                      className="h-4 w-4 sm:hidden"
+                      aria-hidden="true"
+                    />
+                    <span className="hidden sm:inline">Shelves</span>
+                  </>
+                ),
+                ariaLabel: "Shelves view",
               },
             ]}
           />
@@ -1068,119 +1095,127 @@ export function LibraryPage() {
       {/* The front of the Library (Sprint 141, DEC-193): the greeting, what is under
           way, what happened lately and the person's showcases. On the plain library
           only: a search or a filter is a question it does not answer. */}
-      {!filterActive && !filters.query && <LibraryFront />}
+      {!filterActive && !filters.query && !shelvesView && <LibraryFront />}
 
-      {library.isPending && (
-        // Holds the list's height while the new page resolves. Without it the
-        // page collapses to a short message between two lists and the whole
-        // layout jumps underneath the crossfade.
-        <Loading
-          label="Loading your library…"
-          shape="grid"
-          className="min-h-[min(70vh,760px)] pt-6"
-        />
-      )}
-      {library.isError && (
-        <div className="py-24 text-center" role="alert">
-          <h2 className="text-xl font-semibold">
-            Your library could not be loaded
-          </h2>
-          <Button
-            className="mt-5 rounded-full px-5"
-            onClick={() => void library.refetch()}
-          >
-            Try again
-          </Button>
-        </div>
-      )}
-      {/* Two different silences, and only one of them is worth a screen.
+      {/* Shelves are a view of the Library (Sprint 144, DEC-193), beside the grid and
+          the table: the boards, in place of the list. */}
+      {shelvesView ? (
+        <ShelvesView />
+      ) : (
+        <>
+          {library.isPending && (
+            // Holds the list's height while the new page resolves. Without it the
+            // page collapses to a short message between two lists and the whole
+            // layout jumps underneath the crossfade.
+            <Loading
+              label="Loading your library…"
+              shape="grid"
+              className="min-h-[min(70vh,760px)] pt-6"
+            />
+          )}
+          {library.isError && (
+            <div className="py-24 text-center" role="alert">
+              <h2 className="text-xl font-semibold">
+                Your library could not be loaded
+              </h2>
+              <Button
+                className="mt-5 rounded-full px-5"
+                onClick={() => void library.refetch()}
+              >
+                Try again
+              </Button>
+            </div>
+          )}
+          {/* Two different silences, and only one of them is worth a screen.
           An empty library is news: there is nothing here and here is what to do
           about it. An empty *result* is the ordinary case of looking something up
           before adding it -- the settled-and-empty rule is about to search the web
           for exactly this string -- so it gets one line, and the results land where
           the screenful of encouragement used to push them. */}
-      {firstPage?.items.length === 0 &&
-        (filters.query ? (
-          <p className="py-6 text-center text-muted-foreground">
-            Nothing in your library matches “{filters.query}”.
-          </p>
-        ) : (
-          <section className="py-16">
-            {inboxCount > 0 ? (
-              // An import lands in the Inbox, so an empty library right after one
-              // is not "waiting": it is one click from what just arrived (the
-              // Sprint 087 walkthrough, 220 books behind "Your library is waiting").
-              <EmptyState
-                title={`${inboxCount} waiting in your Inbox`}
-                action={
-                  <Button onClick={() => void navigate("/inbox")}>
-                    Sort them into your library
-                  </Button>
-                }
-              >
-                Everything you import lands there first, so you can say what you
-                thought before it joins the library.
-              </EmptyState>
+          {firstPage?.items.length === 0 &&
+            (filters.query ? (
+              <p className="py-6 text-center text-muted-foreground">
+                Nothing in your library matches “{filters.query}”.
+              </p>
             ) : (
-              <EmptyState
-                title="Your library is waiting"
-                action={
-                  <Button
-                    variant="outline"
-                    onClick={() => void navigate("/add")}
+              <section className="py-16">
+                {inboxCount > 0 ? (
+                  // An import lands in the Inbox, so an empty library right after one
+                  // is not "waiting": it is one click from what just arrived (the
+                  // Sprint 087 walkthrough, 220 books behind "Your library is waiting").
+                  <EmptyState
+                    title={`${inboxCount} waiting in your Inbox`}
+                    action={
+                      <Button onClick={() => void navigate("/inbox")}>
+                        Sort them into your library
+                      </Button>
+                    }
                   >
-                    Add something
-                  </Button>
-                }
-              >
-                Search above to add something, or bring in a whole list from
-                another app.
-              </EmptyState>
-            )}
-            {/* Asked once, of someone starting out (Sprint 143, DEC-193). */}
-            <WhatDoYouKeep className="mx-auto mt-12 max-w-xl" />
-          </section>
-        ))}
-      {/* The crossfade is on the container and nowhere else. `mode="wait"` is
+                    Everything you import lands there first, so you can say what
+                    you thought before it joins the library.
+                  </EmptyState>
+                ) : (
+                  <EmptyState
+                    title="Your library is waiting"
+                    action={
+                      <Button
+                        variant="outline"
+                        onClick={() => void navigate("/add")}
+                      >
+                        Add something
+                      </Button>
+                    }
+                  >
+                    Search above to add something, or bring in a whole list from
+                    another app.
+                  </EmptyState>
+                )}
+                {/* Asked once, of someone starting out (Sprint 143, DEC-193). */}
+                <WhatDoYouKeep className="mx-auto mt-12 max-w-xl" />
+              </section>
+            ))}
+          {/* The crossfade is on the container and nowhere else. `mode="wait"` is
           not a stylistic choice: with the default, moving to a filter TanStack
           already has cached mounts the old and new lists in the same commit,
           and two virtualized stacks -- each with its own scroll container and
           its own total-size spacer -- double both the mounted-card count and
           the page height for the duration. */}
-      <AnimatePresence mode="wait" initial={false}>
-        {entries.length > 0 && (
-          <m.div
-            key={libraryMotionKey(filters)}
-            data-library-container=""
-            initial={presets.crossfade.initial}
-            animate={presets.crossfade.animate}
-            exit={presets.crossfade.exit}
-          >
-            <VirtualLibrary
-              entries={entries}
-              total={firstPage?.total ?? entries.length}
-              view={view}
-              focusedId={focusedId}
-              highlightId={highlightId}
-              rollbackId={rollbackId}
-              hasNextPage={library.hasNextPage}
-              isFetchingNextPage={library.isFetchingNextPage}
-              loadNextPage={() => void library.fetchNextPage()}
-              onFocusEntry={setFocusedId}
-              onScore={(entry, score) =>
-                mutation.mutate({ entry, changes: { score } })
-              }
-              onStatus={(entry, status) =>
-                // Finishing one thing asks when, in the finish sheet (DEC-192);
-                // Cancel leaves the card as it was.
-                finishes(entry, status)
-                  ? setFinishing({ entry, status })
-                  : mutation.mutate({ entry, changes: { status } })
-              }
-            />
-          </m.div>
-        )}
-      </AnimatePresence>
+          <AnimatePresence mode="wait" initial={false}>
+            {entries.length > 0 && (
+              <m.div
+                key={libraryMotionKey(filters)}
+                data-library-container=""
+                initial={presets.crossfade.initial}
+                animate={presets.crossfade.animate}
+                exit={presets.crossfade.exit}
+              >
+                <VirtualLibrary
+                  entries={entries}
+                  total={firstPage?.total ?? entries.length}
+                  view={view}
+                  focusedId={focusedId}
+                  highlightId={highlightId}
+                  rollbackId={rollbackId}
+                  hasNextPage={library.hasNextPage}
+                  isFetchingNextPage={library.isFetchingNextPage}
+                  loadNextPage={() => void library.fetchNextPage()}
+                  onFocusEntry={setFocusedId}
+                  onScore={(entry, score) =>
+                    mutation.mutate({ entry, changes: { score } })
+                  }
+                  onStatus={(entry, status) =>
+                    // Finishing one thing asks when, in the finish sheet (DEC-192);
+                    // Cancel leaves the card as it was.
+                    finishes(entry, status)
+                      ? setFinishing({ entry, status })
+                      : mutation.mutate({ entry, changes: { status } })
+                  }
+                />
+              </m.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
       {/* Below the library, and a region of its own.
           The library is a `role="feed"` carrying server-side `aria-posinset` and
           `aria-setsize` (DEC-038); these are not feed items and must never be

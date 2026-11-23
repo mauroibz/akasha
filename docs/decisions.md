@@ -7710,3 +7710,31 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   migrations (media preferences, shelf rules, lit days). The product spec's screens section is
   rewritten as each sprint lands. The presets' final list and names are the owner's to change;
   the mockup's four (*Moss*, *Claret*, *Dusk*, *Sakura*) are the default.
+
+## DEC-194 — A shelf's page stays covers to look at; the Library is where it is edited (Sprint 144)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-193 point 5 (amended here), DEC-169 and Sprint 105 (covers without
+  chips on a shelf), DEC-192 (the pile as a list), DEC-176 (lending).
+- **Context:** DEC-193 said a shelf "opens as the library filtered to it", with the Library's
+  card and controls, and that `/pile` and `/lent` redirect to built-in shelves. Building it
+  met two earlier choices of the owner's. In Sprint 105 the owner asked for a shelf's covers
+  without status and score chips over them: "a shelf is for looking at". And the pile and the
+  loans are not filters of the library: the pile's order is a ranking with reasons, and a loan
+  carries a person and a date, neither of which the library's list has.
+- **Decision:**
+  1. Shelves are a view of the Library (`/?view=shelves`) and leave the navigation, as
+     DEC-193 said.
+  2. A shelf's page keeps its covers-only drawing, now through the shared `Cover`, and gains a
+     link per medium to the same shelf in the Library, where sort, filters, status and score
+     are. It is not replaced by the Library's grid.
+  3. *The pile* and *Lent out* stand in the Shelves view as the application's own shelves and
+     open their existing pages, which keep their own order and actions. `/pile` and `/lent` do
+     not redirect.
+  4. *Pin to library* stays: it is a filter shortcut on the Library's bar, not a third kind of
+     shelf.
+- **Consequences:** the proposal's finding that a shelf had "a different card, a different
+  width and no filters" is answered by the shared cover and width (Sprint 139) and the link,
+  not by one screen. If the owner wants the Library's controls on the shelf's own page, that
+  reverses Sprint 105 and is a small sprint.
