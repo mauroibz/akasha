@@ -24,10 +24,9 @@ test(
       page.getByRole("heading", { name: "Seeded book 0003" }),
     ).toBeVisible();
 
-    await page
-      .getByRole("link", { name: /^Import\b/ })
-      .first()
-      .click();
+    // The importer is reached from the bar's footer since Sprint 140.
+    await page.keyboard.press("ControlOrMeta+k");
+    await page.getByRole("link", { name: "Bring a whole list" }).click();
     await expect(
       page.getByRole("heading", { name: /went wrong/i }),
     ).toBeVisible();

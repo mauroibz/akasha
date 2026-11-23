@@ -97,12 +97,14 @@ test("URL-backed filters are reload-stable", async ({ page }) => {
   await expect(page).toHaveURL(/order=asc/);
 });
 
-test("Inbox button opens the triage tab on Import", async ({ page }) => {
+test("what waits to be sorted is a link in the shell that opens the Inbox", async ({
+  page,
+}) => {
   await stubEntry(page);
   await page.goto("/library");
-  await expect(page.getByText(/Inbox 5/).first()).toBeVisible();
+  // The count lives in the shell since Sprint 140, on every screen.
   await page
-    .getByText(/Inbox 5/)
+    .getByRole("link", { name: /^\d+ to sort$/ })
     .first()
     .click();
   await expect(page).toHaveURL(/\/inbox/);
@@ -292,9 +294,8 @@ test("navigation shell exposes every destination at desktop width", async ({
 }) => {
   await stubEntry(page);
   await page.goto("/library");
-  // Triage is absent on purpose: it folded into Import as a tab (DEC-079).
-  // The Import/Triage/Export destination reads "Data" as of Sprint 069.
-  for (const label of ["Library", "Add", "Data", "Shelves"]) {
+  // Places only since Sprint 140 (DEC-193): Add and Import are in the bar's footer.
+  for (const label of ["Library", "Shelves", "Insights", "Diary"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();
@@ -306,12 +307,16 @@ test("navigation shell exposes every destination at desktop width", async ({
     .first()
     .click();
   await expect(page).toHaveURL("/shelves");
+  await expect(page.getByRole("link", { name: /^(add|import)$/i })).toHaveCount(
+    0,
+  );
   await page
-    .getByRole("link", { name: /^import/i })
-    .first()
+    .getByRole("button", { name: /search your library, or add something/i })
     .click();
+  await page.getByRole("link", { name: "Bring a whole list" }).click();
   await expect(page).toHaveURL("/import");
-  await page.getByRole("link", { name: /add/i }).first().click();
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("link", { name: "Enter it by hand" }).click();
   await expect(page).toHaveURL("/add");
   await page
     .getByRole("link", { name: /library/i })

@@ -7185,3 +7185,14 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   widths. Providers are unreachable from this sandbox: the bar's web results cannot be looked
   at live here.
 - Next: Sprint 140, one bar.
+
+## 2026-11-23 — Sprint 140: one bar (complete)
+
+- Done: places-only navigation, the shell's field, "N to sort" in the shell, the bar's footer
+  and chooser, the Library toolbar without *Add* and *Inbox*.
+- Verified: see the sprint's Outcome.
+- Deviations: the shell's field opens the bar rather than being the input; the Library's field
+  stays in its sticky toolbar. Both reasoned in the Outcome.
+- Warning: the first implementation commit of this sprint was made by mistake with one test
+  red; it was amended before anything else was built on it.
+- Next: Sprint 141, the library at `/`.

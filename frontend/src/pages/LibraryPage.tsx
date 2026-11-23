@@ -87,7 +87,6 @@ import {
 } from "@/features/library/usePatchEntry";
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
-import { useCommandBar } from "@/features/command/commandBar";
 import { NowStrip } from "@/features/library/NowStrip";
 import { SaveView } from "@/features/library/SaveView";
 import { PageFrame } from "@/components/PageFrame";
@@ -185,7 +184,6 @@ export function LibraryPage() {
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
   const navigate = useNavigate();
-  const commandBar = useCommandBar();
   const location = useLocation();
 
   // Highlight the newly added entry. The add page hands the id over as router
@@ -735,7 +733,7 @@ export function LibraryPage() {
                   searchTheWeb();
                 }
               }}
-              placeholder="Title, creator, ISBN or link  /"
+              placeholder="Search your library, or add something  /"
               // The trailing padding is the button's room: without it a long query
               // runs underneath it. `appearance-none` removes WebKit's own tiny
               // cancel glyph, which would otherwise sit beside this one saying the
@@ -972,23 +970,6 @@ export function LibraryPage() {
                 </button>
               </div>
             )}
-            <Button
-              variant="outline"
-              className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
-              aria-pressed={filters.statuses.includes("unsorted")}
-              onClick={() => void navigate("/inbox")}
-            >
-              Inbox {inboxCount}
-            </Button>
-            <Button
-              className="hidden min-h-11 rounded-full px-4 sm:inline-flex"
-              aria-label="Add to library"
-              // The command bar is the one door for adding (Sprint 094), opened
-              // with whatever is already typed here.
-              onClick={() => commandBar.open(search)}
-            >
-              Add
-            </Button>
           </div>
         </div>
         {/* A second row exists only when there is state to spell out. The

@@ -116,7 +116,6 @@ test("announces loading and then renders the populated library and inbox facet",
   await waitFor(() => expect(resolveResponse).toBeDefined());
   resolveResponse?.(new Response(JSON.stringify(populated), { status: 200 }));
   expect(await screen.findByText("Rayuela")).toBeVisible();
-  expect(screen.getAllByText(/Inbox 12/)[0]).toBeVisible();
   expect(fetch).toHaveBeenCalledWith(
     expect.stringContaining("/api/entries"),
     expect.anything(),
@@ -149,7 +148,6 @@ test("renders a useful empty state", async () => {
   expect(
     screen.getByRole("button", { name: "Sort them into your library" }),
   ).toBeVisible();
-  expect(screen.getAllByText(/Inbox 3/)[0]).toBeVisible();
 });
 
 test("announces a library error and offers retry", async () => {
@@ -362,27 +360,6 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
       expect.anything(),
     ),
   );
-});
-
-test("Inbox count applies the unsorted filter", async () => {
-  const fetchMock = vi.fn(
-    async (request: string | URL | Request, init?: RequestInit) => {
-      if (init?.method === "PATCH") {
-        return new Response(JSON.stringify(populated.items[0]), {
-          status: 200,
-        });
-      }
-      return new Response(JSON.stringify(populated), { status: 200 });
-    },
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  renderPage();
-  const user = userEvent.setup();
-  await screen.findByText("Rayuela");
-  const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
-  await user.click(inboxButtons[0]);
-  // The Inbox is its own page again since Sprint 096 (proposal I3).
-  await screen.findByText("Inbox page");
 });
 
 test("the shelf filter lists every shelf, not only those on loaded pages", async () => {

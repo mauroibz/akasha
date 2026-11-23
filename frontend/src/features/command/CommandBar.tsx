@@ -23,7 +23,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/dialog";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { readThemeChoice, resolveTheme, saveThemeChoice } from "@/lib/theme";
+import { DomainStrip } from "@/components/DomainStrip";
 import { cn } from "@/lib/utils";
 import { navigateWithTransition } from "@/lib/viewTransition";
 
@@ -64,6 +65,9 @@ function useDebounced<T>(value: T, delay: number): T {
   }, [value, delay]);
   return settled;
 }
+
+const FOOT =
+  "font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring";
 
 const ITEM =
   "flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-sm aria-selected:bg-accent data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50";
@@ -353,28 +357,21 @@ export function CommandBar({
               value={query}
               onValueChange={setQuery}
               autoFocus
-              placeholder="Find in your library, search the web, or paste a link"
+              placeholder="Search your library, add from the web, or paste a link"
               className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
             />
           </div>
           {!resolvable && domains.length > 1 && typed.length >= 3 && (
-            <div
-              className="flex gap-1.5 overflow-x-auto border-b border-border px-4 py-2"
-              role="group"
-              aria-label="Search the web for"
-            >
-              {domains.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  aria-pressed={item.id === chosenDomain}
-                  onClick={() => setDomain(item.id)}
-                  className="shrink-0 rounded-full px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-ring aria-pressed:bg-primary/15 aria-pressed:text-primary"
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
+            <DomainStrip
+              label="Search the web for"
+              className="border-b border-border px-4"
+              domains={domains.map((item) => ({
+                id: item.id,
+                label: item.label,
+              }))}
+              value={chosenDomain}
+              onChange={setDomain}
+            />
           )}
           <CommandPrimitive.List className="max-h-[min(60dvh,520px)] overflow-y-auto px-2 pb-2">
             {libraryRows.length > 0 && (
@@ -523,6 +520,23 @@ export function CommandBar({
               </CommandPrimitive.Group>
             )}
           </CommandPrimitive.List>
+          {/* The two last resorts (Sprint 140, DEC-193): the form for what no
+              provider lists, and the importer for a whole list. They were
+              navigation items, and the form was the door people tried first. */}
+          <p className="flex flex-wrap gap-x-5 gap-y-1 border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+            <span>
+              Not here?{" "}
+              <Link to="/add" onClick={close} className={FOOT}>
+                Enter it by hand
+              </Link>
+            </span>
+            <span>
+              <Link to="/import" onClick={close} className={FOOT}>
+                Bring a whole list
+              </Link>{" "}
+              from Goodreads, MyAnimeList, Letterboxd and others
+            </span>
+          </p>
         </CommandPrimitive>
       </DialogContent>
     </Dialog>

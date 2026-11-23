@@ -36,7 +36,7 @@ describe("one frame", () => {
 
   it("writes the medium chooser only in DomainStrip", () => {
     const offenders = files
-      .filter(({ text }) => text.includes('aria-label="Choose a domain"'))
+      .filter(({ text }) => text.includes('"Choose a domain"'))
       .map(({ path }) => path);
     expect(offenders).toEqual(["components/DomainStrip.tsx"]);
   });

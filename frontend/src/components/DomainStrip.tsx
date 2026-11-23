@@ -9,6 +9,8 @@ export interface DomainStripProps {
   domains: ReadonlyArray<DomainStripOption>;
   value: string;
   onChange: (id: string) => void;
+  /** What is being chosen, when it is not the screen's medium: the bar's web search. */
+  label?: string;
   className?: string;
 }
 
@@ -32,12 +34,13 @@ export function DomainStrip({
   domains,
   value,
   onChange,
+  label = "Choose a domain",
   className,
 }: DomainStripProps) {
   return (
     <div
       role="radiogroup"
-      aria-label="Choose a domain"
+      aria-label={label}
       className={cn("flex min-w-0 max-w-full gap-6 overflow-x-auto", className)}
     >
       {domains.map((choice) => (

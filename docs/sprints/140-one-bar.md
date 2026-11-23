@@ -1,7 +1,7 @@
 # Sprint 140 — One bar
 
 **Sprint:** 140
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 56
 **Depends on:** 139
 **Owner:** Mauro
@@ -59,4 +59,47 @@ The Library moving to `/` (141). Changing the Add form or the import flow.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-11-23 (DEC-193).
+
+- **Navigation.** Home, Library, Shelves, Insights, Diary. *Add* and *Import* are gone from the
+  desktop bar and the phone's tab bar; the routes stay.
+- **The field.** On every screen but the Library the shell draws the bar as a wide field,
+  "Search your library, or add something", which opens the bar with the cursor in it; ⌘K as
+  before. On a phone the bar is the filled button in the middle of the tab bar.
+- **The Library** keeps its own field, which is the bar there: it filters the grid as it is
+  typed into and searches the web under the existing quota rule. Its placeholder now reads the
+  same as the shell's. The toolbar's *Add* and *Inbox N* buttons are removed.
+- **The bar's footer.** *Enter it by hand* (`/add`) and *Bring a whole list* (`/import`), always
+  shown. Its medium chooser is `DomainStrip` labelled "Search the web for".
+- **What waits to be sorted** is a link in the shell, "N to sort", on every screen, absent at
+  zero; counted once for both headers.
+
+Acceptance: 1 by the existing `CommandBar` tests (library first, add in place) and the new
+footer and chooser tests; 2 by the Library's existing search tests, unchanged; 3 by
+`AppShell.test.tsx` and `e2e/editorial.spec.ts`; 4 by `e2e/add-ebooks.spec.ts` and the
+accessibility spec.
+
+Verification: Vitest 652 passed; `make check`; Playwright chromium 229 passed before the four
+navigation specs were updated, then `editorial`, `add-ebooks`, `resilience`, `command-bar` and
+`accessibility` 65 passed. Looked at in the running app at 1440 and 390 px: Shelves with the
+field, the Library without it, the bar open on "rayu" with a library result and the footer. No
+overflow, no console errors. The web results could not be looked at live: providers are
+unreachable from the agent's sandbox ("Searching…" until the request fails).
+
+Deviations:
+
+- **The shell's field opens the bar; it is not itself the input.** The bar is a modal with
+  tested focus, paste and drop behaviour, and an input in the shell with results beneath it
+  would be a second implementation of the same thing. The owner sees a field in the same place
+  on every screen and types into it after one click or ⌘K.
+- **The Library's field stays in its sticky toolbar** instead of being driven from the shell.
+  That toolbar stays at the top while the grid scrolls and the shell does not, so moving the
+  field up would take the search away from someone halfway down their library. On the Library
+  the shell's field is not drawn, so a screen never shows two.
+- The count reads "N to sort" in the shell on every screen, not beside the Library's count.
+- Typing in the bar keeps its existing order: library results, then the web for the chosen
+  medium, then actions.
+
+Impact on later sprints: 141 moves the Library to `/`; the shell hides its field by path
+(`/library` today), which 141 must change with the route. The greeting line in 141 does not
+repeat the to-sort count. 146 changes the phone's tab bar to two places around the same button.

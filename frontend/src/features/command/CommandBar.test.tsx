@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -191,6 +197,48 @@ describe("CommandBar", () => {
         String(url).startsWith("/api/search/library"),
       ),
     ).toBe(false);
+  });
+
+  it("keeps the two last resorts in its footer: by hand, and a whole list (Sprint 140)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response("[]"),
+    );
+    await renderBar();
+    expect(
+      screen.getByRole("link", { name: "Enter it by hand" }),
+    ).toHaveAttribute("href", "/add");
+    await userEvent.click(
+      screen.getByRole("link", { name: "Bring a whole list" }),
+    );
+    expect(await screen.findByText("Import page")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("chooses the medium to search the web for with the one chooser (Sprint 140)", async () => {
+    const searched: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.startsWith("/api/item-types"))
+        return new Response(
+          JSON.stringify([
+            { id: "book", label: "Book", statuses: [], fields: [] },
+            { id: "movie", label: "Movie", statuses: [], fields: [] },
+          ]),
+        );
+      if (url.startsWith("/api/search?")) searched.push(url);
+      return new Response("[]");
+    });
+    const input = await renderBar();
+    await userEvent.type(input, "solaris");
+    const chooser = await screen.findByRole("radiogroup", {
+      name: "Search the web for",
+    });
+    await userEvent.click(
+      within(chooser).getByRole("radio", { name: "Movie" }),
+    );
+    await waitFor(() =>
+      expect(searched.some((url) => url.includes("type=movie"))).toBe(true),
+    );
   });
 
   it("goes places by name", async () => {
