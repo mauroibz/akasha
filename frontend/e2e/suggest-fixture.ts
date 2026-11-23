@@ -271,7 +271,7 @@ function libraryRound() {
       external_ids: {},
       reason: {
         signal: "library",
-        text: "Close to Seven Samurai; on your list since Mar 2024",
+        text: "Waiting since Mar 2024",
       },
       item_id: id,
       entry_id: entryId,

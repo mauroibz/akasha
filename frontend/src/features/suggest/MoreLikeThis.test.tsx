@@ -528,7 +528,7 @@ describe("From your library", () => {
         external_ids: {},
         reason: {
           signal: "library",
-          text: "Close to Seven Samurai; on your list since Mar 2024",
+          text: "Waiting since Mar 2024",
         },
       });
     const libraryRound = {
@@ -577,11 +577,7 @@ describe("From your library", () => {
       within(sheet).getByText(/Gemini · gemini-embedding-001/),
     ).toBeVisible();
     const [first] = within(list).getAllByRole("listitem");
-    expect(
-      within(first).getByText(
-        "Close to Seven Samurai; on your list since Mar 2024",
-      ),
-    ).toBeVisible();
+    expect(within(first).getByText("Waiting since Mar 2024")).toBeVisible();
     expect(within(first).getByText("On your list")).toBeVisible();
     expect(
       within(first).getByRole("link", { name: "Open Ran (1961)" }),

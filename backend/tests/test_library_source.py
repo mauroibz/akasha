@@ -89,7 +89,7 @@ async def test_from_your_library_returns_the_nearest_waiting_entries_to_the_seed
     assert first["enrichment"] == "enriched"
     assert first["entry_id"] == entries["62: Modelo para armar"]
     assert first["reason"]["signal"] == "library"
-    assert first["reason"]["text"].startswith("Close to Rayuela; on your list since ")
+    assert first["reason"]["text"].startswith("Waiting since ")
     assert first["source_score"] > body["suggestions"][1]["source_score"]
     # One request embedded the library; the round asked nothing more.
     assert len(endpoint.requests) == 1

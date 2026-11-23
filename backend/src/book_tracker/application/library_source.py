@@ -177,11 +177,9 @@ class LibrarySource:
                 creator=row["creator"],
                 item_id=row["item_id"],
                 source_score=row["similarity"],
-                reason=(
-                    f"Close to {seed.title}; on your list since {row['since']}"
-                    if row["since"]
-                    else f"Close to {seed.title}; already on your list"
-                ),
+                # The sheet is titled "More like <seed>" and the row says it is on
+                # your list: the reason is what differs per row, in Up next's words.
+                reason=f"Waiting since {row['since']}" if row["since"] else "",
             )
             for row in found
         ]
