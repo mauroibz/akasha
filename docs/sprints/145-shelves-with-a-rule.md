@@ -1,7 +1,7 @@
 # Sprint 145 — Shelves with a rule
 
 **Sprint:** 145
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 144
 **Owner:** Mauro

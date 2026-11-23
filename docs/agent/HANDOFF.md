@@ -4,8 +4,9 @@
 
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
-all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange) and 143
-(your media) are complete; **Sprint 144 (shelves as a view) is next**. Migration **0039** is
+all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange), 143
+(your media) and 144 (shelves as a view) are complete; **Sprint 145 (shelves with a rule) is
+next**. Migration **0039** is
 new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 
@@ -38,6 +39,9 @@ a third family exists, `insight:<type>:<section>`, drawn by `InsightShowcase.tsx
 What 143 left: `/api/media` and `features/media/` (`useMedia`, `useShownItemTypes`,
 `YourMedia`). A chooser lists `useShownItemTypes().data`; labels and vocabularies still read
 `useItemTypes()`, the whole registry.
+
+What 144 left: shelves are `/?view=shelves` (`features/shelves/ShelvesView.tsx`); DEC-194
+records what was not built from DEC-193 point 5 and why.
 
 ## Earlier state (release 3.1.0)
 

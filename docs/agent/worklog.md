@@ -7229,3 +7229,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   A unit test whose fetch stub never answers unknown URLs must answer `/api/media`, or the
   Library waits for it.
 - Next: Sprint 144, shelves as a view.
+
+## 2026-11-23 — Sprint 144: shelves are a view (complete)
+
+- Done: `ShelvesView` behind the Library's view switch, the pile as a shelf, `/shelves`
+  redirecting, a shelf linking into the Library.
+- Verified: see the sprint's Outcome.
+- Deviations: DEC-194. A shelf's page was not replaced by the Library's grid, `/pile` and
+  `/lent` do not redirect, *Pin to library* stays. For the owner's attention in the final
+  report.
+- Next: Sprint 145, shelves with a rule.

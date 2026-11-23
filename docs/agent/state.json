@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "144",
-  "active_sprint_file": "docs/sprints/144-shelves-as-a-view.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "143",
+  "project_status": "ready",
+  "active_sprint": "145",
+  "active_sprint_file": "docs/sprints/145-shelves-with-a-rule.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "144",
   "completed_sprints": [
     "001",
     "002",
@@ -149,8 +149,9 @@
     "140",
     "141",
     "142",
-    "143"
+    "143",
+    "144"
   ],
-  "started_at": "2026-11-23T13:59:25-03:00",
-  "updated_at": "2026-11-23T13:59:25-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T14:07:32-03:00"
 }

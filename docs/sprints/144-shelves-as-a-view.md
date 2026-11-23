@@ -1,7 +1,7 @@
 # Sprint 144 — Shelves are a view
 
 **Sprint:** 144
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 143
 **Owner:** Mauro
@@ -56,7 +56,7 @@ Shelves with a rule (145).
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193, amended by DEC-194). Commit: `HASH`.
+Completed 2026-11-23 (DEC-193, amended by DEC-194). Commit: `1c815ca`.
 
 - **The Shelves view.** The Library's view switch is *Grid · Table · Shelves*. *Shelves* is in
   the address (`?view=shelves`), draws `features/shelves/ShelvesView.tsx` (the former page:
