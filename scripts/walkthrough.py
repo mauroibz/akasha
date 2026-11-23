@@ -18,16 +18,16 @@ Playwright spec or a script — runs against the base URL it prints:
 - The backend starts on an ephemeral port, waits for readiness, and stops
   cleanly on SIGINT/SIGTERM.
 - `--replay <module>` installs that module's `walkthrough_transport(live)` seam
-  at the same point the series runners did: inside the lifespan, after the
-  catalog is built, swapping the shared provider client's transport so every
-  provider — and the enrichment handler's cover client — replays through it.
-  Without `--replay` the whole boundary is live.
+  as the shared provider client's transport: the lifespan's client factory is
+  replaced before the lifespan runs (Sprint 135), so every provider, cover fetch
+  and recommendation source replays through it. Without `--replay` the whole
+  boundary is live.
 - The source library a flow needs is passed by the flow itself through the
   environment (`AKASHA_WALKTHROUGH_LIBRARY`); the launcher never
   hardcodes an owner path.
 
 The runner drives the lifespan itself (`lifespan="off"` on uvicorn) because the
-replay seam is installed inside it — Sprint 050's worklog records uvicorn's own
+replay seam belongs to the lifespan it drives — Sprint 050's worklog records uvicorn's own
 pass re-running the lifespan and silently rebuilding every provider on a live
 client.
 """
@@ -47,6 +47,7 @@ import httpx
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend" / "src"))
 
+import book_tracker.app.lifespan as lifespan_module  # noqa: E402
 from book_tracker.config import Settings  # noqa: E402
 from book_tracker.infrastructure.providers import create_provider_client  # noqa: E402
 from book_tracker.main import create_app  # noqa: E402
@@ -72,23 +73,24 @@ async def serve(args: argparse.Namespace) -> int:
         user_agent_contact="walkthrough@example.invalid",
         log_level="WARNING",
     )
+    live_transport = httpx.AsyncHTTPTransport()
+    if args.replay:
+        # The shared provider client is built replaying from the start: the
+        # lifespan's client factory is replaced before the lifespan runs, so every
+        # provider, cover fetch and recommendation source holds the replaying
+        # client, and whatever the replay module passes through stays live.
+        # Swapping clients after the lifespan (the earlier seam) missed every holder
+        # it did not name: the `ObservedProvider` wrapper's adapter (since Sprint
+        # 101), Cinemeta's inner client, the recommendation sources (Sprint 135).
+        replay = load_replay(args.replay)
+
+        def replaying_client(transport: httpx.AsyncBaseTransport | None = None):
+            return create_provider_client(replay(live_transport))
+
+        lifespan_module.create_provider_client = replaying_client
     app = create_app(settings)
 
     async with app.router.lifespan_context(app):
-        live_transport = httpx.AsyncHTTPTransport()
-        if args.replay:
-            # The same seam the series runners used, one level up: swap the shared
-            # client's transport inside the lifespan so every provider replays,
-            # while whatever the replay module passes through stays live.
-            replaying = create_provider_client(load_replay(args.replay)(live_transport))
-            await app.state.provider_client.aclose()
-            app.state.provider_client = replaying
-            for provider in app.state.provider_catalog.values():
-                provider.client = replaying
-            for handler in app.state.job_runner.handlers.values():
-                if hasattr(handler, "cover_client"):
-                    handler.cover_client = replaying
-
         import uvicorn
 
         # lifespan="off": the lifespan is driven above, and uvicorn's own pass
