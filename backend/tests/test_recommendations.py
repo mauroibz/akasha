@@ -336,6 +336,25 @@ async def test_pressing_it_again_shows_the_last_round_unless_refreshed(
 
 
 @pytest.mark.anyio
+async def test_a_work_suggested_again_is_resolved_once_and_listed_once(
+    tmp_path: Path, films_suggested: None
+) -> None:
+    async with _app(tmp_path) as (app, client, cinemeta, _fake):
+        entry_id = _seed_film(app)
+        await client.post(f"/api/entries/{entry_id}/more-like-this")
+        await _run_jobs(app)
+        spent = list(cinemeta.requests)
+        fresh = (await client.post(f"/api/entries/{entry_id}/more-like-this?refresh=true")).json()
+        await _run_jobs(app)
+        body = (await client.get(f"/api/suggestion-rounds/{fresh['id']}")).json()
+        listed = (await client.get("/api/suggestions")).json()
+    assert cinemeta.requests == spent, "the second round asked a provider again"
+    assert [state for _title, state in _states(body)][:3] == ["enriched"] * 3
+    assert len(listed) == 7
+    assert {row["round_id"] for row in listed} == {fresh["id"]}
+
+
+@pytest.mark.anyio
 async def test_one_more_is_enriched_when_someone_opens_it(
     tmp_path: Path, films_suggested: None
 ) -> None:

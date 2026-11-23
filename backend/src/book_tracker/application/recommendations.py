@@ -93,48 +93,60 @@ def _norm(value: str | None) -> str:
 
 
 @dataclass
-class _Known:
-    """Works to leave out of a round: by identity, and by title with year or creator."""
+class _Works:
+    """Works matched by identity, or by title with a year or creator that agrees.
 
-    identities: set[tuple[str, str]]
-    titles: dict[str, list[tuple[int | None, str]]]
+    Each work carries a value: `True` for what a round leaves out, an item id for
+    what an earlier round already resolved.
+    """
 
-    def holds(
+    identities: dict[tuple[str, str], Any]
+    titles: dict[str, list[tuple[int | None, str, Any]]]
+
+    def find(
         self, title: str, year: int | None, creator: str | None, ids: Mapping[str, str]
-    ) -> bool:
+    ) -> Any:
         for kind, value in ids.items():
-            if (kind.casefold(), str(value).strip()) in self.identities:
-                return True
+            found = self.identities.get((kind.casefold(), str(value).strip()))
+            if found is not None:
+                return found
             try:
                 identifier = normalize_identifier(kind, str(value))
             except InvalidIdentifier:
                 continue
-            if (identifier.kind, identifier.normalized_value) in self.identities:
-                return True
+            found = self.identities.get((identifier.kind, identifier.normalized_value))
+            if found is not None:
+                return found
         wanted = _norm(creator)
-        for known_year, known_creator in self.titles.get(_norm(title), ()):
+        for known_year, known_creator, found in self.titles.get(_norm(title), ()):
             if wanted and known_creator:
                 if wanted == known_creator:
-                    return True
+                    return found
                 continue
             if year is not None and known_year is not None:
                 if abs(year - known_year) <= 1:
-                    return True
+                    return found
                 continue
             # Nothing contradicts a title match inside one library.
-            return True
-        return False
+            return found
+        return None
 
     def add(
-        self, title: str, year: int | None, creator: str | None, ids: Mapping[str, str]
+        self,
+        title: str,
+        year: int | None,
+        creator: str | None,
+        ids: Mapping[str, str],
+        value: Any = True,
     ) -> None:
-        for kind, value in ids.items():
-            self.identities.add((kind.casefold(), str(value).strip()))
-        self.titles.setdefault(_norm(title), []).append((year, _norm(creator)))
+        for kind, identity in ids.items():
+            self.identities.setdefault((kind.casefold(), str(identity).strip()), value)
+        self.titles.setdefault(_norm(title), []).append((year, _norm(creator), value))
 
 
-def _known(connection: Connection, user_id: int, item_type: str) -> _Known:
-    known = _Known(set(), {})
+def _known(connection: Connection, user_id: int, item_type: str) -> _Works:
+    """What a new round leaves out: the library in this domain, and *not for me*."""
+    known = _Works({}, {})
     params = {"user": user_id, "type": item_type}
     mine = "SELECT e.item_id FROM entries e JOIN items i ON i.id = e.item_id" + (
         " WHERE e.user_id = :user AND i.type = :type"
@@ -143,11 +155,11 @@ def _known(connection: Connection, user_id: int, item_type: str) -> _Known:
         text(f"SELECT kind, normalized_value FROM item_identifiers WHERE item_id IN ({mine})"),
         params,
     ):
-        known.identities.add((str(kind), str(value)))
+        known.identities[(str(kind), str(value))] = True
     for source, source_id in connection.execute(
         text(f"SELECT source, source_id FROM item_sources WHERE item_id IN ({mine})"), params
     ):
-        known.identities.add((str(source).casefold(), str(source_id)))
+        known.identities[(str(source).casefold(), str(source_id))] = True
     for title, year, creator in connection.execute(
         text(
             "SELECT i.title, i.year, i.creator_primary FROM entries e"
@@ -155,7 +167,7 @@ def _known(connection: Connection, user_id: int, item_type: str) -> _Known:
         ),
         params,
     ):
-        known.titles.setdefault(_norm(title), []).append((year, _norm(creator)))
+        known.titles.setdefault(_norm(title), []).append((year, _norm(creator), True))
     for title, year, creator, ids in connection.execute(
         text(
             "SELECT title, year, creator, external_ids_json FROM suggestions"
@@ -165,6 +177,21 @@ def _known(connection: Connection, user_id: int, item_type: str) -> _Known:
     ):
         known.add(title, year, creator, _json_object(ids))
     return known
+
+
+def _resolved(connection: Connection, user_id: int, item_type: str) -> _Works:
+    """What earlier rounds already found, so a work suggested again costs no request."""
+    resolved = _Works({}, {})
+    for title, year, creator, ids, item_id in connection.execute(
+        text(
+            "SELECT title, year, creator, external_ids_json, item_id FROM suggestions"
+            " WHERE user_id = :user AND item_type = :type AND enrichment = 'enriched'"
+            " AND item_id IS NOT NULL ORDER BY id DESC"
+        ),
+        {"user": user_id, "type": item_type},
+    ):
+        resolved.add(title, year, creator, _json_object(ids), int(item_id))
+    return resolved
 
 
 def _json_object(value: object) -> dict[str, Any]:
@@ -332,26 +359,30 @@ class SuggestionStore:
 
         Dropped: what their library already holds in this domain (by identity, or by
         title with a year or creator that agrees), what they answered *not for me*,
-        and a second mention of the same work in this round.
+        and a second mention of the same work in this round. A work an earlier round
+        already resolved is stored resolved, to the same item, without a request.
         """
         now = _now()
         stored: list[int] = []
         dropped = 0
         with self.engine.begin() as connection:
             known = _known(connection, self.user_id, item_type)
+            resolved = _resolved(connection, self.user_id, item_type)
             for candidate in candidates:
                 title = candidate.title.strip()
                 ids = {str(k): str(v) for k, v in candidate.external_ids.items() if v}
-                if not title or known.holds(title, candidate.year, candidate.creator, ids):
+                if not title or known.find(title, candidate.year, candidate.creator, ids):
                     dropped += 1
                     continue
                 known.add(title, candidate.year, candidate.creator, ids)
+                item_id = resolved.find(title, candidate.year, candidate.creator, ids)
                 result = connection.execute(
                     text(
                         "INSERT INTO suggestions (round_id, user_id, item_type, title, year,"
                         " creator, external_ids_json, reason, source_score, display_json,"
-                        " enrichment, created_at) VALUES (:round, :user, :type, :title, :year,"
-                        " :creator, :ids, :reason, :score, :display, 'pending', :now)"
+                        " enrichment, item_id, created_at) VALUES (:round, :user, :type, :title,"
+                        " :year, :creator, :ids, :reason, :score, :display, :enrichment, :item,"
+                        " :now)"
                     ),
                     {
                         "round": round_id,
@@ -364,6 +395,8 @@ class SuggestionStore:
                         "reason": candidate.reason,
                         "score": candidate.source_score,
                         "display": json.dumps(dict(candidate.display), ensure_ascii=False),
+                        "enrichment": "pending" if item_id is None else "enriched",
+                        "item": item_id,
                         "now": now,
                     },
                 )
@@ -386,7 +419,7 @@ class SuggestionStore:
             "NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = s.user_id"
             " AND e.item_id = s.item_id)",
         ]
-        params: dict[str, Any] = {"user": self.user_id, "limit": limit}
+        params: dict[str, Any] = {"user": self.user_id}
         if seed_entry_id is not None:
             clauses.append("r.seed_entry_id = :seed")
             params["seed"] = seed_entry_id
@@ -399,11 +432,27 @@ class SuggestionStore:
                     f"SELECT {_SUGGESTION_COLUMNS} FROM suggestions s"
                     " JOIN suggestion_rounds r ON r.id = s.round_id"
                     f" WHERE {' AND '.join(clauses)}"
-                    " ORDER BY s.created_at DESC, s.round_id DESC, s.id LIMIT :limit"
+                    " ORDER BY s.created_at DESC, s.round_id DESC, s.id LIMIT :scan"
                 ),
-                params,
+                {**params, "scan": limit * 4},
             ).all()
-        return [_suggestion(row) for row in rows]
+        # A work two rounds both suggested is shown once, from the newer round.
+        shown: list[dict[str, Any]] = []
+        seen: set[tuple[Any, ...]] = set()
+        for row in rows:
+            suggestion = _suggestion(row)
+            key = (
+                ("item", suggestion["item_id"])
+                if suggestion["item_id"] is not None
+                else ("title", _norm(suggestion["title"]), suggestion["year"])
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            shown.append(suggestion)
+            if len(shown) == limit:
+                break
+        return shown
 
     def suggestion(self, suggestion_id: int) -> dict[str, Any] | None:
         with self.engine.connect() as connection:
