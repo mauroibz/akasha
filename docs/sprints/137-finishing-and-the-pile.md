@@ -1,7 +1,7 @@
 # Sprint 137 — Finishing, and the pile
 
 **Sprint:** 137
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 55
 **Depends on:** 136
 **Owner:** Mauro
@@ -87,4 +87,46 @@ pile as a list; `[DOCS]` close.
 
 ## Outcome
 
-_Not started._
+Completed 2026-11-23 (DEC-192). Commits: `d631cc6` (the pile in rounds), `5d2a741` (*Mark as
+read*), `ffeb541` (finishing records when), `097eef8` (the pile as a list), and the closing
+documentation commit.
+
+Delivered:
+
+1. A library card moved to a finished status opens the finish sheet for that status
+   (`FinishDialog` takes `status`), *Today* chosen; *Cancel* writes nothing and the card keeps
+   its status. The sheet also asks *Still an 8?*, so the separate *Still* dialog no longer
+   follows a card's finish. The opinion dialog fills an empty finished date with today when a
+   finished status is chosen, and keeps a date already there. Bulk and triage unchanged.
+2. `features/finish/label.ts`: *Mark as* the domain's finished status label ("Mark as read",
+   "Mark as watched", "Mark as completed"; "Mark finished" where a domain has none), on the
+   library's Now strip, Home's On now and Up next, the detail page and the new pile page.
+3. `rank_pile` orders its scored candidates in rounds by `(item type, normalized creator)`:
+   every creator's best before any creator's second. Home, `GET /api/pile` and goal picks.
+4. **Deviation:** the library shows one domain at a time, so a cross-library pile cannot be a
+   library filter. The pile is its own page, `/pile` (`features/pile/PilePage.tsx`): every
+   waiting entry in ranked order, the strongest reason, a library filter, *Start* or *Mark as*,
+   and *Sort in cards →* to `/deck/planned`. `GET /api/pile` accepts up to 1,000. *N on the pile*
+   in Up next and the greeting open it; *Sort* beside Up next's opens the deck.
+
+Acceptance criteria:
+
+1. `LibraryPage.test.tsx` (the sheet with *Today*, today's date sent; *Cancel* sends nothing),
+   `OpinionDialog.test.tsx` (fills today; keeps a set date).
+2. `label.test.ts`; the On now, Up next, Now strip and detail tests use the new names. No
+   `item_type ==` added.
+3. `test_one_creator_does_not_fill_the_top_of_the_pile` (five by one author, three by others:
+   the first four are four creators; the rest keep the score's order).
+4. `UpNext.test.tsx`, `GreetingBar.test.tsx`, `PilePage.test.tsx` (3), and `e2e/home.spec.ts`
+   *the pile's count opens the pile as a list, and Sort the deck*.
+
+Verification: backend `test_ranking` (22), `test_goals`, `test_home_api`, `test_library_source`,
+`test_isolation`; Vitest on the touched files (finish, detail, library page, home, pile, App);
+Playwright `home.spec.ts`, `rescore.spec.ts`, `accessibility.spec.ts` 69 passed; `make check`.
+Walkthrough on a seeded library (six waiting Stephen King books and four other authors): Up
+next shows one King then four others; `/pile` at 1440 and 390 (no overflow); a card set to
+*Read* opens *You finished Dune* with *Today*; the opinion dialog shows today under *Finished*.
+
+Environment note: a local Akasha 1.5.7 container listens on 127.0.0.1:8000, where the e2e dev
+server proxies unstubbed `/api` calls; with it up, 16–17 accessibility tests fail on `main` too.
+Run Playwright with `AKASHA_E2E_BACKEND=http://127.0.0.1:9` while it runs.

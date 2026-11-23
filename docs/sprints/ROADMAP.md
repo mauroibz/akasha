@@ -1954,6 +1954,8 @@ Diary's goal grid, with or without a goal; shelves on Home. "This home screen is
 - **[137 — Finishing, and the pile](137-finishing-and-the-pile.md)**: the finish sheet from a
   library card's status, today filled in the opinion dialog, *Mark as read*, a creator's second
   pick after every creator's first, *N on the pile* as a list with *Sort* beside it.
+  [Closed 2026-11-23 (DEC-192). Four criteria met; the pile is its own page, `/pile`, since
+  the library shows one domain at a time; see the sprint's Outcome.]
 - **[138 — Home is your library](138-home-is-your-library.md)**: module families in the stored
   layout; a year module per library and a module per shelf, each turned on and placed in
   *Edit home*.

@@ -1,7 +1,7 @@
 # Sprint 138 — Home is your library
 
 **Sprint:** 138
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 55
 **Depends on:** 137
 **Owner:** Mauro
