@@ -61,6 +61,7 @@ import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
+import { MoreLikeThis } from "@/features/suggest/MoreLikeThis";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   choosesCovers,
@@ -732,6 +733,15 @@ export function DetailPage() {
                   Lend…
                 </Button>
               )}
+              {/* Sprint 134: only for a library the server says has a source. */}
+              <MoreLikeThis
+                seed={{ entryId: entry.id, title: item.title, type: item.type }}
+                types={itemTypes.data}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "rounded-full px-5",
+                )}
+              />
               <Button
                 variant="outline"
                 className="rounded-full border-destructive/60 px-5 text-destructive hover:bg-destructive/10 hover:text-destructive"

@@ -98,6 +98,7 @@ export const test = base.extend<{
             question: null,
             shelves: [],
             lent: { total: 0, loans: [] },
+            suggested: [],
           },
         }),
       );
@@ -113,6 +114,7 @@ export const test = base.extend<{
           ["question", "S"],
           ["shelves", "S"],
           ["lent", "S"],
+          ["suggested", "M"],
         ].map(([module, size]) => ({ module, size, hidden: false }));
         return route.fulfill({ json: { modules, defaults: modules } });
       });

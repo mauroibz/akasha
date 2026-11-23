@@ -8,6 +8,7 @@ import { FinishDialog } from "@/features/finish/FinishDialog";
 import { countLabel, progressFor } from "@/features/library/labels";
 import { stepFor } from "@/features/progress/outline";
 import { statusWith } from "@/features/rescore/rescore";
+import { MoreLikeThis } from "@/features/suggest/MoreLikeThis";
 import { cn } from "@/lib/utils";
 
 import { HomeModule } from "./HomeModule";
@@ -103,6 +104,11 @@ export function OnNow({
             Set aside
           </button>
         ) : null}
+        <MoreLikeThis
+          seed={{ entryId: entry.id, title, type: entry.item.type }}
+          types={types}
+          className={shape}
+        />
       </div>
     );
   }

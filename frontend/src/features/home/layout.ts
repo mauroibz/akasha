@@ -15,6 +15,7 @@ export const MODULES = [
   "question",
   "shelves",
   "lent",
+  "suggested",
 ] as const;
 
 export type ModuleKey = (typeof MODULES)[number];
@@ -33,6 +34,7 @@ export const moduleLabels: Record<ModuleKey, string> = {
   question: "One question",
   shelves: "Shelves",
   lent: "Lent out",
+  suggested: "More like this",
 };
 
 /** Modules that always take the whole row; their size only changes how much they show. */
@@ -52,6 +54,7 @@ export const fallbackLayout: ModuleLayout[] = [
   { module: "question", size: "S", hidden: false },
   { module: "shelves", size: "S", hidden: false },
   { module: "lent", size: "S", hidden: false },
+  { module: "suggested", size: "M", hidden: false },
 ];
 
 /** Columns of twelve a size asks for on a wide screen (the proposal's S 3, M 5, L 7). */

@@ -54,7 +54,7 @@ describe("EditHome", () => {
     );
     expect(screen.getByRole("button", { name: "Move Lately" })).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Lately moved to 3 of 9",
+      "Lately moved to 3 of 10",
     );
     await user.keyboard("{ArrowDown}{ArrowDown}");
     expect(order().slice(2, 5)).toEqual(["year", "libraries", "lately"]);
@@ -112,7 +112,7 @@ describe("EditHome", () => {
     const onChange = vi.fn();
     const reversed = [...fallbackLayout].reverse();
     render(<Harness onChange={onChange} initial={reversed} />);
-    expect(order()[0]).toBe("lent");
+    expect(order()[0]).toBe("suggested");
     await userEvent
       .setup()
       .click(screen.getByRole("button", { name: "Reset" }));

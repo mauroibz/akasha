@@ -145,6 +145,25 @@ export interface ItemType {
    * the control is not rendered rather than rendered and unable to answer.
    */
   chooses_covers: boolean;
+  /**
+   * *More like this* for this library (Sprint 134): which sources suggest its
+   * things, whether each is configured, and the attribution each one's terms ask
+   * for. Absent or `null` where nothing does, so the button is not shown.
+   */
+  recommendation?: RecommendationInfo | null;
+}
+
+export interface RecommendationSourceInfo {
+  name: string;
+  label: string;
+  configured: boolean;
+  /** How to turn it on, when it is not configured. */
+  hint: string | null;
+}
+
+export interface RecommendationInfo {
+  sources: RecommendationSourceInfo[];
+  attribution: Record<string, string>;
 }
 
 /**

@@ -31,6 +31,7 @@ import { LibraryTiles } from "./LibraryTiles";
 import { OnNow } from "./OnNow";
 import { QuestionModule } from "./QuestionModule";
 import { ShelvesModule } from "./ShelvesModule";
+import { SuggestedModule } from "./SuggestedModule";
 import { TidyUp } from "./TidyUp";
 import { UpNext } from "./UpNext";
 import { localDate } from "./year";
@@ -106,6 +107,8 @@ function hasContent(key: ModuleKey, home: Home): boolean {
       return Boolean(home.shelves?.length);
     case "lent":
       return Boolean(home.lent?.total);
+    case "suggested":
+      return Boolean(home.suggested?.length);
     default:
       return true;
   }
@@ -211,6 +214,13 @@ export function HomePage() {
       ),
       lent: (size) =>
         data.lent ? <LentOut lent={data.lent} size={size} /> : null,
+      suggested: (size) => (
+        <SuggestedModule
+          suggestions={data.suggested ?? []}
+          types={types}
+          size={size}
+        />
+      ),
     };
     const placed = packRows(
       layout.modules.flatMap((row) =>

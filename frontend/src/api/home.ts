@@ -1,4 +1,5 @@
 import type { LibraryEntry } from "./library";
+import type { Suggestion } from "./suggestions";
 import { jsonOrApiError, request } from "./request";
 import type { components } from "./schema";
 
@@ -51,6 +52,8 @@ export interface Home {
   question: HomeQuestion | null;
   shelves: HomeShelf[] | null;
   lent: HomeLent | null;
+  /** *More like this* (Sprint 134): found, unanswered suggestions, newest first. */
+  suggested?: Suggestion[] | null;
 }
 
 /** The person's own zone, so Home's today and Lately's days are theirs (Sprint 132). */
