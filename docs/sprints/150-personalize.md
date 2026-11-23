@@ -1,7 +1,7 @@
 # Sprint 150 — Personalize
 
 **Sprint:** 150
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 57
 **Depends on:** 149
 **Owner:** Mauro
@@ -55,8 +55,8 @@ One per deliverable, then `[DOCS]` close.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-195). Commits: `BACK` (the bands in the layout, the preview
-endpoint), `FRONTH` (Personalize).
+Completed 2026-11-23 (DEC-195). Commits: `b4d627c` (the bands in the layout, the preview
+endpoint), `aa79aee` (Personalize).
 
 - **Bands in the layout.** `now` and `lately` are layout keys, first and shown by default,
   always the full width, with a handle and remove and no size.

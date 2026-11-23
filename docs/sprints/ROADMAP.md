@@ -2,7 +2,7 @@
 
 **Plan revision:** 57
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 149 (DEC-195); see "The owner's first look at the 4.0 line" below. Sprints 139–148, the owner's 2026-11-23 line (DEC-193, amended by DEC-194), are completed; see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** none. Sprints 149–150 (DEC-195) are completed; see "The owner's first look at the 4.0 line" below. Sprints 139–148, the owner's 2026-11-23 line (DEC-193, amended by DEC-194), are completed; see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082

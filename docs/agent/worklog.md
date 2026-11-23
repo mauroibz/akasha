@@ -7296,3 +7296,11 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   copy of `data/` in the session scratchpad, Vite on 5173. The old 1.5.7 container still
   holds 8000.
 - Next: Sprint 150, Personalize.
+
+## 2026-11-23 — Sprint 150: Personalize (complete)
+
+- Done: `now` and `lately` back in the layout; `/api/home/preview`; `Personalize.tsx` (the
+  bar, the plus tile, the add dialog), `Showcase.tsx` as the one renderer; the tray deleted.
+- Verified: see the sprint's Outcome. `make test`'s full backend run was not repeated for
+  149–150: the nine backend files around the change ran, 196 passed.
+- Next: the owner's review. Nothing is released; the version surfaces read 3.1.0.

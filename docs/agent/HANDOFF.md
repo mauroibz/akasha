@@ -2,8 +2,9 @@
 
 ## Where the project stands
 
-**2026-11-23, the 4.0 line is built and not released.** Sprints 139–148 (DEC-193, amended by
-DEC-194; the design is `docs/library-first-proposal.md` with its mockup) are complete on branch
+**2026-11-23, the 4.0 line is built and not released.** Sprints 139–150 (DEC-193, amended by
+DEC-194, and DEC-195 from the owner's first look: a goal's medium, a search in the day's
+question, *Arrange* redrawn as *Personalize* with *On now* and *Lately* movable; the design is `docs/library-first-proposal.md` with its mockup) are complete on branch
 `library-first-4.0`, all commits local, nothing pushed. The project state is `complete`. The
 running board is still 3.1.0. **Do not tag, push or deploy without asking:** the owner asked
 for the build; the standing permission to release applied to the 3.0 line only.
@@ -17,8 +18,10 @@ them; the Journal is the Diary, Insights and the games, opening on a widget (*Ev
 presets. Migrations **0039** (`media_preferences`) and **0040** (`lit_days`) are new since
 3.1.0.
 
-**Gates on this tree:** `make check`; `make test` (backend 2,229, Vitest 760); every
-Playwright project 249 passed, 2 skipped by design; `make audit` clean. Not run:
+**Gates:** on the tree at Sprint 148, `make check`; `make test` (backend 2,229, Vitest 760);
+every Playwright project 249 passed, 2 skipped by design; `make audit` clean. After Sprints
+149–150: Vitest 766, every Playwright project 249 passed, `make check`, and the nine backend
+test files around the change 196 passed; the full backend run was not repeated. Not run:
 `make smoke-container`, and an upgrade of a copy of the board's library (a copy of the
 development library was migrated 0038 → 0040 with counts unchanged).
 
@@ -34,7 +37,7 @@ views were not moved into the shelves table.
 
 **Where things are:** `components/PageFrame.tsx`, `Cover.tsx`, `DomainStrip.tsx` (one frame,
 held by `src/test/frame.test.ts`); `features/home/` (the Library's front: `LibraryFront`,
-`useArrange`, `Arrange`, `InsightShowcase`); `features/media/`; `features/shelves/ShelvesView`
+`Showcase`, `Personalize`, `useArrange`, `Arrange`, `InsightShowcase`); `features/media/`; `features/shelves/ShelvesView`
 and `useRuleShelves`; `pages/JournalPage.tsx` and `features/journal/`; `features/theme/`.
 A new API route needs `test_isolation.py`, `test_app_shape.py` (regenerate the fixture) and
 `test_library_api.py`'s route list; a new migration, `test_migrations.py`.
