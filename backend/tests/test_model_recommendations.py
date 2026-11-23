@@ -29,12 +29,16 @@ from book_tracker.app.recommendations import DEFAULT_RECOMMEND_LIMITS, build_sou
 from book_tracker.application.recommendations import RECOMMEND_JOB, budget_key, want_status
 from book_tracker.config import Settings
 from book_tracker.domain.identity import normalize_identifier
+from book_tracker.domain.providers import SearchCandidate
 from book_tracker.domain.recommendations import (
+    Candidate,
     NotConfigured,
     Seed,
     SourceError,
     TasteEntry,
     TasteProfile,
+    resolve_by_identity_or_search,
+    same_work,
 )
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domains.book.providers import OpenLibraryProvider
@@ -564,3 +568,132 @@ async def test_the_model_is_held_to_fifty_rounds_a_day_unless_configured(tmp_pat
     async with _app(tmp_path, None, [], recommend_daily_limits={"model": 5}) as (app, _client):
         quota = app.state.job_runner.handlers[RECOMMEND_JOB].round_quota
         assert quota.limits[budget_key("model")] == 5
+
+
+# --- A film's year differs between providers --------------------------------------------
+
+
+def _record(title: str, year: int | None, *creators: str) -> SearchCandidate:
+    return SearchCandidate(
+        source="cinemeta",
+        source_id="tt0",
+        source_refs=(),
+        title=title,
+        subtitle=None,
+        creators=creators,
+        year=year,
+        cover_url=None,
+        identifiers={},
+        language=None,
+        metadata={},
+    )
+
+
+def test_an_agreeing_director_admits_a_later_release_year() -> None:
+    """Observed in the walkthrough: Cinemeta dates Kurosawa's films by their US
+    release (*Red Beard* 1968, *The Hidden Fortress* 1960), so the model's true
+    years (1965, 1958) left both unresolved and unshown."""
+    assert same_work(
+        Candidate("Red Beard", 1965, "Akira Kurosawa"), _record("Red Beard", 1968, "Akira Kurosawa")
+    )
+    assert same_work(
+        Candidate("The Hidden Fortress", 1958, "Akira Kurosawa"),
+        _record("The Hidden Fortress", 1960, "Akira Kurosawa"),
+    )
+    # Without a creator to agree on, one year is all the slack there is.
+    assert not same_work(Candidate("Red Beard", 1965), _record("Red Beard", 1968, "Akira Kurosawa"))
+    assert not same_work(Candidate("Red Beard", 1965), _record("Red Beard", 1968))
+    # A creator who disagrees is another work, whatever the year.
+    assert not same_work(
+        Candidate("Red Beard", 1968, "Akira Kurosawa"),
+        _record("Red Beard", 1968, "Kazuyoshi Yoshikawa"),
+    )
+    # A remake decades on is not the same work, director or not.
+    assert not same_work(
+        Candidate("The Hidden Fortress", 1958, "Akira Kurosawa"),
+        _record("The Hidden Fortress", 2001, "Akira Kurosawa"),
+    )
+
+
+class _Answers:
+    """A provider of the library that answers a search with what it was given."""
+
+    def __init__(self, name: str, rows: list[SearchCandidate] | Exception) -> None:
+        self.name = name
+        self.item_type = "movie"
+        self.rows = rows
+
+    async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+        if isinstance(self.rows, Exception):
+            raise self.rows
+        return self.rows
+
+
+@pytest.mark.anyio
+async def test_a_provider_that_failed_leaves_a_pick_to_try_again_not_unresolved() -> None:
+    """`unresolved` means every provider answered and none knew it; one that failed
+    may have been the one that did (Cinemeta, after Wikidata's Spanish labels)."""
+    resolve = resolve_by_identity_or_search()
+    pick = Candidate("Red Beard", 1965, "Akira Kurosawa")
+    other = _Answers("wikidata", [_record("Barbarroja", 1965, "Akira Kurosawa")])
+    with pytest.raises(httpx.ReadTimeout):
+        await resolve(
+            pick, {"wikidata": other, "cinemeta": _Answers("cinemeta", httpx.ReadTimeout("slow"))}
+        )
+    # Every provider answered and none knew it: unresolved.
+    assert await resolve(pick, {"wikidata": other}) is None
+    # A failure before a provider that knows it does not matter.
+    found = await resolve(
+        pick,
+        {
+            "cinemeta": _Answers("cinemeta", httpx.ReadTimeout("slow")),
+            "wikidata": _Answers("wikidata", [_record("Red Beard", 1968, "Akira Kurosawa")]),
+        },
+    )
+    assert found is not None and found.year == 1968
+
+
+def test_the_seed_is_named_once_with_its_works_first_year() -> None:
+    """Observed in the walkthrough: Rayuela's item is a 2000 edition, and it was
+    sent as "Rayuela — Julio Cortázar, 2000", twice (as the seed and as a score)."""
+    seed = Seed(
+        item_type=BOOK,
+        entry_id=1,
+        title="Rayuela",
+        year=2000,
+        creators=("Julio Cortázar",),
+        metadata={"original_year": 1963, "description": "PRIVATE-DESCRIPTION"},
+        options={"kind": "books", "creator": "author"},
+    )
+    profile = TasteProfile(
+        item_type=BOOK,
+        top_scored=(
+            TasteEntry("Rayuela", 1963, "Julio Cortázar", 9),
+            TasteEntry("Bestiario", 1951, "Julio Cortázar", 8),
+        ),
+    )
+    _system, prompt = build_prompt(seed, profile, 8)
+    assert prompt.count("Rayuela") == 1
+    assert "- Rayuela — Julio Cortázar, 1963" in prompt
+    assert "- Bestiario — Julio Cortázar, 1951 (8/10)" in prompt
+    assert "2000" not in prompt and "PRIVATE" not in prompt
+
+
+@pytest.mark.anyio
+async def test_the_profile_carries_a_works_first_year(tmp_path: Path) -> None:
+    from book_tracker.application.recommendations import taste_profile
+
+    async with _app(tmp_path, None, []) as (app, _client):
+        DomainRepository(app.state.engine, 1).create_cached_entry(
+            title="Rayuela",
+            subtitle=None,
+            year=2000,
+            metadata={"creators": ["Julio Cortázar"], "original_year": 1963},
+            identifiers=[],
+            sources=[SourceIdentity("openlibrary", "OL1M", True)],
+            status="read",
+            score=9,
+            item_type=BOOK,
+        )
+        profile = taste_profile(app.state.engine, 1, DOMAINS[BOOK])
+    assert [(row.title, row.year) for row in profile.top_scored] == [("Rayuela", 1963)]

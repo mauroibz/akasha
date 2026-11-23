@@ -13,7 +13,9 @@ the ones found. An unresolved pick is stored and never shown.
 
 **What is sent** is titles, creators, years and scores, and nothing else: no notes,
 reviews, tags, dates, formats, places or identifiers. `TasteProfile` already holds
-only those; the seed's other fields (`metadata`, `external_ids`) are never read.
+only those; of the seed's other fields only `metadata.original_year` is read (a
+book's item is an edition, and the model is asked about the work), and its
+`external_ids` never are.
 The library this asks about is named by the domain's `source_options["model"]`
 (`kind`, `creator`), so this module never asks which domain it holds.
 """
@@ -92,8 +94,13 @@ def build_prompt(seed: Seed, profile: TasteProfile, limit: int) -> tuple[str, st
     creator = seed.options.get("creator") or "creator"
     system = SYSTEM.format(kind=kind, creator=creator, limit=limit)
     lines: list[str] = []
+    seed_title = normalize_text(seed.title) if seed.title else None
     if not seed.is_profile and seed.title:
-        about = TasteEntry(seed.title, seed.year, seed.creators[0] if seed.creators else None)
+        # The work's first year, where the item knows it (a book's item is an
+        # edition): one year, and the only thing read from the seed's metadata.
+        first = seed.metadata.get("original_year")
+        year = first if isinstance(first, int) and not isinstance(first, bool) else seed.year
+        about = TasteEntry(seed.title, year, seed.creators[0] if seed.creators else None)
         lines += [f"Suggest {kind} like this one:", _line(about, score=False), ""]
     else:
         lines += [f"Suggest {kind} this person would like, from their taste below.", ""]
@@ -103,7 +110,9 @@ def build_prompt(seed: Seed, profile: TasteProfile, limit: int) -> tuple[str, st
         ("Turned down before (do not suggest):", profile.dismissed, False),
         ("Already waiting on their list (do not suggest):", profile.waiting, False),
     ):
-        part = _section(heading, entries, score=scored)
+        # The seed is named once, above, not again among their scores.
+        others = [entry for entry in entries if normalize_text(entry.title) != seed_title]
+        part = _section(heading, others, score=scored)
         if part:
             lines += [*part, ""]
     lines.append(f"Up to {limit} suggestions, as the JSON described.")

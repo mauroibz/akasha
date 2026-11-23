@@ -272,29 +272,37 @@ class SourceRegistry:
         return getattr(self._sources.get(name), "retention", None)
 
 
+#: How far apart two years may be once the creator agrees: a release abroad, years
+#: after the premiere, is the same film.
+CREATOR_YEAR_SLACK = 3
+
+
 def same_work(candidate: Candidate, record: SearchCandidate) -> bool:
     """Whether a provider's record is plausibly the work a source named.
 
-    The title must match once normalized (case, accents, punctuation); a year both
-    sides give may differ by one (festival versus release) from the record's year or
-    its original year (a book's record is an edition: Ficciones 1983, first 1944); a
-    creator both sides give must be among the record's. Anything looser resolves a
-    model's invention to a real stranger, which is the failure DEC-183 point 7 forbids.
+    The title must match once normalized (case, accents, punctuation); a creator both
+    sides give must be among the record's; a year both sides give may differ by one
+    (festival versus release) from the record's year or its original year (a book's
+    record is an edition: Ficciones 1983, first 1944), or by up to three when a
+    creator both sides give agrees (Cinemeta dates Kurosawa's films by their US
+    release: *Red Beard* 1968 for 1965). Anything looser resolves a model's invention
+    to a real stranger, which is the failure DEC-183 point 7 forbids.
     """
     if normalize_text(candidate.title) != normalize_text(record.title):
         return False
-    years = [year for year in (record.year, record.original_year) if year is not None]
-    if (
-        candidate.year is not None
-        and years
-        and all(abs(candidate.year - year) > 1 for year in years)
-    ):
-        return False
+    agreed = False
     if candidate.creator and record.creators:
         wanted = normalize_text(candidate.creator)
         if wanted not in {normalize_text(name) for name in record.creators}:
             return False
-    return True
+        agreed = True
+    slack = CREATOR_YEAR_SLACK if agreed else 1
+    years = [year for year in (record.year, record.original_year) if year is not None]
+    return (
+        candidate.year is None
+        or not years
+        or any(abs(candidate.year - year) <= slack for year in years)
+    )
 
 
 def resolve_by_identity_or_search(
@@ -310,7 +318,8 @@ def resolve_by_identity_or_search(
     search), or with the creator after it where the domain says that narrows a
     search (`with_creator`: books and albums, whose one-word titles are many works),
     and the first record that is `same_work` wins, the creator and year checked
-    there.
+    there. A provider that failed, with no match elsewhere, propagates its error
+    (the pick stays pending) rather than answering `None` (unresolved for good).
     A spent budget always propagates: it is not a miss.
     """
     kinds = tuple(identity_kinds)
@@ -343,7 +352,6 @@ def resolve_by_identity_or_search(
             else candidate.title
         )
         last_error: Exception | None = None
-        answered = False
         for provider in providers.values():
             try:
                 rows = await provider.search(query, 5)
@@ -352,11 +360,14 @@ def resolve_by_identity_or_search(
             except Exception as error:  # noqa: BLE001 - the next provider may answer
                 last_error = error
                 continue
-            answered = True
             for row in rows:
                 if same_work(candidate, row):
                     return row
-        if not answered and last_error is not None:
+        # `None` stores the pick unresolved for good, so it means every provider
+        # answered and none knew it. One that failed may have been the one that did:
+        # the failure propagates and the pick stays pending, to be tried again
+        # (Sprint 135: Cinemeta failing after Wikidata's Spanish labels).
+        if last_error is not None:
             raise last_error
         return None
 

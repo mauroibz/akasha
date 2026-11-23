@@ -290,6 +290,9 @@ export function MoreLikeThisSheet({
       : row.enrichment !== "unresolved",
   );
   const found = shown.filter((row) => row.enrichment === "enriched").length;
+  const waiting = resolvedOnly
+    ? (data?.suggestions ?? []).filter((row) => row.enrichment === "pending")
+    : [];
   const finished = data ? FINISHED_ROUNDS.has(data.status) : false;
   const working = start.isPending || (data !== undefined && !finished);
   const about = source?.about;
@@ -329,6 +332,28 @@ export function MoreLikeThisSheet({
             doneLine(label, stored, shown.length, found, resolvedOnly)}
           {data.status === "done" && data.error ? ` · ${data.error}` : null}
         </p>
+        {resolvedOnly && finished && waiting.length ? (
+          // A pick a provider could not be asked about (it failed, or its budget
+          // ran out) is neither shown nor given up on: it can be tried again.
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {waiting.length === 1
+                ? "1 more could not be looked up yet."
+                : `${waiting.length} more could not be looked up yet.`}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={waiting.some((row) => looking.has(row.id))}
+              onClick={() => waiting.forEach((row) => lookUp.mutate(row))}
+            >
+              {waiting.some((row) => looking.has(row.id))
+                ? "Looking…"
+                : "Try again"}
+            </Button>
+          </div>
+        ) : null}
         {shown.length ? (
           <ul className="divide-y divide-border" aria-label="Suggestions">
             {shown.map((suggestion) => (

@@ -593,8 +593,12 @@ def taste_profile(engine: Engine, user_id: int, domain: Domain) -> TasteProfile:
     finished = [status.value for status in domain.statuses if status.finished]
     planned = [status.value for status in domain.statuses if status.planned]
     params: dict[str, Any] = {"user": user_id, "type": domain.item_type, "size": PROFILE_SIZE}
+    # A work's first year where the item knows it: a book's item is an edition
+    # (Rayuela 2000), and a source is asked about the work (Rayuela 1963).
     base = (
-        "SELECT i.title, i.year, i.creator_primary, e.score FROM entries e"
+        "SELECT i.title,"
+        " COALESCE(CAST(json_extract(i.metadata, '$.original_year') AS INTEGER), i.year),"
+        " i.creator_primary, e.score FROM entries e"
         " JOIN items i ON i.id = e.item_id WHERE e.user_id = :user AND i.type = :type"
     )
 

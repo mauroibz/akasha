@@ -309,6 +309,16 @@ describe("Choosing the source", () => {
       "fetch",
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input);
+        if (init?.method === "POST" && url.includes("/enrich")) {
+          posts.push(url);
+          return new Response(
+            JSON.stringify({
+              suggestion: modelRound.suggestions[3],
+              job_id: "job-9",
+            }),
+            { status: 202 },
+          );
+        }
         if (init?.method === "POST") {
           posts.push(url);
           const body = url.includes("source=model") ? modelRound : tmdbRound;
@@ -355,11 +365,19 @@ describe("Choosing the source", () => {
     ).toBeVisible();
     expect(within(sheet).getByText(/Claude · claude-haiku-5-5/)).toBeVisible();
     expect(within(sheet).queryByText(ATTRIBUTION)).toBeNull();
+    // The pick no provider could be asked about yet can be tried again.
+    expect(
+      within(sheet).getByText("1 more could not be looked up yet."),
+    ).toBeVisible();
+    await user.click(within(sheet).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(posts).toContain("/api/suggestions/24/enrich"));
 
     // Back to TMDB: its round is still there, and nothing is asked again.
     await user.click(within(segment).getByRole("radio", { name: "TMDB" }));
     await within(sheet).findByText(/1 picked by TMDB/);
-    expect(posts).toHaveLength(2);
+    expect(posts.filter((url) => url.includes("more-like-this"))).toHaveLength(
+      2,
+    );
   });
 
   it("explains a model that is not configured and asks nothing of it", async () => {
