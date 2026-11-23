@@ -6,7 +6,7 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
-import { HomePage } from "./HomePage";
+import { LibraryPage } from "./LibraryPage";
 
 function makeClient() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -17,7 +17,7 @@ function renderPage(initialEntry = "/", client = makeClient()) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LibraryPage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
           <Route path="/import" element={<h1>Import</h1>} />
           <Route path="/inbox" element={<h1>Inbox page</h1>} />
@@ -1521,7 +1521,7 @@ test("the shell's Library link lands on a library, not on a permanent loading st
       <MemoryRouter initialEntries={["/?type=album"]}>
         <Link to="/">Library</Link>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<LibraryPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -1827,6 +1827,31 @@ test("the library filters by where things are and by what is lent (Sprint 111)",
     expect(last).not.toMatch(/location=/);
     expect(last).not.toMatch(/lent=/);
   });
+});
+
+test("Home's Tidy up opens the library on what has no score yet (Sprint 131)", async () => {
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    const url = String(request);
+    if (url.startsWith("/api/item-types")) return new Response("[]");
+    return new Response(JSON.stringify(populated), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage("/?status=read&unscored=true");
+  await screen.findByText("Rayuela");
+  const listCalls = () =>
+    fetchMock.mock.calls
+      .map(([request]) => String(request))
+      .filter((url) => url.startsWith("/api/entries?"));
+  await waitFor(() =>
+    expect(listCalls().some((url) => /unscored=true/.test(url))).toBe(true),
+  );
+  const chips = screen.getByRole("region", { name: "Active filters" });
+  await userEvent
+    .setup()
+    .click(within(chips).getByRole("button", { name: /No score yet/ }));
+  await waitFor(() =>
+    expect(listCalls().at(-1) ?? "").not.toMatch(/unscored=/),
+  );
 });
 
 test("finishing a scored entry from its card asks whether the score holds (Sprint 115)", async () => {

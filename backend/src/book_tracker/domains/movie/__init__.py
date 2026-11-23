@@ -21,6 +21,10 @@ storing (DEC-057).
 import re
 
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import (
+    RecommendationSpec,
+    resolve_by_identity_or_search,
+)
 from book_tracker.domain.spec import (
     UNSORTED,
     Domain,
@@ -28,6 +32,7 @@ from book_tracker.domain.spec import (
     FieldSpec,
     FormatSpec,
     ListColumnSpec,
+    RankingSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -178,6 +183,22 @@ def recognize_movie_url(value: str) -> UrlMatch | None:
     return None
 
 
+# *More like this* (Sprint 134, DEC-183 point 6): TMDB chooses from its
+# `/movie/{id}/recommendations`, naming each film by TMDB's id alone, which Wikidata
+# holds as an exact claim; an IMDb id, when a candidate carries one, is tried first,
+# and a title search is the last resort. *Want* puts it on the list to watch.
+# A hosted model (Sprint 135) comes second: its picks carry no id, so they reach
+# the title search, and only the films found there are shown.
+MOVIE_RECOMMENDATION = RecommendationSpec(
+    sources=("tmdb", "model", "library"),
+    resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
+    source_options={
+        "tmdb": {"media": "movie"},
+        "model": {"kind": "films", "creator": "director"},
+    },
+)
+
+
 DOMAIN = Domain(
     item_type="movie",
     label="Movie",
@@ -211,4 +232,6 @@ DOMAIN = Domain(
             "name",
         ),
     ),
+    ranking=RankingSpec(affinity_fields=("genres",), text_fields=("genres", "description")),
+    recommendation=MOVIE_RECOMMENDATION,
 )

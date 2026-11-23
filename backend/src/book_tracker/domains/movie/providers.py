@@ -315,6 +315,9 @@ class WikidataMovieProvider:
 
     name = "wikidata"
     item_type = "movie"
+    #: What `fetch_by_identifier` answers: the domain's enrichment keys, and TMDB's
+    #: id, which a recommendation from TMDB carries (Sprint 134).
+    identifier_kinds = frozenset({*ENRICHMENT_KEYS, "tmdb"})
 
     def __init__(
         self,
@@ -579,12 +582,13 @@ class WikidataMovieProvider:
         ones: a Letterboxd export names a film by a short `boxd.it` URI and an IMDb
         export by its `tt` id, and neither carries the other's (DEC-113). Wikidata holds
         both as exact claims — `P6127` and `P345` — so this is one film reachable two
-        ways rather than two lookups.
+        ways rather than two lookups. A TMDB recommendation names a film by TMDB's id
+        alone (Sprint 134), which Wikidata holds as `P4947`.
 
         `letterboxd` additionally arrives in two shapes: a bare slug for a film added
         through search, and the short URI the export stores. Both name one film.
         """
-        if kind not in ENRICHMENT_KEYS:
+        if kind not in self.identifier_kinds:
             raise ProviderPayloadError(
                 f"Wikidata's movie adapter cannot look a film up by {kind!r}",
                 code="unsupported_identity_kind",

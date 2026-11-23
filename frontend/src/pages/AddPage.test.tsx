@@ -15,7 +15,7 @@ import { AddPage } from "./AddPage";
  * Searching, the results list, the provider-health notice, the near-match
  * confirmation and the confirm form's own behaviour all moved. They are not gone:
  * the flow from `/` is tested against the functionality inventory in
- * `HomePage.test.tsx`, and the form itself in `features/add/AddForm.test.tsx`.
+ * `LibraryPage.test.tsx`, and the form itself in `features/add/AddForm.test.tsx`.
  * What is left here is what this route is now for.
  */
 
@@ -29,7 +29,7 @@ function renderPage(initialEntry = "/add") {
         <Routes>
           <Route path="/add" element={<AddPage />} />
           <Route path="/books/:id" element={<h1>Book detail</h1>} />
-          <Route path="/" element={<h1>Library page</h1>} />
+          <Route path="/library" element={<h1>Library page</h1>} />
           <Route path="/import" element={<ImportProbe />} />
         </Routes>
         <Toaster />

@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import RecommendationSpec, resolve_by_identity_or_search
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
@@ -19,6 +20,7 @@ from book_tracker.domain.spec import (
     FormatSpec,
     ListColumnSpec,
     ProgressSpec,
+    RankingSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -120,6 +122,16 @@ def recognize_book_input(value: str) -> UrlMatch | None:
     return None
 
 
+# A hosted model suggests books (Sprint 135, DEC-187). Its picks carry no ISBN, so
+# each is searched by title and author (a title alone is many books) and only the
+# ones found are shown. *Want* puts it on the list to read.
+BOOK_RECOMMENDATION = RecommendationSpec(
+    sources=("model", "library"),
+    resolve=resolve_by_identity_or_search(with_creator=True),
+    source_options={"model": {"kind": "books", "creator": "author"}},
+)
+
+
 DOMAIN = Domain(
     item_type="book",
     label="Book",
@@ -163,4 +175,11 @@ DOMAIN = Domain(
             "escritora",
         ),
     ),
+    ranking=RankingSpec(
+        series_field="series",
+        series_in_title=True,
+        affinity_fields=("subjects",),
+        text_fields=("subjects", "description"),
+    ),
+    recommendation=BOOK_RECOMMENDATION,
 )

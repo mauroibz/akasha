@@ -107,6 +107,15 @@ Environment variables:
 | `AKASHA_LOGIN_WINDOW_SECONDS` | no | `300` | in-process failed-login window; resets on process restart |
 | `AKASHA_ADMIN_USERNAME` | no | empty | paired with `AKASHA_ADMIN_PASSWORD` to bootstrap the first admin at startup |
 | `AKASHA_ADMIN_PASSWORD` | no | empty | optional first-admin secret; plaintext environment/file exposure is the operator's trade-off |
+| `AKASHA_RECOMMEND_DAILY_LIMITS` | no | `{}` | rounds per recommendation source per UTC day, as JSON (`{"tmdb": 200}`), over the built-in `{"model": 50}`; a source absent from both is counted and never stopped (Sprints 133, 135) |
+| `AKASHA_RECS_MODEL_PROVIDER` | no | `anthropic` | the hosted model's kind of API: `anthropic` (Claude Messages API), `gemini` (`generateContent`), `openai` (any OpenAI-compatible `chat/completions`); blank is the default (Sprint 135, DEC-187) |
+| `AKASHA_RECS_MODEL` | no | per provider | `claude-haiku-5-5`, `gemini-2.5-flash`, `gpt-5-mini` |
+| `AKASHA_RECS_MODEL_KEY` | no | empty | the model's API key; falls back to `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OPENAI_API_KEY` for the chosen provider. None: the `model` source is `not_configured` |
+| `AKASHA_RECS_MODEL_URL` | no | `https://api.openai.com/v1` | base URL for `openai`; ignored by the other two |
+| `AKASHA_RECS_EMBEDDINGS_PROVIDER` | no | `gemini` | the hosted embedding endpoint: `gemini` (`batchEmbedContents`, 768 dimensions) or `openai` (any OpenAI-compatible `/embeddings`, Voyage included); blank is the default. The Claude API has none, so `anthropic` is refused (Sprint 136, DEC-187 point 3) |
+| `AKASHA_RECS_EMBEDDINGS_MODEL` | no | per provider | `gemini-embedding-001`, `text-embedding-3-small` |
+| `AKASHA_RECS_EMBEDDINGS_KEY` | no | empty | the endpoint's key; falls back to `GEMINI_API_KEY` or `OPENAI_API_KEY` for the chosen provider. None: embeddings are off, the `library` source is `not_configured`, and the pile and rounds read no vector |
+| `AKASHA_RECS_EMBEDDINGS_URL` | no | `https://api.openai.com/v1` | base URL for `openai` (`https://api.voyageai.com/v1`); ignored by `gemini`. Embedding requests are bounded by `AKASHA_PROVIDER_DAILY_LIMITS["embeddings"]`, default 1,000 a day |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -273,6 +282,29 @@ The runner is one sequential loop: it reclaims expired leases only on an idle pa
   increments it, and a day with no rows is a day nothing was counted
 - configuration, not code: `AKASHA_PROVIDER_DAILY_LIMITS` names the metered
   providers and their ceilings; a provider absent from the mapping is unmetered
+
+`suggestion_rounds` (migration 0037, Sprint 133)
+
+- `id` integer primary key; `user_id` foreign key to users, cascade delete
+- `item_type`, `source` (a name in the source registry), `status` (`queued`, `selecting`,
+  `enriching`, `done`, `failed`, `over_budget`, `not_configured`), nullable `error`
+- nullable `seed_entry_id` foreign key to entries, `SET NULL` on delete: no seed means the
+  person's taste profile, and a deleted seed leaves its round unseeded
+- `created_at`, nullable `finished_at`; indexed on `(user_id, seed_entry_id, source, created_at)`
+
+`suggestions` (migration 0037, Sprint 133)
+
+- `id` integer primary key; `round_id` foreign key to `suggestion_rounds` and `user_id` to
+  users, both cascade delete; `item_type`
+- the source's candidate: `title`, nullable `year` and `creator`, `external_ids_json`
+  (kind to value), `reason` (one sentence), nullable `source_score`, `display_json` (what the
+  source gave for showing it, stored and never interpreted)
+- `enrichment` (`pending`, `enriched`, `unresolved`) and nullable `item_id`, foreign key to
+  items, `SET NULL` on delete: the shared item the domain resolved it to. A suggestion whose
+  item was pruned reads as `pending` again
+- nullable `answer` (`want`, `not_for_me`, `seen`) and `answered_at`; `created_at`
+- indexed on `(user_id, item_type, created_at)`, `round_id` and `item_id`. None of the
+  vocabularies is a schema constraint
 
 `attachments`
 
@@ -625,6 +657,8 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
 | `plural_label` | The label counted, for copy that counts: "142 Books", "3 Anime". Declared because an added "s" is wrong for anime and series (Sprint 102). |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
+| `ranking` | A `RankingSpec` (Sprint 132): `series_field`, a declared `one` text field naming a work's series, its place read from "Name #2", "Name, #2" or "Name (2)"; `series_in_title`, whether a trailing "(Series, #N)" in the title names it (a Goodreads title); `affinity_fields`, declared groupable fields whose values are a taste (subjects, genres); `text_fields` (Sprint 136), declared text fields that say what a work is (subjects or genres, then a description), carried in that order by the item's embedding text after its title, creator and first year. The default declares nothing, and the pile is then ranked by creators, waiting and what was set aside, and an item embedded from its title, creator and year. |
+| `recommendation` | A `RecommendationSpec` (Sprint 133) or `None`, the default: `sources`, names in the recommendation source registry in the order a screen offers them (the first configured one answers a round that names none); `resolve`, `async (Candidate, providers) -> SearchCandidate \| None`, finding a candidate in the domain's own providers (`resolve_by_identity_or_search(kinds)` is the common one); `enrich_top`, how many of a round are resolved straight away (3); `source_options`, what the domain tells each source about itself; `want_status`, where *Want* puts a suggestion (default the first `planned` status; albums declare `wishlist`). A domain declaring one must have a `planned` status or a choosable `want_status`. See section 6.7. |
 | `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
 Plus, outside the record itself:
@@ -675,7 +709,7 @@ Anything else a domain has to edit outside its own package is a coupling, and a 
 
 #### How the core serves a domain
 
-- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order.
+- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order. Since Sprint 134 each domain also carries `recommendation`: `null` where it declares no `RecommendationSpec`, else `{sources: [{name, label, configured, hint, resolved_only, from_library, about}], attribution: {source: line}}` from the source registry, which is how *More like this* knows whether to draw itself and what to say when its source is not configured.
 - `GET /api/importers` publishes every registered importer and its input descriptor; the import
   screen renders its tabs and input control from that declaration.
 - **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
@@ -687,6 +721,142 @@ Anything else a domain has to edit outside its own package is a coupling, and a 
 `backend/tests/test_domain_conformance.py` is parametrized over `DOMAINS`: a domain is held to the contract **by existing**, and nothing in that file is extended when one is added. Its checks split in two, and the split is load-bearing. `REGISTRY_CHECKS` are what a domain satisfies on its own, and an unregistered fixture domain satisfies all of them — that is what makes this a contract rather than a description of books and albums. `CORE_CHECKS` are whether the core can host the domain: whether the published unions carry its values, and whether the database will accept them.
 
 The suite is required to be able to fail. Malformed domains declared inside the file — a status with no label, a default outside the vocabulary, a `rows` field with no columns, a recognizer that raises — must each be rejected by the check that owns them.
+
+### 6.7 Recommendations: select, then enrich
+
+Sprint 133 (DEC-183 points 4-7, DEC-188). A round is one person's request to one source,
+seeded by one entry (*More like this*) or by their taste profile:
+
+```text
+SEED -> SELECT (the source, one request) -> STORE -> ENRICH (the domain's resolve, top few) -> ANSWER
+```
+
+- **Sources** implement `RecommendationSource` (`domain/recommendations.py`): `name` and
+  `async select(seed, profile, limit) -> [Candidate]`, called once per round with `limit` 12.
+  A `Seed` carries the entry's title, year, creators, metadata and `external_ids` (its
+  identifiers and provider sources, kind to value); a `TasteProfile` carries, for one library,
+  the top scores, recent finishes, suggestions answered *not for me* and the pile, as titles,
+  creators, years and scores only. A `Candidate` is `title`, `year`, `creator`,
+  `external_ids`, `reason`, `source_score`, `display`, and `item_id` when the source already
+  knows the cached item (stored `enriched`, no provider asked). A source raises `SourceError` for a
+  failure the round should record; it never calls a metadata provider per candidate.
+- **The registry** (`app/recommendations.py`) is built at start from `SOURCE_FACTORIES`, each
+  reading configuration and returning the source or a `NotConfigured(name, hint, retention,
+  label, attribution)`. Which provider backs a source is this configuration, never a domain's.
+  The test-only `fake` source (`backend/tests/recommendation_fake.py`, recorded in
+  `tests/fixtures/recommendations/`) proves the pipeline. A source may carry `label`,
+  `retention` (how long its rows may be kept) and `attribution` (the line its terms ask for);
+  `select` may answer a `Selection(candidates, seed_ids)` when it looked up the seed's own ids,
+  which the round keeps on the seed's item (insert-or-ignore). A domain's `RecommendationSpec`
+  also carries `source_options` (handed to the source on `Seed.options`) and `want_status`
+  (where *Want* puts a suggestion; default the first `planned` status).
+- **TMDB** (Sprint 134, DEC-183 point 6, DEC-189; `infrastructure/tmdb_recommendations.py`,
+  `TMDB_READ_TOKEN`) is the first source. Films declare `source_options={"tmdb": {"media":
+  "movie"}}` and series `"tv"`. A round reads the seed's `tmdb` identifier, or asks
+  `/find/{imdb_id}?external_source=imdb_id` once and keeps the id, then
+  `/{media}/{id}/recommendations?page=1`: up to twelve candidates named by TMDB's id alone
+  (the response carries no IMDb id), reason "TMDB: often watched together", `display` holding
+  the overview, original title and a `themoviedb.org` link, never a poster. 404, 401/403, 429
+  and transport failures are `SourceError`s the round records. Both domains resolve with
+  `resolve_by_identity_or_search(("imdb", "tmdb"))`; the Wikidata adapters answer
+  `fetch_by_identifier("tmdb", …)` through `P4947`/`P4983`, and a provider declaring
+  `identifier_kinds` is not asked (nor charged) for a kind outside them. Its rows carry
+  TMDB's attribution wherever shown and are deleted after 182 days.
+- **A hosted model** (Sprint 135, DEC-183 point 7, DEC-187, DEC-190;
+  `infrastructure/model_clients.py`, `infrastructure/model_recommendations.py`) is the `model`
+  source, declared by every domain (after `tmdb` for films and series). A `ModelClient`
+  (`provider`, `model`, `async complete(system, prompt) -> str`) has three adapters over the
+  shared provider client, 60 s per request, no SDK: the Claude Messages API (`POST
+  /v1/messages`, `x-api-key`, `anthropic-version: 2026-10-21`, `output_config` with effort
+  `low` and a JSON schema), Gemini (`POST /v1beta/models/{model}:generateContent`,
+  `x-goog-api-key`, `responseMimeType: application/json`) and OpenAI-compatible (`POST
+  {url}/chat/completions`, Bearer, `response_format: json_object`). The key is a header only;
+  every failure is a `SourceError` (`unauthorized`, `not_found`, `busy`, `refused`,
+  `unavailable`, `malformed`) whose message never carries the key or the provider's body. The
+  prompt names the library and its creator word from `source_options["model"]` (`kind`,
+  `creator`), the seed (title, creator, the work's first year: `metadata.original_year` before
+  the item's year), and up to twelve lines each of top scores, recent finishes, *not for me*
+  and the pile, as `- Title — Creator, Year (N/10)`; nothing else of an entry or item is read.
+  The reply must be `{"suggestions": [{title, creator, year, reason}]}` (or the bare list), at
+  most eight; an item without a title is skipped, `0` and `""` read as unknown, and a reply
+  that is not that shape fails the round as malformed. The source is `resolved_only`: the
+  round resolves every candidate, not the first `enrich_top`, and a screen shows only the
+  `enriched` ones (`resolved_only` and `about` — provider, model, what is sent — are published
+  on `/api/item-types`). Books and albums resolve by title and creator
+  (`resolve_by_identity_or_search(with_creator=True)`), the rest by title alone. A record is
+  the same work when the normalized title matches, a creator both give agrees, and a year
+  both give is within one of the record's year or original year, or within three when the
+  creator agreed. A provider that failed, with no match elsewhere, leaves the pick `pending`
+  (`unresolved` means every provider answered and none knew it). No retention, no
+  attribution. Fixtures are written in each API's documented shape and marked unrecorded in
+  `model_fixtures.json` until `scripts/record_model_fixtures.py` runs with a key.
+- **Embeddings** (Sprint 136, DEC-183 point 7, DEC-187 point 3, DEC-191;
+  `infrastructure/embedding_clients.py`, `application/embeddings.py`, migration 0038). An
+  `EmbeddingClient` (`provider`, `model`, `identity`, `async embed(texts) -> [[float]]`) has two
+  adapters over the shared provider client, 30 s per request, no SDK: Gemini (`POST
+  /v1beta/models/{model}:batchEmbedContents`, `x-goog-api-key`, one `EmbedContentRequest` per
+  text with `taskType: SEMANTIC_SIMILARITY` and `outputDimensionality: 768`) and
+  OpenAI-compatible (`POST {url}/embeddings`, Bearer, `{model, input}` only, rows put back in
+  order by `index`). Failures are `SourceError`s naming `AKASHA_RECS_EMBEDDINGS_KEY`/`_MODEL`,
+  never the key. An item's text is its title, `By` its creators (the metadata's list, else the
+  primary creator), its first year (`original_year` before `year`), then each of the domain's
+  `RankingSpec.text_fields` as `Label: value`, at most 2,000 characters; nothing about a person.
+  `item_embeddings(item_id PK → items ON DELETE CASCADE, model, dims, vector BLOB, text_hash,
+  created_at)` holds one vector per item, little-endian float32 scaled to unit length (cosine is
+  a dot product, `math.sumprod`, no numpy), `model` the client's identity
+  (`gemini:gemini-embedding-001@768`, `openai:<model>@<url>`): vectors of another identity are
+  never read. The `embed_items` job (no owner, payload `{}`) embeds items someone holds or was
+  suggested whose vector is missing, of another model, or of another text hash: 32 texts a
+  request, eight requests a job, then a follow-up; each request is counted under `embeddings`
+  in `provider_usage` and stops at the day's limit (the job succeeds, saying so). It is queued
+  (at most one waiting) after an enrichment filled something, after a suggestion's item was
+  cached, by a one-minute sweep when any held item has no current vector (every add path), and
+  by the hourly housekeeping pass when any text's hash changed (an edit). Without a key nothing
+  is queued and nothing is read.
+- **The library** (Sprint 136, `application/library_source.py`) is the `library` source,
+  "From your library", declared last by every domain. With embeddings configured it answers a
+  seeded round with the person's own entries in that library waiting in a `planned` status or
+  the spec's `want_status`, other than the seed, ordered by their vectors' similarity to the
+  seed's (about 120 ms for 10,000 at 768 dimensions; under 300 ms is the budget its test
+  holds). A seed without a current vector is embedded for its round (one request); an entry
+  without one is left out until the job reaches it. Its candidates carry `item_id`, reason
+  "Waiting since Mon YYYY" and the similarity as `source_score`. It declares `from_library`:
+  storing keeps the person's own entries (it still drops *not for me*), `/api/item-types`
+  publishes it, and the sheet opens each entry instead of offering *Want* or *Seen it*. Home's
+  module never shows its rows (they are in the library). No retention, no attribution; `about`
+  names the provider, model and what is sent.
+- **Likeness.** With embeddings configured, a seeded round is read with its found picks in
+  order of their vectors' similarity to the seed's, each taking a place a found pick held, so a
+  pending one keeps the source's place. Stored vectors only.
+- **The `recommend` job** (payload `{round_id}`, owner the person) checks the source's daily
+  round budget (`provider_usage` under `recommend:<source>`, limits from
+  `AKASHA_RECOMMEND_DAILY_LIMITS`), asks the source once, stores the candidates, then resolves
+  the first `enrich_top` through the domain's `resolve`. Storing drops what the person's
+  library in that domain already holds (by identifier or provider source, or by normalized
+  title with a creator or a year within one that agrees), what they answered *not for me*, and
+  a second mention in the round; a work an earlier round already resolved is stored resolved
+  to the same item, at no request. Resolving hands `resolve` only the providers serving the
+  domain, each wrapped so that a request over its `AKASHA_PROVIDER_DAILY_LIMITS` budget raises
+  `ProviderBudgetSpent` before it is made; the rest of the round then waits `pending` and the
+  round's `error` says why. A resolved record is cached as a shared item with no entry (its
+  cover installed as an add would), and the suggestion points at it; `None` stores it
+  `unresolved`, never shown. A source without configuration, over its budget, or failing ends
+  the round `not_configured`, `over_budget` or `failed` with the reason in `error`; the job
+  itself succeeds, and nothing retries a round behind the person's back.
+- **The `enrich_suggestion` job** (payload `{suggestion_id}`) resolves one pending suggestion
+  someone opened, under the same budgets.
+- **Progress** is the job's progress on the event stream: `{round_id, status, stored,
+  dropped, enriched, error}` for a round, `{suggestion_id, enrichment}` for one suggestion.
+- **Retention.** The job runner's idle pass runs its housekeeping sweeps at most hourly
+  (`JobRunner(housekeeping=…)`); `prune_expired_suggestions` deletes the rounds of every source
+  with a `retention` older than it, configured or not, and their suggestions with them.
+  `JobRunner(sweeps=[(sweep, every)])` runs sweeps with a cadence of their own on the same idle
+  pass (Sprint 136: the one-minute embedding check).
+- **Art.** A suggestion carries `cover_url`, Akasha's own cover route for the item it resolved
+  to. Under `AKASHA_AUTH=on` the cover route admits an item one of the requester's
+  suggestions points at, as well as one they hold an entry on.
+- **Reading never calls a provider or a source.** Only the jobs do, and a `library` round for
+  a seed not yet embedded.
 
 ## 7. HTTP API contract
 
@@ -730,6 +900,102 @@ The product-spec route list is authoritative, with these refinements:
 - Loans and locations (Sprint 110): `GET`/`POST /api/entries/{id}/loans`, `PATCH`/`DELETE
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
+- `GET /api/home` (Sprints 130–131, DEC-183–185) is Home's one read, from stored data only — no
+  provider is consulted, and a test fails if one is. Eleven sections:
+  `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, an entry under way with `day`, 1 on
+  its `date_started` and `null` without one; `entries`, every entry but `unsorted`; `pile`,
+  entries in a status their domain declares `planned`; `goals`, at most one `{item_type, target,
+  count}` for the current year — `active` and that goal are of one library: the first goal in
+  registry order whose library has something under way names that library's entry touched last;
+  without one, the entry touched last beside its own library's goal; with nothing under way, the
+  lead goal); `now`, `/now`'s entries; `next`, the first five of `/api/pile` across every library
+  (Sprint 132), each `{entry, score, reasons}`; `year`, twelve `{month, count,
+  counts, covers}` for the current year by `date_finished` (at most 24 `covers` a month, each
+  `{entry_id, item_id, item_type, title, cover_url, score}`) and each goal's `{item_type, period,
+  count, target, done}`; `domains`, one tile per registered domain holding a non-`unsorted` entry,
+  in registry order: `count`, `status_counts` per status in declared order, `scores` (ten bins),
+  `mean_score`, up to three best-scored `covers` and `without_cover`; `lately`, up to ten
+  `{kind: finished|score|added, at, entry, score, previous, count}` newest first — finishes and
+  score changes are `/diary/timeline`'s, additions are one row per day of `date_added` (its
+  newest entry, `count` in all), the Inbox's `unsorted` entries left out; `tidy`, `{duplicates,
+  without_cover, unscored, unscored_by_type}` — the duplicate pairs `/duplicates` lists, entries
+  without a cover (the covers deck's filter), and entries in a declared `finished` status with
+  no score, in all and per domain in registry order; `question`, `{kind: revisit|gap, entry,
+  scored_at}` — the first card `/revisit` would deal, else the first entry `/gaps` lists, else
+  `null`; `shelves`, up to eight `{id, name, slug, entry_count}` holding something, the one whose
+  members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
+  the five open loans out longest, each `{id, person, lent_on, entry}`; `suggested` (Sprint 134,
+  DEC-189), up to eight unanswered suggestions already found in a provider (`enriched`), newest
+  first, each work once, in the suggestion shape below. A module the person hid
+  is not read: `year`, `lately`, `tidy`, `question`, `shelves`, `lent` and `suggested` are `null`, `next` and
+  `domains` empty (`now` is still read, for the greeting). `?tz=` (Sprint 132) is the person's
+  IANA zone, which the client sends: today and the day an addition counts under in `lately` are
+  that zone's; an absent or unknown zone falls back to the server's `TZ`, then UTC. Answers in
+  under 150 ms on a 10,000-entry library (about 119 ms median in its test after Sprint 132).
+- `GET /api/pile?type=&limit=` (Sprint 132, DEC-186; `limit` 1–100, default 20) is the pile
+  ranked locally, from stored data only: entries in a status their domain declares `planned`,
+  most likely wanted next first, each `{entry, score, reasons: [{signal, text}]}`. `score` is
+  the ranking's points, comparable within one answer. `reasons` are only the signals that fired,
+  the one moving the score most first; each `text` is a sentence citing the data it rests on.
+  Signals (`application/ranking.py`, weights as constants there): `series`, the next waiting
+  entry of a series the person has finished or is under way in, after the last one by place
+  ("Next in Mistborn; you gave book 1 a 9"), not after a series scored below 6 on average or
+  past a dropped one, at half weight after one still under way; `creator`, a creator's mean
+  above the person's own in that library over two or more rated, shrunk while the count is
+  small ("You rate Le Guin 8.4 across 5"); `affinity`, a subject or genre the person has lately
+  scored above their own recency-weighted average, over three or more, scores halving in weight
+  every two years down to a quarter, never a value on more than half the scored entries ("You
+  rate Fantasy 9.0 across 3 books"); `waiting`, 0.15 a year on the pile up to five ("Waiting
+  since Mar 2023"); `goal`, a library short of its goal's pace by one or more, only when every
+  library is ranked together ("Toward 24 books this year; 14 so far"); `set_aside`, an entry
+  with a `date_started` back on the pile, pushed down by up to two points fading over 90 days
+  from its last change ("Started 1 Nov 2026, then set aside"); `similarity` (Sprint 136, only
+  with embeddings configured), up to two points for the waiting entries closest to the mean
+  vector of up to ten entries scored above the person's mean in that library, measured from the
+  pile's median toward its closest (nothing below a third of the way, at least three embedded,
+  fifty at most), naming the scored work it is nearest ("Close to what you scored 9:
+  Rayuela"). Without a configured endpoint no vector is read and the order is Sprint 132's. Ties break on entry id. Which
+  fields carry a series or a taste is the domain's `RankingSpec`. Under 100 ms for a 2,000-entry
+  pile (about 26 ms in its test).
+- Suggestions (Sprint 133, section 6.7), all scoped to the requester (another person's round,
+  suggestion or seed entry is a 404):
+  - `POST /api/entries/{id}/more-like-this?source=&refresh=` answers 202 with the round
+    (`{id, item_type, seed_entry_id, source, status, error, created_at, finished_at,
+    suggestions}`). It shows the newest round for that seed and source under a day old again
+    unless `refresh=true` (a `failed`, `over_budget` or `not_configured` round is never shown
+    again in place of asking). `source` defaults to the domain's first configured one; one the
+    domain does not declare is a 422 `unknown_recommendation_source`, and a domain declaring no
+    `RecommendationSpec` is a 409 `no_recommendation_source`. A declared source missing its
+    configuration stores and returns a round `not_configured` whose `error` says how to set it
+    up; nothing is queued and nothing fails.
+  - `GET /api/suggestion-rounds/{id}`: the round with every suggestion it stored, in the
+    source's order, whatever their state; with embeddings configured its found picks are in
+    order of likeness to the seed (section 6.7).
+  - `GET /api/suggestions?seed_entry_id=&item_type=&limit=` (`limit` 1–100, default 20): the
+    unanswered suggestions worth showing, newest round first: not `unresolved`, not since in
+    the library, each work once. A suggestion is `{id, round_id, item_type, source, title,
+    year, creator, external_ids, reason: {signal: <source>, text} | null, source_score,
+    display, enrichment, item_id, entry_id, cover_url, seed: {entry_id, title} | null, answer,
+    answered_at, created_at}` (`cover_url` and `seed` since Sprint 134).
+  - `POST /api/suggestions/{id}/enrich`: 202 `{suggestion, job_id}` with an
+    `enrich_suggestion` job queued, or 200 with `job_id: null` when it is not `pending`.
+  - `PATCH /api/suggestions/{id}` `{answer: want | not_for_me | seen | null}`. `want` adds the
+    resolved item as an entry in the spec's `want_status`, else the domain's first `planned` status (409
+    `suggestion_not_resolved` until it is `enriched`; wanting twice keeps the one entry).
+    `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
+    `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays. *Want* on
+    an item already held (a `library` pick) records the answer and adds nothing.
+- `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
+  S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
+  `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
+  `libraries`, `tidy`, `question`, `shelves`, `lent`, `suggested` (`application/home_layout.py`). A read is
+  lenient — an unknown key, a malformed row or unreadable JSON is dropped, an unknown size falls
+  back to the module's default, and every module not named is appended with its default — and
+  carries `defaults`, what *Reset* restores. A write is strict: an unknown module, a size other
+  than S/M/L, or a module named twice is a 422 and nothing is stored. A downgrade past 0036
+  drops the stored layouts.
+- `GET /api/entries` takes `unscored=true` (Sprint 131): only entries with no score; part of
+  the cursor's filter key, and of the totals and facets.
 - `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
   most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
   month with per-domain counts (Sprint 098).
@@ -758,9 +1024,9 @@ The product-spec route list is authoritative, with these refinements:
   `date_finished` is refused with 422 `goal_not_supported`. `GET /api/goals/{item_type}/progress?year=`
   returns twelve monthly counts of entries finished that year, the total, and the year's target
   (a monthly count times twelve), so months count together and no field says behind.
-  `GET /api/goals/{item_type}/picks?limit=` returns entries in a status the domain declares
-  `planned`, each with a reason: `creator` (the primary creator averages 8 or more over two or
-  more rated entries in that domain, best first) or `waiting` (oldest added first), alternating.
+  `GET /api/goals/{item_type}/picks?limit=` returns that library's ranked pile, the same
+  `{entry, score, reasons}` as `/api/pile?type=` (Sprint 132; until then a favourite creator's
+  and the longest waiting, alternating).
 - `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
   `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
   own URL query string, so the server never interprets it (Sprint 100).

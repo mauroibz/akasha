@@ -25,7 +25,7 @@ function renderShell(routes: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("AppShell", () => {
-  it("renders Library, Add, Import, and Shelves navigation links", () => {
+  it("renders Home, Library, Add, Import, and Shelves navigation links", () => {
     renderShell(
       <Routes>
         <Route path="/" element={<div>Library page</div>} />
@@ -36,7 +36,7 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Library", "Add", "Import", "Shelves"]) {
+    for (const label of ["Home", "Library", "Add", "Import", "Shelves"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
       });
@@ -51,15 +51,32 @@ describe("AppShell", () => {
         <Route path="/add" element={<div>Add page</div>} />
       </Routes>,
     );
-    const libraryLinks = screen.getAllByRole("link", { name: /library/i });
-    const activeLibrary = libraryLinks.find((l) =>
-      l.hasAttribute("aria-current"),
-    );
-    expect(activeLibrary).toBeDefined();
+    // `/` is Home since Sprint 130; the library is `/library` and not current here.
+    const homeLinks = screen.getAllByRole("link", { name: /^home$/i });
+    expect(homeLinks.find((l) => l.hasAttribute("aria-current"))).toBeDefined();
+    for (const link of screen.getAllByRole("link", { name: /^library$/i })) {
+      expect(link.hasAttribute("aria-current")).toBe(false);
+    }
     const addLinks = screen.getAllByRole("link", { name: /^add$/i });
     for (const link of addLinks) {
       expect(link.hasAttribute("aria-current")).toBe(false);
     }
+  });
+
+  it("keeps the phone's bar to five, Home first and Import off it", () => {
+    renderShell(
+      <Routes>
+        <Route path="/" element={<div>Home page</div>} />
+      </Routes>,
+    );
+    const [, phone] = screen.getAllByRole("navigation", {
+      name: "Primary",
+      hidden: true,
+    });
+    const labels = Array.from(phone.querySelectorAll("a")).map((link) =>
+      link.getAttribute("aria-label"),
+    );
+    expect(labels).toEqual(["Home", "Library", "Add", "Shelves", "Insights"]);
   });
 
   it("shows a useful 404 for unknown routes", () => {
@@ -142,7 +159,7 @@ describe("AppShell", () => {
             onSignedOut={vi.fn()}
           >
             <Routes>
-              <Route path="/" element={<h1>Own library</h1>} />
+              <Route path="/library" element={<h1>Own library</h1>} />
               <Route
                 path="/books/7"
                 element={<div role="dialog">Edit entry</div>}

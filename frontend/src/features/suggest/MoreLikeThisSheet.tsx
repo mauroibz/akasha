@@ -1,0 +1,643 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+
+import { queryKeys } from "@/api/keys";
+import type { ItemType } from "@/api/library";
+import {
+  FINISHED_ROUNDS,
+  answerSuggestion,
+  enrichSuggestion,
+  getSuggestionRound,
+  moreLikeThis,
+  type Suggestion,
+  type SuggestionAnswer,
+  type SuggestionRound,
+} from "@/api/suggestions";
+import { CoverImage } from "@/components/CoverImage";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useJobEvent } from "@/features/activity/jobEvents";
+import { cn } from "@/lib/utils";
+
+import { firstSource, recommendationFor } from "./recommendation";
+
+export interface Seed {
+  entryId: number;
+  title: string;
+  type: string;
+  /** The source to show first (Home opens a pick in the round that chose it). */
+  source?: string;
+}
+
+const answered: Record<SuggestionAnswer, string> = {
+  want: "On your list",
+  not_for_me: "Not for you",
+  seen: "Seen it",
+};
+
+/** What a round is doing, in words, while it is not done. */
+function progressLine(
+  round: SuggestionRound,
+  label: string,
+  resolvedOnly: boolean,
+  fromLibrary: boolean,
+): string | null {
+  if (FINISHED_ROUNDS.has(round.status)) return null;
+  // The library's own picks need no lookup: reading the library is all of it.
+  if (fromLibrary) return "Reading your library…";
+  if (round.status !== "enriching") return `Asking ${label}…`;
+  return resolvedOnly
+    ? `Looking up what ${label} named in your providers…`
+    : "Finding the first few in your providers…";
+}
+
+/** The line under a finished round: how many, and how many were found. */
+function doneLine(
+  label: string,
+  stored: number,
+  shown: number,
+  found: number,
+  resolvedOnly: boolean,
+  fromLibrary: boolean,
+): string {
+  if (fromLibrary)
+    return shown
+      ? `${shown} on your list, nearest first`
+      : "Nothing waiting on your list is close to this yet.";
+  if (resolvedOnly) {
+    if (!stored) return `${label} had nothing new to suggest.`;
+    if (!found)
+      return `None of the ${stored} ${label} named could be found in your providers, so none is shown.`;
+    return `${stored} named by ${label} · ${found} found in your providers`;
+  }
+  return shown
+    ? `${shown} picked by ${label} in one request · ${found} found so far`
+    : `${label} had nothing new to suggest.`;
+}
+
+/**
+ * The art a suggestion has: the cover its domain's providers found, served by
+ * Akasha, or its title set as type while it has none. Never an image from the
+ * source itself (DEC-189).
+ */
+function Art({ suggestion }: { suggestion: Suggestion }) {
+  if (suggestion.cover_url)
+    return (
+      <CoverImage
+        src={suggestion.cover_url}
+        alt=""
+        className="aspect-[2/3] w-full rounded object-cover"
+      />
+    );
+  return (
+    <div
+      aria-hidden="true"
+      className="flex aspect-[2/3] w-full flex-col justify-end overflow-hidden rounded bg-surface-raised p-1 font-display text-[10px] leading-tight text-foreground"
+    >
+      <span className="line-clamp-4 hyphens-auto break-words">
+        {suggestion.title}
+      </span>
+      {suggestion.year ? (
+        <span className="text-[9px] text-muted-foreground">
+          {suggestion.year}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * *More like this* (Sprint 134, the mockup's sheet): one round of one source for
+ * one entry. Pressing the button asks once (or shows the round from the last day);
+ * the round's job reports on the event stream and the sheet re-reads the stored
+ * round each time, so picks and their enrichment arrive while it is open. The
+ * first few are looked up straight away; opening a pending one looks it up. Each
+ * can be wanted (onto the list), turned down, or marked seen; *Refresh* asks again.
+ *
+ * The segment chooses the source (Sprint 135): each is asked with `?source=` and
+ * keeps its own round while the sheet is open, so switching back shows it again
+ * without a request. A source whose picks may be inventions (a hosted model's)
+ * shows only those its library's providers found.
+ */
+export function MoreLikeThisSheet({
+  seed,
+  open,
+  onOpenChange,
+  types,
+}: {
+  seed: Seed | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  types: ItemType[] | undefined;
+}) {
+  const queryClient = useQueryClient();
+  const info = seed ? recommendationFor(seed.type, types) : null;
+  // The choice and the rounds are per seed: a sheet reused for another entry
+  // (Home's) starts from that entry's own first source.
+  const [choice, setChoice] = useState<{ entryId: number; name: string }>();
+  const chosen =
+    choice && choice.entryId === seed?.entryId ? choice.name : null;
+  const source =
+    (info &&
+      (info.sources.find((row) => row.name === chosen) ??
+        info.sources.find((row) => row.name === seed?.source) ??
+        firstSource(info))) ||
+    null;
+  const [rounds, setRounds] = useState<Readonly<Record<string, number>>>({});
+  const roundKey = (entryId: number, name: string) => `${entryId}:${name}`;
+  const roundId =
+    seed && source
+      ? (rounds[roundKey(seed.entryId, source.name)] ?? null)
+      : null;
+  const [looking, setLooking] = useState<ReadonlySet<number>>(new Set());
+  const asked = useRef<Set<string>>(new Set());
+
+  const start = useMutation({
+    mutationFn: ({
+      entryId,
+      refresh,
+      source,
+    }: {
+      entryId: number;
+      refresh: boolean;
+      source: string;
+    }) => moreLikeThis(entryId, { refresh, source }),
+    onSuccess: (found, { entryId }) => {
+      queryClient.setQueryData(queryKeys.suggestionRound(found.id), found);
+      setRounds((before) => ({
+        ...before,
+        [roundKey(entryId, found.source)]: found.id,
+      }));
+      setLooking(new Set());
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Suggestions could not be asked for",
+      ),
+  });
+
+  // Ask once per seed and source opened, and only a source that can answer: one
+  // that is not configured is explained without a request.
+  useEffect(() => {
+    if (!open || !seed || !source?.configured) return;
+    const key = roundKey(seed.entryId, source.name);
+    if (asked.current.has(key)) return;
+    asked.current.add(key);
+    start.mutate({
+      entryId: seed.entryId,
+      refresh: false,
+      source: source.name,
+    });
+  }, [open, seed, source?.configured, source?.name, start]);
+
+  const round = useQuery({
+    queryKey: queryKeys.suggestionRound(roundId ?? 0),
+    queryFn: ({ signal }) => getSuggestionRound(roundId ?? 0, signal),
+    enabled: roundId !== null,
+    staleTime: Infinity,
+  });
+  const data = roundId !== null ? round.data : undefined;
+
+  useJobEvent((event) => {
+    const progress = event.progress as Record<string, unknown>;
+    // Every round this sheet asked for, not only the one shown: a round switched
+    // away from while it was still working is current when switched back to.
+    if (event.kind === "recommend") {
+      const asked = Object.values(rounds);
+      if (
+        typeof progress.round_id === "number" &&
+        asked.includes(progress.round_id)
+      )
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.suggestionRound(progress.round_id),
+        });
+      return;
+    }
+    if (
+      roundId !== null &&
+      data &&
+      event.kind === "enrich_suggestion" &&
+      data.suggestions.some((row) => row.id === progress.suggestion_id)
+    )
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.suggestionRound(roundId),
+      });
+  });
+
+  const replace = (saved: Suggestion) => {
+    if (roundId === null) return;
+    queryClient.setQueryData<SuggestionRound>(
+      queryKeys.suggestionRound(roundId),
+      (before) =>
+        before && {
+          ...before,
+          suggestions: before.suggestions.map((row) =>
+            row.id === saved.id ? saved : row,
+          ),
+        },
+    );
+  };
+
+  const answer = useMutation({
+    mutationFn: ({
+      suggestion,
+      value,
+    }: {
+      suggestion: Suggestion;
+      value: SuggestionAnswer | null;
+    }) => answerSuggestion(suggestion.id, value),
+    onSuccess: (saved, { value, suggestion }) => {
+      replace(saved);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.home });
+      if (value === "want" || suggestion.answer === "want") {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
+      }
+    },
+    onError: (error) =>
+      toast.error(
+        error instanceof Error ? error.message : "Your answer was not saved",
+      ),
+  });
+
+  const lookUp = useMutation({
+    mutationFn: (suggestion: Suggestion) => enrichSuggestion(suggestion.id),
+    onMutate: (suggestion) =>
+      setLooking((before) => new Set(before).add(suggestion.id)),
+    onSuccess: ({ suggestion, job_id }) => {
+      replace(suggestion);
+      if (job_id === null)
+        setLooking((before) => {
+          const next = new Set(before);
+          next.delete(suggestion.id);
+          return next;
+        });
+    },
+    onError: (error, suggestion) => {
+      setLooking((before) => {
+        const next = new Set(before);
+        next.delete(suggestion.id);
+        return next;
+      });
+      toast.error(
+        error instanceof Error ? error.message : "It could not be looked up",
+      );
+    },
+  });
+
+  const label = source?.label ?? "the source";
+  const resolvedOnly = source?.resolved_only ?? false;
+  const fromLibrary = source?.from_library ?? false;
+  const attribution = source ? info?.attribution[source.name] : undefined;
+  const stored = data?.suggestions.length ?? 0;
+  // An unresolved pick is never shown; a model's is shown only once found.
+  const shown = (data?.suggestions ?? []).filter((row) =>
+    resolvedOnly
+      ? row.enrichment === "enriched"
+      : row.enrichment !== "unresolved",
+  );
+  const found = shown.filter((row) => row.enrichment === "enriched").length;
+  const waiting = resolvedOnly
+    ? (data?.suggestions ?? []).filter((row) => row.enrichment === "pending")
+    : [];
+  const finished = data ? FINISHED_ROUNDS.has(data.status) : false;
+  const working = start.isPending || (data !== undefined && !finished);
+  const about = source?.about;
+
+  let body;
+  if (!seed || !info || !source) {
+    body = null;
+  } else if (!source.configured) {
+    body = (
+      <p className="rounded-lg border border-border bg-surface p-3 text-sm">
+        {source.hint ?? `${source.label} is not configured on this server.`}
+      </p>
+    );
+  } else if (!data) {
+    body = (
+      <p className="text-sm text-muted-foreground" aria-live="polite">
+        {start.isError
+          ? "Suggestions could not be asked for."
+          : `Asking ${label}…`}
+      </p>
+    );
+  } else if (
+    data.status === "not_configured" ||
+    data.status === "over_budget" ||
+    data.status === "failed"
+  ) {
+    body = (
+      <p className="rounded-lg border border-border bg-surface p-3 text-sm">
+        {data.error ?? "No suggestions this time."}
+      </p>
+    );
+  } else {
+    body = (
+      <>
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {progressLine(data, label, resolvedOnly, fromLibrary) ??
+            doneLine(
+              label,
+              stored,
+              shown.length,
+              found,
+              resolvedOnly,
+              fromLibrary,
+            )}
+          {data.status === "done" && data.error ? ` · ${data.error}` : null}
+        </p>
+        {resolvedOnly && finished && waiting.length ? (
+          // A pick a provider could not be asked about (it failed, or its budget
+          // ran out) is neither shown nor given up on: it can be tried again.
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {waiting.length === 1
+                ? "1 more could not be looked up yet."
+                : `${waiting.length} more could not be looked up yet.`}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={waiting.some((row) => looking.has(row.id))}
+              onClick={() => waiting.forEach((row) => lookUp.mutate(row))}
+            >
+              {waiting.some((row) => looking.has(row.id))
+                ? "Looking…"
+                : "Try again"}
+            </Button>
+          </div>
+        ) : null}
+        {shown.length ? (
+          <ul className="divide-y divide-border" aria-label="Suggestions">
+            {shown.map((suggestion) => (
+              <Row
+                key={suggestion.id}
+                suggestion={suggestion}
+                looking={looking.has(suggestion.id)}
+                busy={
+                  answer.isPending &&
+                  answer.variables?.suggestion.id === suggestion.id
+                }
+                onAnswer={(value) => answer.mutate({ suggestion, value })}
+                onLookUp={() => lookUp.mutate(suggestion)}
+                onOpenEntry={() => onOpenChange(false)}
+              />
+            ))}
+          </ul>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn(
+          "gap-3",
+          // A side sheet from 640px (the mockup's), a bottom sheet on a phone.
+          "sm:inset-y-0 sm:left-auto sm:right-0 sm:top-0 sm:h-dvh sm:max-h-none sm:w-[28rem] sm:max-w-[100vw] sm:translate-x-0 sm:translate-y-0 sm:content-start sm:rounded-none sm:border-y-0 sm:border-r-0 sm:border-l sm:data-[state=closed]:zoom-out-100 sm:data-[state=open]:zoom-in-100",
+        )}
+      >
+        <DialogHeader className="pr-8 text-left">
+          <DialogTitle className="font-display text-xl font-medium">
+            More like {seed?.title ?? "this"}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            {info && info.sources.length > 1
+              ? `Suggestions from ${info.sources.map((row) => row.label).join(" or ")}.`
+              : `Suggestions from ${label}, looked up in your own providers.`}
+          </DialogDescription>
+        </DialogHeader>
+        {info && info.sources.length > 0 ? (
+          <div className="flex items-center justify-between gap-3">
+            <div
+              role="radiogroup"
+              aria-label="Source"
+              className="inline-flex rounded-full border border-border p-0.5 text-xs"
+            >
+              {info.sources.map((row) => {
+                const checked = row.name === source?.name;
+                return (
+                  <button
+                    key={row.name}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    className={cn(
+                      "min-h-8 rounded-full px-3 focus-ring",
+                      checked
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() =>
+                      seed &&
+                      setChoice({ entryId: seed.entryId, name: row.name })
+                    }
+                  >
+                    {row.label}
+                  </button>
+                );
+              })}
+            </div>
+            {source?.configured && seed ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                disabled={working}
+                onClick={() =>
+                  start.mutate({
+                    entryId: seed.entryId,
+                    refresh: true,
+                    source: source.name,
+                  })
+                }
+              >
+                Refresh
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+        {about?.model && source?.configured ? (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {about.provider_label ?? about.provider} · {about.model}.{" "}
+            {about.sends}
+          </p>
+        ) : null}
+        {body}
+        {attribution ? (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {attribution}
+          </p>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({
+  suggestion,
+  looking,
+  busy,
+  onAnswer,
+  onLookUp,
+  onOpenEntry,
+}: {
+  suggestion: Suggestion;
+  looking: boolean;
+  busy: boolean;
+  onAnswer: (value: SuggestionAnswer | null) => void;
+  onLookUp: () => void;
+  onOpenEntry: () => void;
+}) {
+  const enriched = suggestion.enrichment === "enriched";
+  // Already yours, unanswered: *From your library*'s picks are your own waiting
+  // entries (Sprint 136), so the row opens the entry instead of offering *Want*.
+  const held = suggestion.entry_id !== null && !suggestion.answer;
+  const name = suggestion.year
+    ? `${suggestion.title} (${suggestion.year})`
+    : suggestion.title;
+  return (
+    <li className="grid grid-cols-[3rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 py-2.5">
+      <div className="row-span-2 w-12">
+        <Art suggestion={suggestion} />
+      </div>
+      <div className="min-w-0">
+        <p className="font-display text-base leading-snug">
+          {suggestion.title}
+          {suggestion.year ? (
+            <span className="ml-1.5 text-xs text-muted-foreground">
+              {suggestion.year}
+            </span>
+          ) : null}
+        </p>
+        {suggestion.reason ? (
+          <p className="text-xs text-muted-foreground">
+            {suggestion.reason.text}
+          </p>
+        ) : null}
+        <p
+          className={cn(
+            "text-[11px]",
+            enriched ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
+          {held
+            ? "On your list"
+            : enriched
+              ? "Found in your providers"
+              : looking
+                ? "Looking it up…"
+                : "Looked up when you open it"}
+        </p>
+      </div>
+      <div className="col-start-2 flex flex-wrap items-center gap-1.5">
+        {suggestion.answer ? (
+          <>
+            {suggestion.answer === "want" && suggestion.entry_id ? (
+              <Link
+                to={`/books/${suggestion.entry_id}`}
+                onClick={onOpenEntry}
+                className="text-xs font-medium underline-offset-2 hover:underline focus-ring"
+              >
+                {answered.want}
+              </Link>
+            ) : (
+              <span className="text-xs font-medium">
+                {answered[suggestion.answer]}
+              </span>
+            )}
+            {suggestion.answer !== "want" ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 rounded-full px-2.5"
+                disabled={busy}
+                aria-label={`Undo your answer on ${name}`}
+                onClick={() => onAnswer(null)}
+              >
+                Undo
+              </Button>
+            ) : null}
+          </>
+        ) : held ? (
+          <>
+            <Link
+              to={`/books/${suggestion.entry_id}`}
+              onClick={onOpenEntry}
+              aria-label={`Open ${name}`}
+              className="inline-flex h-8 items-center rounded-full bg-primary px-3 text-xs font-medium text-primary-foreground focus-ring"
+            >
+              Open
+            </Link>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={busy}
+              aria-label={`Not for me: ${name}`}
+              onClick={() => onAnswer("not_for_me")}
+            >
+              Not for me
+            </Button>
+          </>
+        ) : (
+          <>
+            {enriched ? (
+              <Button
+                size="sm"
+                className="h-8 rounded-full px-3"
+                disabled={busy}
+                aria-label={`Want ${name}`}
+                onClick={() => onAnswer("want")}
+              >
+                Want
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-full px-3"
+                disabled={looking}
+                aria-label={`Look up ${name}`}
+                onClick={onLookUp}
+              >
+                {looking ? "Looking…" : "Look up"}
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={busy}
+              aria-label={`Not for me: ${name}`}
+              onClick={() => onAnswer("not_for_me")}
+            >
+              Not for me
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 rounded-full px-3"
+              disabled={busy}
+              aria-label={`Seen ${name}`}
+              onClick={() => onAnswer("seen")}
+            >
+              Seen it
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}

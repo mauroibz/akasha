@@ -184,6 +184,8 @@ class TvmazeSeriesProvider:
 
     name = "tvmaze"
     item_type = "series"
+    #: What `fetch_by_identifier` answers: `/lookup/shows?imdb=`.
+    identifier_kinds = frozenset({"imdb"})
 
     def __init__(
         self,

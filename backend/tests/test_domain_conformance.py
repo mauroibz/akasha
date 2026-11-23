@@ -62,6 +62,10 @@ from book_tracker.domain.providers import (
     ItemPayload,
     SearchCandidate,
 )
+from book_tracker.domain.recommendations import (
+    RecommendationSpec,
+    resolve_by_identity_or_search,
+)
 from book_tracker.domain.registry import (
     ALL_STATUSES,
     DOMAINS,
@@ -482,6 +486,61 @@ def suppressed_keys_are_normalized(domain: Domain) -> None:
         assert value == normalize_text(value), (
             f"{domain.item_type} suppresses {value!r}, which is not normalized"
         )
+
+
+@registry_check
+def ranking_reads_fields_this_domain_declares(domain: Domain) -> None:
+    """Sprint 132: the ranked pile reads a series field and taste fields by name.
+
+    A name the domain does not declare reads nothing, and the pile would quietly lose
+    a signal; a taste field must be groupable, since its values are compared as keys.
+    """
+    fields = {spec.name: spec for spec in domain.fields}
+    ranking = domain.ranking
+    if ranking.series_field is not None:
+        series = fields.get(ranking.series_field)
+        assert series is not None, f"{domain.item_type} ranks by an undeclared series field"
+        assert series.multiplicity == "one" and series.type == "text"
+    assert not ranking.series_in_title or ranking.series_field is not None
+    for name in ranking.affinity_fields:
+        assert name in fields, f"{domain.item_type} ranks by undeclared {name}"
+        assert fields[name].groupable, f"{domain.item_type}'s {name} is not groupable"
+    # Sprint 136: an embedding's text reads these by name, as words.
+    assert len(set(ranking.text_fields)) == len(ranking.text_fields)
+    for name in ranking.text_fields:
+        assert name in fields, f"{domain.item_type} embeds undeclared {name}"
+        assert fields[name].type in ("text", "long_text"), f"{domain.item_type}: {name} is not text"
+
+
+@registry_check
+def recommendation_names_sources_and_somewhere_to_want(domain: Domain) -> None:
+    """Sprint 133: a declared `RecommendationSpec` must be answerable.
+
+    Its sources are names a registry can hold (nonblank, each once), its resolve is
+    callable, `enrich_top` is not negative, and *Want* has somewhere to go: the
+    declared `want_status` (Sprint 134), a choosable status of the domain, or else a
+    `planned` status. `source_options` speak only of declared sources. `None` is the
+    deliberate default.
+    """
+    spec = domain.recommendation
+    if spec is None:
+        return
+    assert spec.sources, f"{domain.item_type} declares recommendations with no source"
+    assert all(isinstance(name, str) and name.strip() for name in spec.sources)
+    assert len(set(spec.sources)) == len(spec.sources), f"{domain.item_type} names a source twice"
+    assert callable(spec.resolve), f"{domain.item_type}'s recommendation resolve is not callable"
+    assert spec.enrich_top >= 0
+    if spec.want_status is not None:
+        choosable = {status.value for status in domain.statuses if status.choosable}
+        assert spec.want_status in choosable, (
+            f"{domain.item_type} wants suggestions in {spec.want_status!r}, not a status it has"
+        )
+    else:
+        assert any(status.planned for status in domain.statuses), (
+            f"{domain.item_type} takes suggestions but has no planned status for Want"
+        )
+    unknown = set(spec.source_options) - set(spec.sources)
+    assert not unknown, f"{domain.item_type} sets options for undeclared sources {unknown}"
 
 
 @registry_check
@@ -1297,6 +1356,8 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "enrichment": "enrichment_is_answerable_by_this_domain",
         "progress": "progress_counts_something_this_domain_declares",
         "insight_suppressed_keys": "suppressed_keys_are_normalized",
+        "ranking": "ranking_reads_fields_this_domain_declares",
+        "recommendation": "recommendation_names_sources_and_somewhere_to_want",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
@@ -1404,6 +1465,50 @@ def test_the_core_now_hosts_a_status_no_registered_domain_declares(migrated: Eng
 
 
 MALFORMED: list[tuple[str, str, Domain]] = [
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
+        "suggestions with nowhere for Want to put them",
+        a_third_domain(
+            recommendation=RecommendationSpec(("fake",), resolve_by_identity_or_search())
+        ),
+    ),
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
+        "Want pointed at a status the domain does not have",
+        a_third_domain(
+            recommendation=RecommendationSpec(
+                ("fake",), resolve_by_identity_or_search(), want_status="wanted"
+            )
+        ),
+    ),
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
+        "options for a source the domain does not declare",
+        a_third_domain(
+            statuses=(
+                StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
+                StatusSpec("wishlist", "Wishlist", hotkey="w", planned=True),
+                StatusSpec("owned", "Owned", hotkey="o"),
+            ),
+            recommendation=RecommendationSpec(
+                ("fake",),
+                resolve_by_identity_or_search(),
+                source_options={"tmdb": {"media": "movie"}},
+            ),
+        ),
+    ),
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
+        "suggestions from no source at all",
+        a_third_domain(
+            statuses=(
+                StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
+                StatusSpec("wishlist", "Wishlist", hotkey="w", planned=True),
+                StatusSpec("owned", "Owned", hotkey="o"),
+            ),
+            recommendation=RecommendationSpec((), resolve_by_identity_or_search()),
+        ),
+    ),
     (
         "statuses_are_a_usable_vocabulary",
         "a status with no label",
@@ -1590,6 +1695,17 @@ def test_the_suite_rejects_a_malformed_domain(name: str, domain: Domain) -> None
     """
     with pytest.raises(AssertionError):
         REGISTRY_CHECKS[name](domain)
+
+
+def test_a_declared_want_status_stands_in_for_a_planned_one() -> None:
+    """Sprint 134: albums have no planned status, and will name their wishlist."""
+    REGISTRY_CHECKS["recommendation_names_sources_and_somewhere_to_want"](
+        a_third_domain(
+            recommendation=RecommendationSpec(
+                ("fake",), resolve_by_identity_or_search(), want_status="wishlist"
+            )
+        )
+    )
 
 
 class _CatalogProvider:

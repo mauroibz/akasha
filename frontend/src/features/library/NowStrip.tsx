@@ -8,12 +8,8 @@ import { getNow, patchEntry, type LibraryEntry } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { FinishDialog } from "@/features/finish/FinishDialog";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { stepFor } from "@/features/progress/outline";
 import { navigateWithTransition } from "@/lib/viewTransition";
-
-/** Pages advance ten at a time, everything else one: an episode, a chapter. */
-function stepFor(unit: string): number {
-  return unit === "page" ? 10 : 1;
-}
 
 /**
  * What you are in the middle of, across every domain (Sprint 098, proposal §7): the

@@ -265,7 +265,7 @@ test("the acting-as banner stays usable at 390px with no serious violations", as
   await page.setViewportSize({ width: 390, height: 844 });
   await stubAuth(page, "acting");
   await seedLibrary(page, 2);
-  await page.goto("/");
+  await page.goto("/library");
 
   const banner = page.getByRole("status", { name: "Viewing Bruno's library" });
   const leave = page.getByRole("button", { name: "Return to your library" });
@@ -287,7 +287,7 @@ test("library in grid view has no serious accessibility violations", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await seedLibrary(page);
   await stubShelves(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -300,7 +300,7 @@ test("library in table view has no serious accessibility violations", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await seedLibrary(page);
   await stubShelves(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -337,7 +337,7 @@ test("wall-card score and status controls are visible at rest and keyboard reach
   await page.setViewportSize({ width: 390, height: 844 });
   await seedLibrary(page);
   await stubShelves(page);
-  await page.goto("/");
+  await page.goto("/library");
   await page.mouse.move(0, 0);
   const card = page.locator("[data-entry-id]").first();
   await expect(card).toBeVisible();
@@ -393,7 +393,7 @@ test("the library with web results on it has no serious accessibility violations
       ],
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -431,7 +431,7 @@ test("the add dialog over the library has no serious accessibility violations", 
       ],
     }),
   );
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -439,6 +439,14 @@ test("the add dialog over the library has no serious accessibility violations", 
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: /Web result/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  // The dialog and its overlay fade in over 200 ms, and axe computes contrast
+  // from the colours on screen: sampled mid-fade, text the settled dialog shows
+  // at full contrast reads as too faint (a different element each time, 1-2
+  // runs in 3 under parallel load). Wait until nothing moves, as the goal
+  // dialog's check does.
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().length))
+    .toBe(0);
   await expectNoSeriousViolations(page, "library (add dialog)");
 });
 
@@ -447,7 +455,7 @@ test("the expanded score picker overlay is accessible inside its card", async ({
 }) => {
   await seedLibrary(page);
   await stubShelves(page);
-  await page.goto("/");
+  await page.goto("/library");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
@@ -672,7 +680,7 @@ test("the degraded provider notice has no serious accessibility violations", asy
   // sample was wrong, not the palette. The three checks that do own the wall
   // are serial for exactly this reason (DEC-114); this one never needed a card.
   await seedLibrary(page, 0);
-  await page.goto("/");
+  await page.goto("/library");
   await page.getByRole("searchbox").fill("rayuela");
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByText(/running on fewer providers/i)).toBeVisible();

@@ -4,7 +4,8 @@ import type { components } from "./schema";
 /** A gentle goal for one domain (Sprint 103, DEC-169). */
 export type Goal = components["schemas"]["GoalResponse"];
 export type GoalProgress = components["schemas"]["GoalProgressResponse"];
-export type GoalPick = components["schemas"]["GoalPickResponse"];
+/** A pick from the library's ranked pile (Sprint 132), its reasons strongest first. */
+export type GoalPick = components["schemas"]["PilePick"];
 export type GoalPeriod = Goal["period"];
 
 export function getGoals(signal?: AbortSignal) {

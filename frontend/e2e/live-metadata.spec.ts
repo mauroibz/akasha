@@ -23,7 +23,7 @@ test("live provider editions add with metadata and cached covers", async ({
   test.skip(mode !== "add");
   const saved: Array<{ url: string; title: string; editionYear: string }> = [];
   for (const book of books) {
-    await page.goto("/");
+    await page.goto("/library");
     await page.getByRole("searchbox").fill(book.query);
     await page.getByRole("button", { name: "Search", exact: true }).click();
     const result = page
@@ -40,7 +40,7 @@ test("live provider editions add with metadata and cached covers", async ({
     // goes straight to its detail page (§4.3). This spec used to assert only the
     // second, which no build does for a new add — it never ran, being gated behind
     // an env var.
-    await expect(page).toHaveURL(/\/(books\/\d+|(\?.*)?$)/, {
+    await expect(page).toHaveURL(/\/(books\/\d+|library(\?.*)?$)/, {
       timeout: 20_000,
     });
     if (!/\/books\/\d+/.test(page.url())) {

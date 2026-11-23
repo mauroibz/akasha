@@ -50,6 +50,31 @@
         "title": "AmbiguityChoice",
         "type": "object"
       },
+      "AnswerBody": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "enum": [
+                  "want",
+                  "not_for_me",
+                  "seen"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "AnswerBody",
+        "type": "object"
+      },
       "AttachmentList": {
         "properties": {
           "attachments": {
@@ -689,6 +714,30 @@
           "reason"
         ],
         "title": "DuplicatePairResponse",
+        "type": "object"
+      },
+      "EnrichResponse": {
+        "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "suggestion": {
+            "$ref": "#/components/schemas/SuggestionResponse"
+          }
+        },
+        "required": [
+          "suggestion",
+          "job_id"
+        ],
+        "title": "EnrichResponse",
         "type": "object"
       },
       "EntryCreateBody": {
@@ -1726,60 +1775,6 @@
         "title": "GoalBody",
         "type": "object"
       },
-      "GoalPickResponse": {
-        "properties": {
-          "creator": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Creator"
-          },
-          "entry": {
-            "$ref": "#/components/schemas/EntryResponse"
-          },
-          "mean_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mean Score"
-          },
-          "reason": {
-            "enum": [
-              "creator",
-              "waiting"
-            ],
-            "title": "Reason",
-            "type": "string"
-          },
-          "since": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Since"
-          }
-        },
-        "required": [
-          "entry",
-          "reason"
-        ],
-        "title": "GoalPickResponse",
-        "type": "object"
-      },
       "GoalProgressResponse": {
         "properties": {
           "item_type": {
@@ -1855,6 +1850,704 @@
           "suggest"
         ],
         "title": "GoalResponse",
+        "type": "object"
+      },
+      "HomeActive": {
+        "description": "The entry most recently touched among those under way.",
+        "properties": {
+          "day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          }
+        },
+        "required": [
+          "entry",
+          "day"
+        ],
+        "title": "HomeActive",
+        "type": "object"
+      },
+      "HomeCover": {
+        "properties": {
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "item_id",
+          "item_type",
+          "title",
+          "cover_url",
+          "score"
+        ],
+        "title": "HomeCover",
+        "type": "object"
+      },
+      "HomeDomainTile": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "mean_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Score"
+          },
+          "scores": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 10,
+            "title": "Scores",
+            "type": "array"
+          },
+          "status_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Status Counts",
+            "type": "object"
+          },
+          "without_cover": {
+            "title": "Without Cover",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "count",
+          "status_counts",
+          "scores",
+          "mean_score",
+          "covers",
+          "without_cover"
+        ],
+        "title": "HomeDomainTile",
+        "type": "object"
+      },
+      "HomeGoalCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "target",
+          "count"
+        ],
+        "title": "HomeGoalCount",
+        "type": "object"
+      },
+      "HomeGreeting": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeActive"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "entries": {
+            "title": "Entries",
+            "type": "integer"
+          },
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/HomeGoalCount"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "pile": {
+            "title": "Pile",
+            "type": "integer"
+          },
+          "today": {
+            "title": "Today",
+            "type": "string"
+          }
+        },
+        "required": [
+          "today",
+          "active",
+          "entries",
+          "pile",
+          "goals"
+        ],
+        "title": "HomeGreeting",
+        "type": "object"
+      },
+      "HomeLatelyRow": {
+        "description": "A finish, a change of score, or the entries added on one day (Sprint 131).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "kind": {
+            "enum": [
+              "finished",
+              "score",
+              "added"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "entry",
+          "score",
+          "previous",
+          "count"
+        ],
+        "title": "HomeLatelyRow",
+        "type": "object"
+      },
+      "HomeLayoutBody": {
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "maxItems": 64,
+            "title": "Modules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "modules"
+        ],
+        "title": "HomeLayoutBody",
+        "type": "object"
+      },
+      "HomeLayoutResponse": {
+        "properties": {
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "title": "Modules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "modules",
+          "defaults"
+        ],
+        "title": "HomeLayoutResponse",
+        "type": "object"
+      },
+      "HomeLent": {
+        "properties": {
+          "loans": {
+            "items": {
+              "$ref": "#/components/schemas/HomeLoan"
+            },
+            "title": "Loans",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "loans"
+        ],
+        "title": "HomeLent",
+        "type": "object"
+      },
+      "HomeLoan": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lent_on": {
+            "title": "Lent On",
+            "type": "string"
+          },
+          "person": {
+            "title": "Person",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person",
+          "lent_on",
+          "entry"
+        ],
+        "title": "HomeLoan",
+        "type": "object"
+      },
+      "HomeModuleLayout": {
+        "properties": {
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "size": {
+            "enum": [
+              "S",
+              "M",
+              "L"
+            ],
+            "title": "Size",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "size"
+        ],
+        "title": "HomeModuleLayout",
+        "type": "object"
+      },
+      "HomeMonth": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "covers": {
+            "items": {
+              "$ref": "#/components/schemas/HomeCover"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month",
+          "count",
+          "counts",
+          "covers"
+        ],
+        "title": "HomeMonth",
+        "type": "object"
+      },
+      "HomeQuestion": {
+        "description": "One question from Play: an old score to look at again, else a gap to fill.",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "kind": {
+            "enum": [
+              "revisit",
+              "gap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "scored_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored At"
+          }
+        },
+        "required": [
+          "kind",
+          "entry",
+          "scored_at"
+        ],
+        "title": "HomeQuestion",
+        "type": "object"
+      },
+      "HomeResponse": {
+        "description": "Every module's payload. A module the person hid is empty or `null`, unread.",
+        "properties": {
+          "domains": {
+            "items": {
+              "$ref": "#/components/schemas/HomeDomainTile"
+            },
+            "title": "Domains",
+            "type": "array"
+          },
+          "greeting": {
+            "$ref": "#/components/schemas/HomeGreeting"
+          },
+          "lately": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HomeLatelyRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lately"
+          },
+          "lent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeLent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "items": {
+              "$ref": "#/components/schemas/PilePick"
+            },
+            "title": "Next",
+            "type": "array"
+          },
+          "now": {
+            "items": {
+              "$ref": "#/components/schemas/EntryResponse"
+            },
+            "title": "Now",
+            "type": "array"
+          },
+          "question": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeQuestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shelves": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HomeShelf"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shelves"
+          },
+          "suggested": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested"
+          },
+          "tidy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeTidy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "year": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeYear"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "greeting",
+          "now",
+          "next",
+          "year",
+          "domains",
+          "lately",
+          "tidy",
+          "question",
+          "shelves",
+          "lent",
+          "suggested"
+        ],
+        "title": "HomeResponse",
+        "type": "object"
+      },
+      "HomeShelf": {
+        "properties": {
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "entry_count"
+        ],
+        "title": "HomeShelf",
+        "type": "object"
+      },
+      "HomeTidy": {
+        "properties": {
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "unscored": {
+            "title": "Unscored",
+            "type": "integer"
+          },
+          "unscored_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Unscored By Type",
+            "type": "object"
+          },
+          "without_cover": {
+            "title": "Without Cover",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "duplicates",
+          "without_cover",
+          "unscored",
+          "unscored_by_type"
+        ],
+        "title": "HomeTidy",
+        "type": "object"
+      },
+      "HomeYear": {
+        "properties": {
+          "goals": {
+            "items": {
+              "$ref": "#/components/schemas/HomeYearGoal"
+            },
+            "title": "Goals",
+            "type": "array"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/HomeMonth"
+            },
+            "maxItems": 12,
+            "minItems": 12,
+            "title": "Months",
+            "type": "array"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "months",
+          "goals"
+        ],
+        "title": "HomeYear",
+        "type": "object"
+      },
+      "HomeYearGoal": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "period": {
+            "enum": [
+              "month",
+              "year"
+            ],
+            "title": "Period",
+            "type": "string"
+          },
+          "target": {
+            "title": "Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "item_type",
+          "period",
+          "count",
+          "target",
+          "done"
+        ],
+        "title": "HomeYearGoal",
         "type": "object"
       },
       "ImportBrowseResponse": {
@@ -2780,6 +3473,16 @@
               }
             ]
           },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "$ref": "#/components/schemas/StatusSpecResponse"
@@ -3293,6 +3996,59 @@
         "title": "PairBody",
         "type": "object"
       },
+      "PilePick": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/PileReason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          }
+        },
+        "required": [
+          "entry",
+          "score",
+          "reasons"
+        ],
+        "title": "PilePick",
+        "type": "object"
+      },
+      "PileReason": {
+        "description": "One signal that fired, as a sentence naming its evidence.",
+        "properties": {
+          "signal": {
+            "enum": [
+              "series",
+              "creator",
+              "affinity",
+              "waiting",
+              "goal",
+              "set_aside",
+              "similarity"
+            ],
+            "title": "Signal",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "text"
+        ],
+        "title": "PileReason",
+        "type": "object"
+      },
       "PreviewResponse": {
         "properties": {
           "batch_id": {
@@ -3536,6 +4292,91 @@
         "title": "RankBody",
         "type": "object"
       },
+      "RecommendationResponse": {
+        "description": "*More like this* for one library (Sprint 134): which sources, and their terms.",
+        "properties": {
+          "attribution": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Attribution",
+            "type": "object"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources",
+          "attribution"
+        ],
+        "title": "RecommendationResponse",
+        "type": "object"
+      },
+      "RecommendationSourceResponse": {
+        "description": "One source that may suggest this library's things, as the server is set up.",
+        "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About"
+          },
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "from_library": {
+            "default": false,
+            "title": "From Library",
+            "type": "boolean"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resolved_only": {
+            "default": false,
+            "title": "Resolved Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "configured",
+          "hint"
+        ],
+        "title": "RecommendationSourceResponse",
+        "type": "object"
+      },
       "RefileBody": {
         "properties": {
           "source": {
@@ -3754,6 +4595,91 @@
           "total"
         ],
         "title": "RevisitResponse",
+        "type": "object"
+      },
+      "RoundResponse": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "item_type": {
+            "$ref": "#/components/schemas/ItemTypeName"
+          },
+          "seed_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed Entry Id"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "selecting",
+              "enriching",
+              "done",
+              "failed",
+              "over_budget",
+              "not_configured"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionResponse"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "item_type",
+          "seed_entry_id",
+          "source",
+          "status",
+          "error",
+          "created_at",
+          "finished_at",
+          "suggestions"
+        ],
+        "title": "RoundResponse",
         "type": "object"
       },
       "RowSearchBody": {
@@ -4507,6 +5433,226 @@
         "title": "SuggestionKeyBody",
         "type": "object"
       },
+      "SuggestionReason": {
+        "description": "Why the source chose it, in the ranked pile's shape: the signal is the source.",
+        "properties": {
+          "signal": {
+            "title": "Signal",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "signal",
+          "text"
+        ],
+        "title": "SuggestionReason",
+        "type": "object"
+      },
+      "SuggestionResponse": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "enum": [
+                  "want",
+                  "not_for_me",
+                  "seen"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "answered_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answered At"
+          },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "creator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator"
+          },
+          "display": {
+            "additionalProperties": true,
+            "title": "Display",
+            "type": "object"
+          },
+          "enrichment": {
+            "enum": [
+              "pending",
+              "enriched",
+              "unresolved"
+            ],
+            "title": "Enrichment",
+            "type": "string"
+          },
+          "entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Id"
+          },
+          "external_ids": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "External Ids",
+            "type": "object"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "item_type": {
+            "$ref": "#/components/schemas/ItemTypeName"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionReason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "round_id": {
+            "title": "Round Id",
+            "type": "integer"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionSeed"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Score"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "id",
+          "round_id",
+          "item_type",
+          "source",
+          "title",
+          "year",
+          "creator",
+          "external_ids",
+          "reason",
+          "source_score",
+          "display",
+          "enrichment",
+          "item_id",
+          "entry_id",
+          "answer",
+          "answered_at",
+          "created_at"
+        ],
+        "title": "SuggestionResponse",
+        "type": "object"
+      },
+      "SuggestionSeed": {
+        "description": "The entry a round was about: what a suggestion is *more like*.",
+        "properties": {
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "title"
+        ],
+        "title": "SuggestionSeed",
+        "type": "object"
+      },
       "TimelineEvent": {
         "description": "One thing that happened: an entry finished, or its score changed (Sprint 118).",
         "properties": {
@@ -4868,7 +6014,7 @@
   },
   "info": {
     "title": "Akasha",
-    "version": "2.9.0"
+    "version": "3.0.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -6088,6 +7234,16 @@
           },
           {
             "in": "query",
+            "name": "unscored",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unscored",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
@@ -6890,6 +8046,96 @@
         "summary": "Lend Entry"
       }
     },
+    "/api/entries/{entry_id}/more-like-this": {
+      "post": {
+        "description": "A round seeded by one entry: queued, or the last one under a day old.",
+        "operationId": "more_like_this_api_entries__entry_id__more_like_this_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 50,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "in": "query",
+            "name": "refresh",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Refresh",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "description": "Not a source of this library"
+          }
+        },
+        "summary": "More Like This"
+      }
+    },
     "/api/entries/{entry_id}/refile": {
       "post": {
         "description": "Move an entry into another library through that library's own record (Sprint 100).",
@@ -7506,6 +8752,7 @@
     },
     "/api/goals/{item_type}/picks": {
       "get": {
+        "description": "This library's pile, ranked (Sprint 132): the same picks `/api/pile` gives.",
         "operationId": "goal_picks_api_goals__item_type__picks_get",
         "parameters": [
           {
@@ -7535,7 +8782,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/GoalPickResponse"
+                    "$ref": "#/components/schemas/PilePick"
                   },
                   "title": "Response Goal Picks Api Goals  Item Type  Picks Get",
                   "type": "array"
@@ -7752,6 +8999,210 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/home": {
+      "get": {
+        "description": "Every module of Home from stored data; no provider is consulted.\n\n`tz` is the person's IANA zone (the client sends its own): their today, and the\nday an addition counts under in *Lately* (Sprint 132). Without a known one, the\nserver's `TZ`. Today is resolved per request, so a server running across midnight\nmoves on.",
+        "operationId": "home_api_home_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Home"
+      }
+    },
+    "/api/home/layout": {
+      "get": {
+        "description": "This person's Home layout (Sprint 131); the default until one is saved.",
+        "operationId": "get_layout_api_home_layout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeLayoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Layout"
+      },
+      "put": {
+        "description": "Replace this person's layout; an unknown module, or one named twice, is refused.",
+        "operationId": "put_layout_api_home_layout_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeLayoutBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeLayoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Layout"
       }
     },
     "/api/import/batches/{batch_id}": {
@@ -10687,6 +12138,99 @@
         "summary": "Now"
       }
     },
+    "/api/pile": {
+      "get": {
+        "description": "Waiting entries ranked from the library's own data; every library when no type.",
+        "operationId": "pile_api_pile_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ItemTypeName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PilePick"
+                  },
+                  "title": "Response Pile Api Pile Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Pile"
+      }
+    },
     "/api/revisit": {
       "get": {
         "operationId": "revisit_api_revisit_get",
@@ -11451,6 +12995,343 @@
           }
         },
         "summary": "Rename Shelf"
+      }
+    },
+    "/api/suggestion-rounds/{round_id}": {
+      "get": {
+        "operationId": "suggestion_round_api_suggestion_rounds__round_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "round_id",
+            "required": true,
+            "schema": {
+              "title": "Round Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoundResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Suggestion Round"
+      }
+    },
+    "/api/suggestions": {
+      "get": {
+        "description": "Unanswered suggestions worth showing, newest first; stored data only.",
+        "operationId": "suggestions_api_suggestions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "seed_entry_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Seed Entry Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "item_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ItemTypeName"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Item Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SuggestionResponse"
+                  },
+                  "title": "Response Suggestions Api Suggestions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Suggestions"
+      }
+    },
+    "/api/suggestions/{suggestion_id}": {
+      "patch": {
+        "operationId": "answer_api_suggestions__suggestion_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Answer"
+      }
+    },
+    "/api/suggestions/{suggestion_id}/enrich": {
+      "post": {
+        "description": "Find a pending suggestion in its providers now; 200 when there is nothing to do.",
+        "operationId": "enrich_suggestion_api_suggestions__suggestion_id__enrich_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "suggestion_id",
+            "required": true,
+            "schema": {
+              "title": "Suggestion Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrichResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrichResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Enrich Suggestion"
       }
     },
     "/api/users": {

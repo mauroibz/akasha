@@ -19,6 +19,7 @@ from typing import Any, Literal
 from urllib.parse import SplitResult, urlsplit
 
 from book_tracker.domain.providers import IdentityStrategy
+from book_tracker.domain.recommendations import RecommendationSpec
 
 FieldType = Literal["text", "long_text", "number", "rows"]
 Multiplicity = Literal["one", "many"]
@@ -326,6 +327,35 @@ class EnrichmentSpec:
 
 
 @dataclass(frozen=True)
+class RankingSpec:
+    """What the ranked pile may read from this domain's metadata (Sprint 132).
+
+    The pile is ranked from the library's own data and nothing else, and two of its
+    signals need to know which fields mean what. A series is a book's idea, a genre an
+    anime's and a film's, and a subject list is what Open Library gives a book; the
+    shared ranking names none of them. The default declares nothing, and a domain
+    that declares nothing is ranked by its creators, how long things have waited and
+    what was set aside, which every domain has.
+    """
+
+    #: A `one` field naming the series a work belongs to. A position written into the
+    #: value ("Mistborn #2", "Mistborn, #2", "Mistborn (2)") is read when it is there.
+    series_field: str | None = None
+    #: Whether a title's own trailing "(Series, #N)" names its series and place in it,
+    #: the way a Goodreads export writes a title. Read only when `series_field` is
+    #: empty on the item.
+    series_in_title: bool = False
+    #: Groupable fields whose values say what a work is about (subjects, genres): the
+    #: person's recent high scores across a value lift waiting entries carrying it.
+    affinity_fields: tuple[str, ...] = ()
+    #: Fields that say what a work is, in the order an item's embedding text carries
+    #: them after its title, creator and year (Sprint 136): subjects or genres, then a
+    #: description. Declared, so the shared text builder names no field; empty means
+    #: the title, creator and year alone.
+    text_fields: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Domain:
     """Everything the shared layers may know about one kind of thing.
 
@@ -397,6 +427,13 @@ class Domain:
     #: artist is. A ranking still reports what it left out rather than silently
     #: shrinking, and a query parameter can bring suppressed rows back.
     insight_suppressed_keys: frozenset[str] = frozenset()
+    #: Which fields the ranked pile reads for series and for taste (Sprint 132).
+    ranking: RankingSpec = RankingSpec()
+    #: Which recommendation sources may suggest this domain's things and how a
+    #: candidate is found in its providers (Sprint 133, DEC-183 point 5), or `None`
+    #: for a domain nothing suggests yet. Declaring one needs a `planned` status:
+    #: that is where *Want* puts a suggestion.
+    recommendation: RecommendationSpec | None = None
 
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)

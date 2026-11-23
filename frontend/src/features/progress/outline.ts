@@ -106,3 +106,8 @@ export function passageDates(
     dates.date_finished = day;
   return dates;
 }
+
+/** Pages advance ten at a time, everything else one: an episode, a chapter. */
+export function stepFor(unit: string): number {
+  return unit === "page" ? 10 : 1;
+}

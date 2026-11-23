@@ -40,7 +40,27 @@ save — takes under 20 seconds and never requires leaving the keyboard.
   counts, sessions and streaks remain out
 - Ebook file management or runtime linkage to Kavita/Calibre. Read-only Calibre
   metadata import is explicitly in scope.
-- Recommendations, statistics dashboards, year-in-review
+- Statistics dashboards, year-in-review. *Recommendations* left this list in 2026-11 (DEC-183):
+  the pile is ranked locally since Sprint 132 (see *Up next* under §7 Screens). Suggestions
+  from outside the library (*More like this*) select first and enrich after: since Sprint 133
+  they are stored per person with their answers (*Want* adds a planned entry, *Not for me* keeps
+  a work out of later rounds). Since Sprint 134 TMDB suggests films and series: *More like this*
+  on a film's or a series' page and on its *On now* card opens a side sheet of TMDB's picks, the
+  first three found in the library's own providers, each answered in place; Home's *More like
+  this* shows the newest found ones. Both carry TMDB's attribution, and TMDB's rows are deleted
+  after six months. Without `TMDB_READ_TOKEN` the button says how to set it. Since Sprint 135 a
+  hosted language model, chosen by configuration and an API key (Claude, Gemini or any
+  OpenAI-compatible endpoint; nothing runs locally), suggests things for every library: the
+  only source for books, anime and albums, the second for films and series. The sheet's source
+  segment is a choice. A model's picks are shown only once the library's own providers found
+  them, so an invented title is never shown; it is sent titles, creators, years and scores and
+  nothing else, and Settings says so. *Want* on an album puts it on the wishlist. Since Sprint
+  136, with a hosted embedding endpoint (Gemini or any OpenAI-compatible one; the Claude API has
+  none, so a Claude key alone leaves it off and changes nothing else) every library's sheet has
+  *From your library*: the person's own waiting entries nearest the one they opened, each
+  opened rather than wanted; *Up next* may say "Close to what you scored 9: …"; and other
+  sources' found picks are listed in order of likeness. What is sent is each item's title,
+  creator, year, subjects or genres and description, never anything about the person
 - Mobile app (responsive web is enough)
 
 ---
@@ -60,7 +80,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
 | Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
-| List rendering | TanStack Virtual + keyset pagination on `/` and the triage surface | Calibre libraries reach thousands of rows |
+| List rendering | TanStack Virtual + keyset pagination on `/library` and the triage surface | Calibre libraries reach thousands of rows |
 | Auth | Optional, off by default (2.0). With auth on: accounts, per-user libraries, 400-day sessions. Exposure rule unchanged until all four hold: auth on, TLS in front, cookie `Secure`, setup completed before publishing (DEC-180) | Delivered as DEC-146; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
@@ -772,7 +792,7 @@ dashboard" looks like.
 A Calibre import can produce several thousand rows, and triage is a dense
 table of exactly those. Plain React rendering will visibly stutter past ~500.
 
-- **TanStack Virtual** on both `/` and triage. Only visible rows mount.
+- **TanStack Virtual** on both `/library` and triage. Only visible rows mount.
 - **TanStack Query with `infiniteQuery`** against the keyset cursor (§6), page
   size 100, prefetch the next page when the user scrolls within 200px of the
   bottom.
@@ -813,7 +833,38 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — The library.** The primary screen and the one to get right. Since Sprint 029 it is
+**`/` — Home** (Sprints 130–132, DEC-183–186). The screen Akasha opens on: a 12-column grid of
+modules over one `GET /api/home` that reads stored data only. The greeting names the day, "Day
+N of" an entry under way (when it has a start date) and the library's totals; what it names and
+the goal beside it are always of one library — the first goal's library with something under
+way, else the entry touched last beside its own library's goal. *On now* holds what is under
+way with *+N* progress, *Finished* (the finish sheet) and *Set aside* (back to the domain's
+planned status); *Up next* holds the pile ranked by what the person is most likely to want next
+(Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
+under way or finished, a creator or a subject they score above their own average, how long it
+has waited, a library short of its goal, and pushed down for a while when set aside; with
+embeddings configured (Sprint 136), also what stands closest to what they scored highest, from
+vectors already stored — each pick
+with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you gave book 1
+a 9"), and *Start* (or *Finished* where a domain has no under-way status); a goal's picks in the
+Diary are the same ranking within that library; *Year* draws twelve months of covers, as large as the height its row gives it allows, and,
+from this month on, an empty slot for each thing the lead goal still needs, never marking a
+past month short; *Lately* lists finishes, score changes (a score kept reads "still a 9") and
+additions (a day's additions as one row, the day being the person's own), newest first; one tile per library opens
+`/library?type=…`; *Tidy up* counts duplicate pairs (the duplicates deck), entries without a
+cover (the covers deck) and finished entries with no score (the library filtered to them, one
+link per library); *One question* asks an old score again ("Still a 9" keeps it, *Change* opens
+the revisit deck) or else one gap of an entry, answered in place; *Shelves* shows the shelves
+in use with counts; *Lent out* shows open loans, longest out first. A module with nothing to
+show is hidden until it has something. *Edit home* lists the modules: drag a handle (or focus
+it and use the arrow keys) to reorder, S/M/L, a switch to hide, *Reset*; each change is stored
+per person on the server at once. On a wide screen sizes are column spans (S 3, M 5, L 7; the
+library tiles always take the row) and each row's spare columns are shared out so no row ends
+in a gap; below 720 px every module is full width in the same order and its size only changes
+how much it shows. An empty library sees a first-run message.
+
+**`/library` — The library** (at `/` until Sprint 130; a `/` address carrying library
+parameters redirects here with them). The primary screen and the one to get right. Since Sprint 029 it is
 also **the screen you search from and the screen you add from** (DEC-065, DEC-073); adding
 something no provider lists is the only thing that still leaves it.
 
@@ -878,7 +929,7 @@ here is the one thing no provider can do for you.
   typed as the default domain whatever the client sends (DEC-067 row 6, DEC-073). Naming a
   domain here would show one domain's statuses and fields and then write another's row.
   Giving manual entry a real domain needs an API change and is unscheduled.
-- On success it returns to `/` with the new entry highlighted.
+- On success it returns to `/library` with the new entry highlighted.
 
 The confirm step itself — **what we already know** about the thing you clicked, everything
 the search returned rendered from the domain's field spec, at no cost and with nothing to

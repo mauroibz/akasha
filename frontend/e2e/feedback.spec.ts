@@ -116,7 +116,7 @@ for (const size of widths) {
       await page.goto("/add");
       await page.getByLabel(/^title$/i).fill("Rayuela");
       await page.getByRole("button", { name: /add to library/i }).click();
-      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+      await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
       await expectVisibleToast(page, "Book added");
     });
 
@@ -161,7 +161,7 @@ for (const size of widths) {
         .getByRole("alertdialog", { name: /remove this/i })
         .getByRole("button", { name: /delete entry/i })
         .click();
-      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+      await expect(page).toHaveURL(/\/library(\?type=[a-z]+)?$/);
       await expectVisibleToast(page, "Removed from your library");
     });
 
@@ -293,7 +293,7 @@ test.describe("a rejected write", () => {
     page,
   }) => {
     await stubOneEntryLibrary(page);
-    await page.goto("/");
+    await page.goto("/library");
     const row = page.locator("[data-entry-id='7']");
     await expect(row).toBeVisible();
     await row.getByRole("button", { name: /score/i }).click();
@@ -317,7 +317,7 @@ test.describe("a rejected write", () => {
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await stubOneEntryLibrary(page);
-    await page.goto("/");
+    await page.goto("/library");
     const row = page.locator("[data-entry-id='7']");
     await row.getByRole("button", { name: /score/i }).click();
     await page.getByRole("button", { name: "Score 3", exact: true }).click();

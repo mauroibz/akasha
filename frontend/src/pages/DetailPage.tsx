@@ -61,6 +61,7 @@ import { StillDialog } from "@/features/rescore/StillDialog";
 import { ProgressTracker } from "@/features/progress/ProgressTracker";
 import { RefileDialog } from "@/features/detail/RefileDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
+import { MoreLikeThis } from "@/features/suggest/MoreLikeThis";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   choosesCovers,
@@ -270,7 +271,7 @@ export function DetailPage() {
   // working through, instead of the library. Absent (a deep link, the library)
   // means the library — the only place left to go back to.
   const from = (useLocation().state as { from?: string } | null)?.from;
-  const backTo = from === "triage" ? "/inbox" : "/";
+  const backTo = from === "triage" ? "/inbox" : "/library";
   const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
     | "opinion"
@@ -420,7 +421,7 @@ export function DetailPage() {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: queryKeys.library.all });
       toast.success("Removed from your library");
-      navigate("/");
+      navigate("/library");
     } catch (e) {
       // Reported inside the dialog, which is still open and still covering the
       // page: an alert rendered behind a modal is an alert nobody sees.
@@ -732,6 +733,15 @@ export function DetailPage() {
                   Lend…
                 </Button>
               )}
+              {/* Sprint 134: only for a library the server says has a source. */}
+              <MoreLikeThis
+                seed={{ entryId: entry.id, title: item.title, type: item.type }}
+                types={itemTypes.data}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "rounded-full px-5",
+                )}
+              />
               <Button
                 variant="outline"
                 className="rounded-full border-destructive/60 px-5 text-destructive hover:bg-destructive/10 hover:text-destructive"

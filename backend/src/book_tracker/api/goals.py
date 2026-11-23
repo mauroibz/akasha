@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from book_tracker.api.identity import CurrentUser
-from book_tracker.api.library import ERRORS, EntryResponse, ErrorResponse
+from book_tracker.api.library import ERRORS, ErrorResponse
+from book_tracker.api.pile import PilePick
 from book_tracker.application.goals import GoalService
 from book_tracker.domain.registry import ItemTypeName
 
@@ -19,7 +20,11 @@ REFUSED: dict[int | str, dict[str, object]] = {
 
 
 async def service(request: Request, user: CurrentUser) -> GoalService:
-    return GoalService(request.app.state.engine, user.effective_user_id)
+    return GoalService(
+        request.app.state.engine,
+        user.effective_user_id,
+        embedding_model=getattr(request.app.state, "embedding_model", None),
+    )
 
 
 Goals = Annotated[GoalService, Depends(service)]
@@ -49,16 +54,6 @@ class GoalProgressResponse(BaseModel):
     target: int | None
 
 
-class GoalPickResponse(BaseModel):
-    entry: EntryResponse
-    reason: Literal["creator", "waiting"]
-    #: For a *creator* pick: whose, and their average in this library.
-    creator: str | None = None
-    mean_score: float | None = None
-    #: For a *waiting* pick: when it was added.
-    since: str | None = None
-
-
 @router.get("/goals", response_model=list[GoalResponse])
 def list_goals(goals: Goals) -> list[GoalResponse]:
     return [GoalResponse.model_validate(goal) for goal in goals.list_goals()]
@@ -84,10 +79,9 @@ def goal_progress(
     return GoalProgressResponse.model_validate(goals.progress(item_type.value, year))
 
 
-@router.get("/goals/{item_type}/picks", response_model=list[GoalPickResponse], responses=REFUSED)
+@router.get("/goals/{item_type}/picks", response_model=list[PilePick], responses=REFUSED)
 def goal_picks(
     item_type: ItemTypeName, goals: Goals, limit: int = Query(default=6, ge=1, le=24)
-) -> list[GoalPickResponse]:
-    return [
-        GoalPickResponse.model_validate(pick) for pick in goals.picks(item_type.value, limit=limit)
-    ]
+) -> list[PilePick]:
+    """This library's pile, ranked (Sprint 132): the same picks `/api/pile` gives."""
+    return [PilePick.model_validate(pick) for pick in goals.picks(item_type.value, limit=limit)]

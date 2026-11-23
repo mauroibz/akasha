@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppContent } from "./App";
@@ -14,6 +14,14 @@ const admin = {
   is_admin: true,
 };
 
+/** Where the router ended up, so a redirect can be asserted rather than inferred. */
+function LocationProbe() {
+  const location = useLocation();
+  return (
+    <div data-testid="location">{`${location.pathname}${location.search}`}</div>
+  );
+}
+
 function renderApp(initialEntry: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -22,6 +30,7 @@ function renderApp(initialEntry: string) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <AppContent />
+        <LocationProbe />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -142,7 +151,8 @@ describe("authentication routing", () => {
 
     renderApp("/login");
 
-    expect(await screen.findByText("Your library is waiting")).toBeVisible();
+    expect(await screen.findByRole("main", { name: "Home" })).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
     expect(screen.queryByText("Sign out")).toBeNull();
     expect(screen.queryByLabelText("Username")).toBeNull();
   });
@@ -234,5 +244,65 @@ describe("authentication routing", () => {
     expect(
       await screen.findByRole("heading", { name: "Favorites" }),
     ).toBeVisible();
+  });
+});
+
+function authOff(url: string) {
+  if (url.includes("/api/auth/me")) {
+    return new Response('{"detail":"Not Found"}', { status: 404 });
+  }
+  return libraryResponse(url);
+}
+
+describe("home and library routes (Sprint 130)", () => {
+  it("opens on Home at /", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => authOff(String(input))),
+    );
+    renderApp("/");
+
+    expect(await screen.findByRole("main", { name: "Home" })).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent(/^\/$/);
+  });
+
+  it("keeps the library, unchanged, at /library", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => authOff(String(input))),
+    );
+    renderApp("/library");
+
+    expect(await screen.findByText("Your library is waiting")).toBeVisible();
+    expect(screen.queryByRole("main", { name: "Home" })).toBeNull();
+  });
+
+  it("sends a / address carrying library filters to /library with them", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => authOff(String(input))),
+    );
+    renderApp("/?type=anime&status=watching");
+
+    expect(await screen.findByText("Your library is waiting")).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/library?type=anime&status=watching",
+    );
+  });
+
+  it("puts Home first in the navigation and keeps Library", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => authOff(String(input))),
+    );
+    renderApp("/");
+    await screen.findByRole("main", { name: "Home" });
+
+    const [desktop] = screen.getAllByRole("navigation", { name: "Primary" });
+    const links = Array.from(desktop.querySelectorAll("a"));
+    expect(links[0]).toHaveAttribute("href", "/");
+    expect(links[0]).toHaveTextContent("Home");
+    expect(links[1]).toHaveAttribute("href", "/library");
+    expect(links[1]).toHaveTextContent("Library");
   });
 });

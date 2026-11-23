@@ -45,7 +45,7 @@ test("the command bar finds, adds and navigates from the keyboard", async ({
     });
   });
 
-  await page.goto("/");
+  await page.goto("/library");
   await expect(page.getByRole("feed", { name: "Library" })).toBeVisible();
   await page.keyboard.press("ControlOrMeta+k");
   const input = page.getByRole("combobox", { name: "Search or add" });

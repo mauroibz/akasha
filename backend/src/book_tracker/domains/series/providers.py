@@ -330,6 +330,9 @@ class WikidataSeriesProvider:
 
     name = "wikidata-series"
     item_type = "series"
+    #: What `fetch_by_identifier` answers: IMDb's id, and TMDB's, which a
+    #: recommendation from TMDB carries alone (Sprint 134).
+    identifier_kinds = frozenset({"imdb", "tmdb"})
 
     def __init__(
         self,
@@ -608,9 +611,9 @@ class WikidataSeriesProvider:
         as their primary identity. `haswbstatement:P345=` hit 13 of 13 measured series
         (docs/series-domain-viability.md); it is not optional.
         """
-        if kind != "imdb":
+        if kind not in self.identifier_kinds:
             raise ProviderPayloadError(
                 f"Wikidata's series adapter cannot look a series up by {kind!r}",
                 code="unsupported_identity_kind",
             )
-        return await self.fetch(f"imdb:{value.strip()}")
+        return await self.fetch(f"{kind}:{value.strip()}")

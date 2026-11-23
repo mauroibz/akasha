@@ -111,7 +111,7 @@ export function InsightsPage() {
 
   const noun = (count: number) => countLabel(count, type, itemTypes.data);
   const linkTo = (key: string, row: Pick<InsightRow, "key" | "label">) =>
-    `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+    `/library?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
       key,
     )}&value=${encodeURIComponent(row.key)}&label=${encodeURIComponent(row.label)}`;
 

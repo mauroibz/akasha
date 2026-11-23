@@ -97,7 +97,8 @@ function PersonRow({
     mutationFn: () => actAs(person.id),
     onSuccess: () => {
       onActAs(person);
-      void navigate("/", { replace: true });
+      // "View Bruno's library": the library itself, not Home (Sprint 130).
+      void navigate("/library", { replace: true });
     },
   });
   return (

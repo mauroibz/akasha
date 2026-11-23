@@ -6854,3 +6854,268 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   migration transaction, digest guard, library batching, durability and shutdown found nothing
   blocking; two import-resume edge cases are recorded in the handoff.
 - Next: the board upgrades to 2.9.0.
+
+## 2026-11-22 — Sprint 130 (complete)
+- Done: the library moved to `/library` and `/` became Home (`dafe022`); `GET /api/home`
+  (`527e6e1`); the module grid (`c1c8c34`); `e2e/home.spec.ts` (`749359a`). DEC-184 records the
+  choices the sprint left open (phone bar, link destinations, per-status tile counts, `next`
+  interleaving, *Set aside*, the movie *Finished* fallback, no past month marked short).
+- Verified: focused backend tests (home 6, goals, isolation, now/diary, batching, app shape,
+  conformance), `npx vitest related` 298, `make check`, Playwright 13 updated specs + auth 6 +
+  home 10. `/api/home` 117 ms median on 10,000 entries (test) and 19 ms on the walkthrough
+  library.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by a scratchpad script with 346 generic
+  entries over five domains and covers copied from the scratchpad (never committed), a book goal
+  of two a month; vite on 5180. Screenshots at 1440 and 390 in Ink and Paper: scroll width 0,
+  only console error the auth-off 404 on `/api/auth/me`. Exercised: *Start* on the first pile
+  entry moved it into On now; *Finished* through the sheet removed it from On now and the goal
+  read 9 / 24; the Anime tile opened `/library?type=anime`; `/?type=album&status=owned` landed on
+  `/library?type=album&status=owned` with the library rendering.
+- Observed and fixed during the walkthrough: month letters in the year sat at different heights
+  (now aligned); Up next had no action for a movie (now *Finished*); a tile's footer overflowed
+  at 390 (now wraps).
+- Observed, left: at full width the year module is short and wide with empty months (Lately
+  takes five of its columns in 131); on a phone On now's three pills wrap to two rows per entry,
+  so the module is tall; "Day 32 of" names the most recently touched entry under way even when
+  the goal shown is for another library. `heavy-library` probes failed once per run under
+  parallel Playwright load, passed alone (DEC-114 class).
+- Next: Sprint 131, the remaining modules and Edit home.
+
+## 2026-11-22 — Sprint 131 (complete)
+- Done: `/api/home` sections Lately, Tidy up, One question, Shelves, Lent out; migration 0036
+  and `GET`/`PUT /api/home/layout`; `unscored` library filter (`8a4a151`). Greeting names one
+  library (`451d3cb`). On now's actions on one line at 390 (`7970a69`). Modules, row packing and
+  *Edit home* (`e9dbcdd`). Walkthrough fixes: per-library unscored links (`da08275`), "still a 9"
+  in Lately (`9b072b2`). DEC-185.
+- Verified: backend 152 (home, layout, isolation, batching, duplicates, chores, migrations,
+  security migrations); `/api/home` 126–133 ms on 10k (was 213 ms until duplicate pairs read
+  plain rows); `npx vitest related` 389; `make check`; Playwright home 16, library/auth/chores
+  54 total, accessibility 105 + 1 pre-existing flake (below). Migration: a copy of the
+  walkthrough library 0036 → 0035 → head, counts unchanged, integrity ok, no FK violations.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by a scratchpad script (347 generic
+  entries, score changes, shelves, loans, a duplicate pair, book and anime goals with the anime
+  touched last); vite 5180; scripted passes at 1440 and 390, Ink and Paper. Observed: greeting
+  "Day 32 of" the book beside "14 of 24 books" though the anime was touched later; year 714 px
+  beside Lately 506 px; all nine modules 358 px at 390, scroll width 0; On now's pills on one
+  line at 390; *Edit home* (three ArrowUps on Tidy up, Up next to M, Shelves hidden) stored,
+  survived a reload, `shelves` null in the payload; drag of Lent out to the top stored; Reset
+  equal to defaults; "Still a 7" moved One question to the next old score; Tidy up links opened
+  "1 left", "42 left", "7 of 82 anime", "3 of 106 book"; a shelf chip opened its shelf. Console:
+  only the auth-off `/api/auth/me` 404.
+- Observed and fixed: Tidy up's 11 unscored opened as 3 books (the library opens one domain);
+  a kept score read "9 → 9" in Lately.
+- Observed, left: a module alone in its row stretches to twelve columns (Lately alone after
+  moving Tidy up looks sparse; it is the arrangement chosen). Lately's additions group by the
+  stored UTC day, so an evening import can split across two rows. `accessibility.spec.ts` *the
+  add dialog over the library* fails about one run in four on a contrast probe inside the add
+  dialog, on the base commit too.
+- Next: Sprint 132, the ranked pile.
+
+## 2026-11-23 — Sprint 132 (complete)
+- Done: `application/ranking.py` and `GET /api/pile`; Home `next` and goal picks read it
+  (`68f8b1e`). Prerequisite Home repairs: Lately by the person's day via `?tz=` (`b83f2c2`);
+  the year fills its row beside Lately (`929fca4`). Walkthrough-driven tuning (`5272c90`,
+  `8da1fbd`); e2e reason check (`0993d52`); conformance check for `RankingSpec` (`05bdc34`);
+  specs, DEC-186, roadmap (`375d4fe`).
+- Verified: backend 341 (ranking, goals, home, layout, isolation, app shape, domain,
+  conformance); pile 26 ms median on a 2,000 pile; `/api/home` 119 ms median on 10k (was
+  126–133); vitest related 49; `make check`; Playwright home + diary-goal 18.
+- Walkthrough: `scripts/walkthrough.py --keep`, seeded by scratchpad `seed_132.py` (137 items:
+  Mistborn #1 read 9 with #2/#3 waiting, Tres Cuerpos #1 an 8, Expanse #1 read and #2 under
+  way, Le Guin/King/García Márquez rated, 30 generic old pile, a book set aside 6 days ago,
+  anime/films/series piles, book and anime goals, an evening import at 21:30/22:40 Buenos
+  Aires), vite 5180, browser in America/Argentina/Buenos_Aires, 1440 and 390, Ink and Paper.
+  Up next: Well of Ascension (Next in Mistborn; you gave book 1 a 9), El bosque oscuro (an 8),
+  Crónica de una muerte anunciada (García Márquez 9.0 across 2), Abaddon's Gate (you're on book
+  2 now), 22/11/63 (King 8.2 across 5). Judgement: the order feels right — continuations of
+  series the person liked, then favourite creators, then the old pile with a small subject
+  lift; the set-aside book stays out of the top fifteen. *Start* on Mistborn #2 moved it to On
+  now and put El bosque oscuro first, The Hero of Ages second. Lately: the three evening
+  additions are one row dated 22 Nov. Year: strip 268 px tall at 1440, covers 53x79 in one
+  column per month. Scroll width 0 at 390. Console: only the auth-off `/api/auth/me` 404.
+- Observed and fixed: "You rate Fiction 7.3 across 59 books" on nearly every pick (a subject
+  on everything read as taste when recent scores ran higher); "a 8"; #3 of a series leading
+  right after #2 was started.
+- Observed, left: all five picks are books — the book goal is short of pace and books carry
+  the most signals; no diversity rule (the approved mockup showed five books too). On a phone
+  the year's strip keeps a 144 px minimum, so a light year shows some empty space above its
+  covers; at 1440 about one cover row stays empty above the busiest month. The goal reason is
+  the second reason on every book (only the first is shown on Home).
+- Next: Sprint 133, recommendation infrastructure.
+
+## 2026-11-23 — Sprint 133 (complete)
+- Done: recommendation pipeline (`ffb263d`): `domain/recommendations.py`, `Domain.recommendation`,
+  `app/recommendations.py` (empty `SOURCE_FACTORIES`), migration 0037, `recommend` and
+  `enrich_suggestion` jobs, five endpoints, `AKASHA_RECOMMEND_DAILY_LIMITS`, test-only fake
+  source. Cover read off the loop (`273b88c`); cover test (`37c48b2`); reuse of earlier
+  resolutions and one row per work in the list (`afc9f42`); docs and DEC-188 (`0fe6311`).
+  Prerequisite: the documented-route check lacked `/api/home`, `/api/home/layout`, `/api/pile`
+  since Sprint 130 and failed (`9734b03`).
+- Verified: `tests/test_recommendations.py` 28; regression over touched modules 634
+  (conformance, repositories, cached add, refile, library API, app shape, migrations, security
+  migrations, settings, home, layout, isolation, events, jobs, enrichment, enrichment pipeline,
+  domain, prune, quota, ranking, ownership, robustness); `make check`. Running a subset with
+  `-p no:logging` breaks tests that use `caplog` (an error, not a failure).
+- API pass (no screen changed): scratchpad `api_pass_133.py` runs a real uvicorn server on
+  8733 with the live job runner, the fake source registered, films declaring it, Cinemeta
+  replayed from recordings, `recommend_daily_limits={"fake": 3}`. Observed: 202 queued; round
+  `done` in 1.8 s; seven stored (the seed and a repeated Suspiria dropped), the first three
+  enriched (Suspiria 1977, La Ciénaga as item "The Swamp", Suspiria 2018 via title search),
+  four pending; 8 Cinemeta requests, none for the pending four; pressing again returned the same
+  round; *Want* on Suspiria made a `watchlist` entry; *Want* on a pending one 409; *Not for me*
+  on Stalker kept it out of the refreshed round; enrich on Rashomon queued a job and left it
+  pending (no recording, so the replay refused); the fourth round that day `over_budget` with
+  "fake has answered its 3 rounds for today; it answers again tomorrow (UTC)"; the event stream
+  carried `recommend` running/enriching then succeeded/done, and the `enrich_suggestion` job.
+- Observed and fixed: a refreshed round spent three requests re-finding films already found,
+  and `GET /api/suggestions` listed them twice.
+- Observed, left: the round lists a candidate under the source's title ("La Ciénaga") while
+  its item is the provider's ("The Swamp"); the sheet (134) chooses which to show. A
+  `selecting` state usually falls between two stream polls and is not seen. Tests must set the
+  enricher's `cover_client` to None or a replay, or covers are fetched from the live poster host
+  (the first run did; fixed before commit).
+- Next: Sprint 134, TMDB and *More like this*.
+
+## 2026-11-23 — Sprint 134 (complete)
+- Done: TMDB source, film/series declarations, recordings, `/api/item-types` availability,
+  cover route for suggested items, hourly pruning hook, Home `suggested` section (`10e9d51`);
+  the sheet, the button on the detail page and On now, Home's module, Vitest and e2e
+  (`688889d`); walkthrough fixes (`ac4b5a1`). DEC-189.
+- Verified: backend 391 focused (after a 1,153-test pass over touched modules that caught
+  `/api/item-types` without a lifespan); Vitest related 367 then 55; Playwright
+  more-like-this + home 21, detail/home neighbours 67 + the known add-dialog axe flake (2 of 3
+  on base `9dfa89a` too, in a worktree outside the scratchpad path, which Playwright ignores);
+  `make check`.
+- Recording: TMDB with the `.env` token sent as a Bearer header (never printed); Wikidata
+  responses for the top three captured through the adapters with a recording transport
+  (strip `content-encoding` when re-wrapping a decoded body, or httpx decodes twice).
+- Walkthrough: `scripts/walkthrough.py --keep` with `TMDB_READ_TOKEN` exported from `.env`,
+  vite 5180, scratchpad `walk134/live_134.py` (seeds The Bear via Cinemeta, Seven Samurai via
+  Wikidata, Suspiria via Cinemeta, Breaking Bad; runs three rounds) and
+  `frontend/e2e/scratchpad/walk134.mjs` (1440 dark, 390 light). Live rounds: each `done` in
+  5.5 s, 12 stored, 3 enriched; Suspiria's TMDB id 11906 found by `/find` and kept. Sheet opened
+  in ~0.3 s on the stored round; *Look up* Kagemusha found it in 2.8 s from the event stream;
+  *Want* Yojimbo linked to its new entry; *Not for me* 47 Ronin; both kept after a reload;
+  *Refresh* stored 10 (both dropped), reusing Kagemusha and After the Rain without requests.
+  On now's The Bear card: *More like this* opened Shameless, The Chi, Six Feet Under found.
+  Home's module: four found picks across two seeds, attribution under it. Overflow 0 at 390;
+  phone sheet 390 wide. Console: only the auth-off `/api/auth/me` 404s.
+- Observed and fixed: pending rows had a yellow "Open" like *Want* (now an outlined
+  *Look up*); placeholder art clipped titles mid-word; Home's tiles were two huge covers per
+  row on a phone (now four across); module buttons misaligned under two-line titles.
+- Observed, left: the sheet's header scrolls away with a long list; the seed's title is the
+  library's (Wikidata's Spanish "Los siete samuráis") while picks use TMDB's English titles;
+  On now's lead card wraps *More like this* onto a second line at M; TMDB's year can differ by
+  one from Wikidata's (After the Rain 2000 vs 1999).
+- Next: Sprint 135, the model source.
+
+## 2026-11-23 — Sprint 135 (complete)
+- Done: the hosted model source (`1f6e015`): `model_clients.py` (Claude, Gemini,
+  OpenAI-compatible over the shared client, no SDK), `model_recommendations.py`, config and
+  compose pass-through, every domain declares `model`, albums `want_status="wishlist"`,
+  `resolved_only`/`about` on `/api/item-types`, default 50 rounds/day. The sheet's segment as
+  a choice and Settings → Suggestions (`c0d8a1c`). Walkthrough fixes: replay launcher
+  (`880c657`), resolution and prompt (`1ebae80`), rounds kept current across sources
+  (`f3d3229`). DEC-190.
+- Keys: no `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` or `OPENAI_API_KEY` in the process
+  environment. Model fixtures written in each API's documented shape (Claude's from the
+  `claude-api` skill), `"recorded": false` in `model_fixtures.json`; no live round. Open
+  Library searches for the fixture's books recorded live.
+- Verified: `test_model_recommendations.py` 31; touched-module regression 593; Vitest related
+  346 then 73; Playwright more-like-this + home 24, export axe 1; `make check`.
+- Walkthrough: `scratchpad/walk135/run_backend.sh` (walkthrough.py `--keep --replay
+  replay_model.py`, TMDB token exported from `.env` by itself — sourcing the whole `.env` turns
+  `AKASHA_AUTH` on — and a dummy Claude key the replay intercepts), `seed.py` (Rayuela
+  `OL47684105M`, Seven Samurai `imdb:tt0047478`, Kind of Blue MB group), vite on 5180
+  (it listens on `localhost`, not 127.0.0.1), `frontend/e2e/scratchpad/walk135.mjs`. Book,
+  film and album model rounds 9-17 s; invented titles hidden; Want on an album → wishlist;
+  Settings correct; 390 px overflow 0. `sent.jsonl` beside the replay module holds every
+  prompt sent.
+- Observed and fixed: `--replay` broken since Sprint 101 (ObservedProvider wrappers kept the
+  closed client); *Red Beard* and *The Hidden Fortress* unresolved (Cinemeta US-release years,
+  Wikidata Spanish labels); a failed provider made picks unresolved for good; Rayuela sent as
+  2000 and twice; a TMDB round switched away from mid-enrichment stayed on "Finding…".
+- Observed, left: "Found in your providers" on every model row; Settings lists Model before
+  TMDB; MusicBrainz answers 503 under a burst (an album pick stayed pending, *Try again*).
+- Next: Sprint 136, embeddings. Owner: the live Claude check (record_model_fixtures.py).
+
+## 2026-11-23 — Sprint 136 (complete)
+- Done: embeddings (`eea2c12`): config, `embedding_clients.py`, migration 0038,
+  `application/embeddings.py`, `embed_items`, `RankingSpec.text_fields`; the `library` source
+  and the sheet's segment (`2659c7f`); the pile's `similarity` signal (`427c2fb`); a browser
+  case (`4356fdf`); walkthrough fixes: a one-minute sweep (`44d51b4`), the reason's wording
+  (`8d32488`); docs (`b35b095`). DEC-191. Final sprint: project state `complete`.
+- Keys: no `GEMINI_API_KEY`, `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` in the process
+  environment. Embedding fixtures written in each API's documented shape, `"recorded": false`
+  in `embedding_fixtures.json`; vectors fabricated from topic directions for the six books of
+  `tests/embedding_library.py`. No live pass.
+- Verified: `test_embeddings.py` 33, `test_library_source.py` 8 (10,000 waiting items in
+  119-123 ms), `test_ranking.py` 20; touched-module set 544; Vitest related 348; Playwright
+  more-like-this + home 25; `make check`. Not run (the release's): `make test`, full Playwright.
+- Walkthrough: scratchpad `walk136/` (`replay_embeddings.py` answers Gemini's
+  `batchEmbedContents` with word-hashed 768-d vectors and logs `sent.jsonl`; everything else
+  live; `seed.py` adds 13 books and 4 films from live search; `TMDB_READ_TOKEN` exported alone
+  from `.env`, `GEMINI_API_KEY=walkthrough-dummy`), `frontend/e2e/scratchpad/walk136.mjs`,
+  vite on 5180. Seen: all 17 items embedded within 40 s of the seed (two jobs, 9 + 8; earlier
+  run 11 + 6); *From your library* on Rayuela lists 7 waiting books with covers, "7 on your
+  list, nearest first", *Open* lands on the entry; on Seven Samurai 3 waiting films; Up next's
+  first pick "Close to what you scored 8: Ficciones"; a TMDB round's 3 found films embedded
+  after their round (on_cached), their likeness order (0.61, 0.49, 0.44) equal to TMDB's so
+  nothing moved; Settings lists *From your library* On with Gemini and what is sent; 390 px
+  overflow 0. The word-hash replay is not a model: which book is "close" is not evidence of
+  quality.
+- Observed and fixed: no vector at all after seeding (an add from search queues no enrichment;
+  the hourly pass had run at start) — the one-minute sweep; every library row repeating "Close
+  to Rayuela" — "Waiting since Nov 2026".
+- Observed, left (pre-existing, not this sprint): the add from Open Library stored *Cien años
+  de soledad* as a Chinese edition titled "Bai nian gu du" with `original_year` 1999, and *The
+  Hobbit*'s edition with no creators (both visible in Lately and the embedded text);
+  `/api/auth/me` answers 404 with auth off (console noise); Settings lists Model before TMDB;
+  Up next's covers fade in after a full-page screenshot.
+- Next: none planned. Release: `make test`, full Playwright, `make smoke-container`. Owner:
+  the live embedding check (`record_embedding_fixtures.py`) and Sprint 135's Claude check.
+
+## 2026-11-23 — Release preparation v3.0.0
+
+- Done: the release gates on `home-and-recommendations`; two fixes; version surfaces
+  2.9.0 → 3.0.0 (pyproject, uv.lock, main.py, compose default image, package and lock,
+  openapi, runbook example, docs index); release notes `docs/operations/release-notes-v3.0.md`.
+  Not pushed, tagged or merged (the owner's).
+- Fixes: `a6f57e4` Up next no longer names "General" as a subject and reads a shouted
+  catalogue path as words ("Fiction / Horror"), both seen on the owner's data; `c7a809f` the
+  add-dialog axe check waits for the dialog's 200 ms fade before sampling contrast (failed 4
+  of 16 repeats before, 40 of 40 passed after; the check is unchanged, the goal dialog's test
+  already waited this way).
+- Verified: `make check`; `make test` backend 2195 passed, Vitest 625 passed (2194 before the ranking test; rerun on the
+  final tree after the fixes); full Playwright 239 passed, 2 skipped (live metadata, by design),
+  heavy-library included; `make audit` no known vulnerabilities; `make build`;
+  `make smoke-container` passed on the 3.0.0 tree. The permission-based prune test
+  (`test_the_report_names_a_cover_that_could_not_be_removed`) passes as uid 1000; it can fail
+  only as root, where a read-only directory does not stop an unlink.
+- Rehearsal: the board's nightly backup (2.9.0, revision 0035) copied to a scratchpad data dir,
+  the image built from this tree, run with `compose.yaml` + `compose.bind-mounts.yaml`
+  (read-only root, no capabilities, limits) and `AKASHA_AUTH=on`, twice (before and after the
+  fixes, each on a fresh copy). Pre-migration backup written (its manifest: 0035, counts as
+  live), 0036–0038 applied, integrity ok, no foreign-key violations, items 359, entries 345,
+  attachments 22, shelves 11, users 2; a restart ran no migration and wrote no backup; root
+  read-only, CapEff 0; `/api/home`, `/openapi.json`, `/docs` 401 without a session. A test
+  password was written to the copy's user 1 with `hash_password` (no admin CLI for it).
+- Walkthrough (real data, 1440 and 390, the production bundle in the container, TMDB token
+  from `.env`): Home in ~115 ms; On now, Up next, the year (2 of 24, Aug and Nov covers, slots
+  for what the goal still needs), Lately, five library tiles, Tidy up (12 duplicate pairs, 32
+  without a cover, 3 unscored, matching the decks), One question, Shelves; More like this on
+  Bojack Horseman, Obsession, The Odyssey and the imdb-only Clone Wars film: 11–12 picked by
+  TMDB, 2–3 found, sheet in 1.3–2.3 s; Home's More like this appeared after. No console errors,
+  no 4xx/5xx, no horizontal overflow at 390.
+- Observed, left for the owner (judgement calls): Up next is five Stephen King books (many
+  waiting) with no variety rule; Open Library's bookkeeping subjects ("Large type books",
+  "Reading Level-Grade 11", "New York Times bestseller") can still be named as reasons;
+  Home's More like this at 1440 shows four posters ~290×440 px, much larger than the rest of
+  the grid; the year module is mostly empty space when few finishes carry dates; the sheet
+  shows Model and From your library segments when neither is configured; a found TMDB pick can
+  have no poster (Seth MacFarlane's Cavalcade); Lately shows imported titles as stored
+  ("JUEGO DE GERALD, EL").
+- Private data, logs and screenshots stay in the scratchpad (`rehearsal/`); the copied
+  library was removed after the run.
+- Next: the owner pushes, opens the PR, merges, tags `v3.0.0`, upgrades the board; the live
+  Claude and embedding fixture checks.

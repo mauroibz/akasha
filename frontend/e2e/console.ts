@@ -3,6 +3,12 @@ import { test as base, expect } from "@playwright/test";
 import { bookItemType } from "./seed";
 
 /**
+ * `GET /api/home` with or without its `tz` (Sprint 132), and not `/api/home/layout`:
+ * a glob ending at the path would miss the query string.
+ */
+export const isHome = (url: URL) => url.pathname === "/api/home";
+
+/**
  * Every test in this suite fails if the page logged an error or threw.
  *
  * This is Sprint 017's fourth acceptance criterion, and it is a fixture rather
@@ -58,6 +64,60 @@ export const test = base.extend<{
       );
       // Sprint 098: nothing under way, and an empty diary, unless a spec says so.
       await page.route("**/api/now", (route) => route.fulfill({ json: [] }));
+      // Home (Sprint 130): an empty library, unless a spec says otherwise.
+      await page.route(isHome, (route) =>
+        route.fulfill({
+          json: {
+            greeting: {
+              today: "2026-11-22",
+              active: null,
+              entries: 0,
+              pile: 0,
+              goals: [],
+            },
+            now: [],
+            next: [],
+            year: {
+              year: 2026,
+              months: Array.from({ length: 12 }, (_, index) => ({
+                month: index + 1,
+                count: 0,
+                counts: {},
+                covers: [],
+              })),
+              goals: [],
+            },
+            domains: [],
+            lately: [],
+            tidy: {
+              duplicates: 0,
+              without_cover: 0,
+              unscored: 0,
+              unscored_by_type: {},
+            },
+            question: null,
+            shelves: [],
+            lent: { total: 0, loans: [] },
+            suggested: [],
+          },
+        }),
+      );
+      // Home's layout (Sprint 131): the default, unless a spec says otherwise.
+      await page.route("**/api/home/layout", (route) => {
+        const modules = [
+          ["now", "M"],
+          ["next", "L"],
+          ["year", "L"],
+          ["lately", "M"],
+          ["libraries", "L"],
+          ["tidy", "S"],
+          ["question", "S"],
+          ["shelves", "S"],
+          ["lent", "S"],
+          ["suggested", "M"],
+        ].map(([module, size]) => ({ module, size, hidden: false }));
+        return route.fulfill({ json: { modules, defaults: modules } });
+      });
       // Shelves asks what is lent out (Sprint 122).
       await page.route("**/api/loans?open=true", (route) =>
         route.fulfill({ json: [] }),

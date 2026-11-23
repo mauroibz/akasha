@@ -1,0 +1,19 @@
+{
+  "_comment": "The test-only `fake` recommendation source (Sprint 133). One list of candidates per seed title; `default` answers a profile round or an unknown seed. The films are ones the Cinemeta recordings in ../providers cover, so the domain's resolve runs against recorded real responses.",
+  "rounds": {
+    "Seven Samurai": [
+      {"title": "Seven Samurai", "year": 1954, "creator": "Akira Kurosawa", "external_ids": {"imdb": "tt0047478"}, "reason": "The seed itself, which the library already holds", "source_score": 0.99},
+      {"title": "Suspiria", "year": 1977, "creator": "Dario Argento", "external_ids": {"imdb": "tt0076786"}, "reason": "Often watched together", "source_score": 0.91, "display": {"poster": "https://images.metahub.space/poster/small/tt0076786/img"}},
+      {"title": "La Ciénaga", "year": 2001, "creator": "Lucrecia Martel", "external_ids": {"imdb": "tt0240419"}, "reason": "Often watched together", "source_score": 0.88},
+      {"title": "Suspiria", "year": 2018, "creator": "Luca Guadagnino", "reason": "Often watched together", "source_score": 0.85},
+      {"title": "Rashomon", "year": 1950, "creator": "Akira Kurosawa", "external_ids": {"imdb": "tt0042876"}, "reason": "Also by Akira Kurosawa", "source_score": 0.8},
+      {"title": "Ikiru", "year": 1952, "creator": "Akira Kurosawa", "external_ids": {"imdb": "tt0044741"}, "reason": "Also by Akira Kurosawa", "source_score": 0.78},
+      {"title": "Suspiria", "year": 1950, "creator": "Nobody At All", "reason": "A film no provider knows", "source_score": 0.5},
+      {"title": "Stalker", "year": 1979, "creator": "Andrei Tarkovsky", "external_ids": {"imdb": "tt0079944"}, "reason": "Often watched together", "source_score": 0.7},
+      {"title": "Suspiria", "year": 1977, "creator": "Dario Argento", "external_ids": {"imdb": "tt0076786"}, "reason": "Named twice", "source_score": 0.6}
+    ],
+    "default": [
+      {"title": "Stalker", "year": 1979, "creator": "Andrei Tarkovsky", "external_ids": {"imdb": "tt0079944"}, "reason": "From your taste", "source_score": 0.7}
+    ]
+  }
+}

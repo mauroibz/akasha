@@ -22,6 +22,10 @@ Two names here are decisions, not omissions:
 import re
 
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import (
+    RecommendationSpec,
+    resolve_by_identity_or_search,
+)
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
@@ -32,6 +36,7 @@ from book_tracker.domain.spec import (
     FormatSpec,
     ListColumnSpec,
     ProgressSpec,
+    RankingSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -199,6 +204,21 @@ def recognize_series_url(value: str) -> UrlMatch | None:
     return None
 
 
+# *More like this* (Sprint 134, DEC-183 point 6): TMDB chooses from its
+# `/tv/{id}/recommendations`, naming each series by TMDB's id alone, which Wikidata
+# holds as an exact claim; an IMDb id, when a candidate carries one, is tried first,
+# and a title search is the last resort. *Want* puts it on the list to watch.
+# A hosted model (Sprint 135) comes second, resolved by title like a film.
+SERIES_RECOMMENDATION = RecommendationSpec(
+    sources=("tmdb", "model", "library"),
+    resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
+    source_options={
+        "tmdb": {"media": "tv"},
+        "model": {"kind": "TV series", "creator": "creator"},
+    },
+)
+
+
 DOMAIN = Domain(
     item_type="series",
     label="Series",
@@ -233,4 +253,6 @@ DOMAIN = Domain(
             "name",
         ),
     ),
+    ranking=RankingSpec(affinity_fields=("genres",), text_fields=("genres", "synopsis")),
+    recommendation=SERIES_RECOMMENDATION,
 )

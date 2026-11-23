@@ -22,13 +22,16 @@ import {
 import { AUTH_REQUIRED_EVENT } from "@/api/request";
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
-import { HomePage } from "@/pages/HomePage";
+import { HomePage } from "@/features/home/HomePage";
+import { libraryRedirect } from "@/features/library/library";
+import { LibraryPage } from "@/pages/LibraryPage";
 import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
 import { createQueryClient } from "@/lib/queryClient";
 
-// `/` is the screen the application opens on, so it stays in the entry chunk.
+// `/` (Home) and `/library` are the screens the application opens on, so they
+// stay in the entry chunk.
 // Everything else is reached by a deliberate navigation and can arrive then:
 // Sprint 016 left a single 696 kB bundle that every cold load parsed in full,
 // against a 500 ms first-page budget on a ZimaBoard (DEC-037).
@@ -112,6 +115,18 @@ const PeoplePage = lazy(async () => ({
 }));
 
 /**
+ * `/` is Home since Sprint 130 (DEC-183). A `/` address carrying library filters
+ * was a library link before that, in bookmarks and saved views, so it lands on
+ * `/library` with them rather than on Home without them.
+ */
+function HomeRoute() {
+  const location = useLocation();
+  const target = libraryRedirect(location.search);
+  if (target) return <Navigate to={`${target}${location.hash}`} replace />;
+  return <HomePage />;
+}
+
+/**
  * Occupies the main region while a route chunk arrives.
  *
  * `role="status"` rather than a bare spinner: a screen reader user gets told the
@@ -179,7 +194,8 @@ function PrivateRoutes({
       >
         <Suspense fallback={<RouteFallback />}>
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomeRoute />} />
+            <Route path="/library" element={<LibraryPage />} />
             <Route path="/add" element={<AddPage />} />
             <Route path="/books/:entryId" element={<DetailPage />} />
             <Route path="/import" element={<ImportPage />} />

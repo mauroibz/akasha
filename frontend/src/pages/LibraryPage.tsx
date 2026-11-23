@@ -111,13 +111,14 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
-    // An insights ranking row links here as `/?type=...&key=...&value=...` — without
+    // An insights ranking row links here as `/library?type=...&key=...&value=...` — without
     // reading them back out, the library page would silently ignore the link.
     key: params.get("key") ?? "",
     value: params.get("value") ?? "",
     valueLabel: params.get("label") ?? "",
     location: params.get("location") ?? "",
     lent: params.get("lent") === "true",
+    unscored: params.get("unscored") === "true",
   };
 }
 
@@ -135,12 +136,13 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   }
   if (filters.location) params.set("location", filters.location);
   if (filters.lent) params.set("lent", "true");
+  if (filters.unscored) params.set("unscored", "true");
   params.set("sort", filters.sort);
   params.set("order", filters.order);
   return params;
 }
 
-export function HomePage() {
+export function LibraryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
     () => filtersFromParams(searchParams),
@@ -330,7 +332,8 @@ export function HomePage() {
     filters.query.trim().length > 0 ||
     (filters.key !== "" && filters.value !== "") ||
     Boolean(filters.location) ||
-    Boolean(filters.lent);
+    Boolean(filters.lent) ||
+    Boolean(filters.unscored);
   // Facets clear only their own dimension: under a shelf, query, format, or
   // insights filter their sum is the filtered total again, not the size of the
   // domain. Fetch the domain's unfiltered first page when the readout needs an
@@ -566,7 +569,8 @@ export function HomePage() {
     (filters.query.trim() ? 1 : 0) +
     (filters.key !== "" && filters.value !== "" ? 1 : 0) +
     (filters.location ? 1 : 0) +
-    (filters.lent ? 1 : 0);
+    (filters.lent ? 1 : 0) +
+    (filters.unscored ? 1 : 0);
   const libraryWhole = wholeLibrary.data?.total;
   const shownDomain = domains.find((type) => type.id === selectedDomain);
   const web = useWebSearch(selectedDomain);
@@ -1024,6 +1028,12 @@ export function HomePage() {
               <FilterChip
                 label="Lent out"
                 onClear={() => updateFilters({ lent: false })}
+              />
+            )}
+            {filters.unscored && (
+              <FilterChip
+                label="No score yet"
+                onClear={() => updateFilters({ unscored: false })}
               />
             )}
             {filters.query.trim() && (

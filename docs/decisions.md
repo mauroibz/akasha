@@ -7195,3 +7195,437 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      focus. The inbox badge keeps a focus refetch.
 - Consequences: migration 0035 (`entry_shelves(shelf_id)`, `entries(item_id)`); backup
   manifests gain `database_digest`; the container CMD gains `--timeout-graceful-shutdown 10`.
+
+## DEC-183 — Home as a desk, and recommendations that select before they enrich (Sprints 130–136)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: the owner asked for a home that shows what they were up to, are doing and will do
+  next, and that is also an overview of the library; and for a recommendation engine. A first
+  mockup was rejected ("too much wasted space and focuses too much on a small subset"); the second,
+  a dense module grid with a select-then-enrich recommendation pipeline, was approved whole:
+  "Love all of it. Build it all." The design is
+  [`home-and-recommendations-proposal.md`](home-and-recommendations-proposal.md).
+- Decision: `FINAL_SPRINT` 129 → 136, plan revision 54.
+  1. **`/` is Home; the library moves to `/library`.** A `/` URL carrying library query
+     parameters redirects to `/library` with them, so saved links keep working.
+  2. **Home reads stored data only**, through one `GET /api/home`. Its layout (order, size,
+     hidden) is stored per user; unknown module keys are ignored on read.
+  3. **Recommendations stop being a non-goal** (product spec §1). The first, network-free form is
+     the ranked pile (Sprint 132).
+  4. **Select, then enrich.** A source selects candidates in one request; providers are spent
+     only on selected candidates, through the domain's own resolve and the existing budgets.
+     Nothing crawls a provider to choose what to suggest.
+  5. **Per domain, through the registry.** A domain declares `RecommendationSpec(sources=…,
+     resolve=…)`; the shared layers never branch on the item type. Which provider backs a
+     source is configuration.
+  6. **TMDB is the first source** (movies and series). This amends DEC-103 for recommendations
+     only: suggestion rows from TMDB carry TMDB's attribution wherever they are shown and are
+     dropped or refreshed within TMDB's six-month cache window. DEC-103's poster choice is not
+     reopened.
+  7. **Model and embedding sources are off until configured**, through any OpenAI-compatible
+     endpoint, local or hosted. A model candidate is shown only after the domain resolves it.
+- Consequences: new tables for the home layout and for suggestions; a `recommend` job kind; the
+  product spec's non-goals and the technical spec gain the recommendation contract as each sprint
+  lands.
+
+## DEC-184 — Home's first grid: choices the sprint file left open (Sprint 130)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: Sprint 130 built `/` as Home and moved the library to `/library` (DEC-183). Several
+  details were not settled by the sprint file or the proposal.
+- Decision:
+  1. **The phone's bar keeps five: Home, Library, Add, Shelves, Insights.** Import leaves it
+     (desktop only, like Diary); the command bar and Home's first-run message reach it.
+  2. **Library-meaning links go to `/library`; app-start links stay on `/`.** Back controls,
+     the add confirmation, saved views, insights rows, deleting an entry, *View X's library* and
+     *Return to your library* open the library. Signing in, setup, a 404's other exits and
+     `/share` land on Home.
+  3. **Tiles carry counts per status, not per category.** The client draws the bar's colour from
+     each status's declared flag (finished, in progress, planned, abandoned, other), so the
+     category is still the registry's answer and the tile can name the domain's own words.
+  4. **`next` interleaves domains.** Each domain with a `planned` status gives its goal-picks
+     order; the domains are taken in turn, five in all. The picks query now reads at most twice
+     the limit per source, which gives the same picks.
+  5. **Set aside moves an entry to its domain's `planned` status.** No domain declares a "paused"
+     status; *on hold* exists only in two domains and is not a declared flag.
+  6. **A domain with no `in_progress` status (movies) offers *Finished* in Up next**, through the
+     finish sheet, rather than a *Start* it cannot honour.
+  7. **The year never marks a past month short** (DEC-169): empty slots appear only from the
+     current month on, at the goal's pace, and all of them together are at most what the goal
+     still needs. The lead goal is the first in registry order; other libraries' finishes are a
+     `+N` under the month.
+- Consequences: Sprint 131's stored layout names the module keys `now`, `next`, `year` and
+  `libraries` from `features/home/layout.ts`.
+
+## DEC-185 — Home's remaining modules and Edit home: choices the sprint file left open (Sprint 131)
+
+- Date: 2026-11-22
+- Status: accepted
+- Context: Sprint 131 added Lately, Tidy up, One question, Shelves and Lent out to Home, a
+  layout stored per person (migration 0036) and *Edit home* (DEC-183). The sprint file and the
+  proposal left several details open, and one line of the sprint file did not match the code.
+- Decision:
+  1. **Sizes are spans, and rows are packed.** S 3, M 5, L 7 of twelve columns (the proposal's
+     ranges); the library tiles always take the row. Modules fill rows in the stored order; a
+     module that does not fit starts the next row, and a row's spare columns are shared out
+     from its last module back, so no row ends in a gap. The default order puts the year (L)
+     beside Lately (M), which answers Sprint 130's short, wide year. On a phone every module is
+     full width and its size changes how much it shows: On now 1/3/6 entries beneath the first,
+     Up next 3/4/5, Lately 4/8/10 (so `/api/home` reads ten, and the default M shows the eight
+     the sprint asked for), Shelves 4/6/8, Lent out 3/4/5. The year, Tidy up and One question
+     show the same at every size.
+  2. **Tidy up's unscored count opens the library, one link per library.** The sprint file named
+     "finished-unscored queries behind `/deck`"; there are none — `/deck` holds the inbox,
+     covers and duplicates decks. Rather than build a scoring deck, `GET /api/entries` gained
+     `unscored=true` and the library a *No score yet* chip. The library always opens one
+     domain, so a count across libraries opened as one library's share (the walkthrough's 11
+     opened as 3 books); `tidy` carries `unscored_by_type` and the module links each library
+     to its own filtered view, so the number shown is the number that opens.
+  3. **One question is an old score first, then a gap.** The first card the revisit deck would
+     deal ("Still a 9" writes the same `score` + `score_reason: time` the deck writes, so it
+     rests a year; *Change* opens the deck), else the first entry `/gaps` lists, asked through
+     the detail page's own `OneQuestion` in place. A rank question is left to Insights' Play: it
+     needs two entries and a tie, which is not one tap.
+  4. **Lately groups additions by day.** An import of three hundred is one row ("Added X and
+     299 more"), not eight; days are the stored `date_added`'s, which is UTC. Finishes and score
+     changes are the Diary timeline's; a score kept (previous equals score) reads "still a 9".
+  5. **Shelves in use are ordered by their members' last update.** A membership has no
+     timestamp (Sprint 074), so the members' own `updated_at` is the nearest signal of a shelf
+     in use. Empty shelves are left out.
+  6. **The greeting names one library** (Sprint 130's walkthrough): the first goal in registry
+     order whose library has something under way names that library's entry touched last,
+     beside that goal; else the entry touched last beside its own library's goal. `goals` keeps
+     its list shape and holds at most one.
+  7. **The layout API carries its defaults.** `GET`/`PUT /api/home/layout` answer `{modules,
+     defaults}`, so *Reset* restores the server's default and the client's copy is only a
+     fallback while the layout loads. A hidden module is not read by `/api/home`; `now` still
+     is, for the greeting.
+  8. **Drag without a library.** Pointer events on a handle, which serve a mouse and a finger
+     alike; the arrow keys on the focused handle move it, announced in a live region. The tier
+     board moves its covers with its own taps and keys and adds no dependency either. Each
+     change is stored at once; saves run one at a time (a mutation scope) and each move builds
+     on the last one made, so a quick run of edits is stored as the last of them.
+  9. **Duplicate pairs are found from plain rows.** Reading every entry through the ORM cost
+     more than the query and pushed `/api/home` to 213 ms on 10,000 entries; one finder over
+     plain rows now serves the deck and Home's count, and the median is 126–133 ms.
+- Consequences: a module added later (Sprint 134's *More like this*) is a key in
+  `application/home_layout.py`'s `DEFAULT_LAYOUT`, in `features/home/layout.ts` (`MODULES`,
+  `moduleLabels`, `fallbackLayout`), and a case in `HomePage`'s `hasContent`; a stored layout
+  that predates it gets it appended at the end, at its default size.
+
+## DEC-186 — The ranked pile: signals, weights and what they read (Sprint 132)
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 132 replaced *Up next*'s placeholder order (each domain's goal picks, taken in
+  turn) with a local ranking of the pile, each pick with a true reason (DEC-183 point 3). The
+  sprint file named the signals; several details were not settled, and one signal has no stored
+  source.
+- Decision:
+  1. **One ranking, three readers.** `application/ranking.py` `rank_pile` serves `GET /api/pile`,
+     Home's `next` (every library together, five) and `/goals/{type}/picks` (one library). The
+     picks' `{reason, creator, mean_score, since}` became `{score, reasons: [{signal, text}]}`;
+     the reasons are server-written sentences, strongest first, only signals that fired.
+  2. **Domains declare what the pile reads.** `Domain.ranking: RankingSpec(series_field,
+     series_in_title, affinity_fields)`: books read `series` and a Goodreads title's "(Series,
+     #N)", taste from `subjects`; anime, films and series from `genres`; albums declare nothing
+     (they have no pile). A conformance check holds the names to declared fields.
+  3. **"Above your average", not a fixed 8.** Creator and subject lifts are measured from the
+     person's own mean in that library (a subject's from the recency-weighted mean, so scores
+     rising lately lift no subject for being common), shrunk while the count is small. A subject
+     on more than half the scored entries is no reason: the walkthrough showed "You rate Fiction
+     7.3 across 59 books" on nearly every pick.
+  4. **The goal lifts only across libraries.** Inside one library it would lift every entry
+     alike and fill each pick with the same sentence. Its words never say *behind* (DEC-169):
+     "Toward 24 books this year; 14 so far".
+  5. **Set aside is read from what is stored; nothing is "dismissed".** No action dismisses a
+     pile entry (the Diary's *Something else* is client-side), so the signal is an entry back on
+     the pile with a `date_started` (*Set aside* keeps it), pushed down for 90 days from its last
+     change. A stored "not now" would be a new table and action, left for a later sprint.
+  6. **A series under way waits.** The next after one still under way counts half: starting
+     Mistborn #2 put #3 first in the walkthrough. Positions come from the field or the title;
+     Calibre's `series_index` is not imported, so a Calibre series ranks without places.
+  7. **Weights are constants at the top of `ranking.py`**; ties break on entry id. The weights
+     were tuned on the walkthrough library and are a judgement, recorded there and in the
+     worklog.
+  8. **Home's day is the person's.** `/api/home?tz=` (the client's zone; else `TZ`, else UTC)
+     sets today and the day an addition counts under in *Lately*, which grouped by the UTC date
+     and split an evening import in Buenos Aires into two rows (DEC-185 point 4 superseded).
+     Additions are counted per UTC hour and placed by local day, exact on whole-hour offsets.
+- Consequences: Sprint 133's recommendation sources can cite the same reason shape; Sprint 136
+  adds embeddings as one more signal in `ranking.py`.
+
+## DEC-187 — The model source is hosted, by API key, in three provider kinds
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 135 planned a local model on the owner's GPU. The owner: "the model should be
+  configurable via API key, support both openai compatible, claude API and gemini. assume a
+  claude key for testing, do not run it locally."
+- Decision: amends DEC-183 point 7.
+  1. The model source selects a provider by configuration (`anthropic`, `gemini`, `openai` for
+     any OpenAI-compatible endpoint) and authenticates with an API key. Nothing runs locally.
+  2. Claude is the reference provider for tests.
+  3. Embeddings (Sprint 136) support Gemini and OpenAI-compatible endpoints only, because the
+     Claude API offers no embeddings; with only a Claude key they are off.
+  4. Where no key is present in the development environment, fixtures follow each API's
+     documented response shape and are marked unrecorded, with a script to re-record them; the
+     live check is the owner's, after the line. This is an owner-directed exception to the
+     recorded-real-responses rule, limited to these two sources.
+
+## DEC-188 — Recommendation infrastructure: choices the sprint file left open (Sprint 133)
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 133 built the select-then-enrich pipeline (DEC-183 points 4-7) with a fake
+  source, so that TMDB (134), a hosted model (135, DEC-187) and the library's embeddings (136)
+  are each an adapter plus a domain declaration. The sprint file named the shapes; these
+  details were open.
+- Decision:
+  1. **`select` is async** (`async select(seed, profile, limit)`; the proposal sketched it
+     sync). Every real source is an HTTP request or a database query run off the loop.
+  2. **`resolve` receives the domain's providers, already budgeted.** Its signature is
+     `async (Candidate, providers) -> SearchCandidate | None`, the providers being only those
+     serving the domain, ordered by `identity.source_preference`, each wrapped so a request over
+     its daily budget raises `ProviderBudgetSpent` before it is made. The budget is therefore
+     enforced by the shared layer whatever a domain's resolve asks. `resolve_by_identity_or_search
+     (kinds)` is the shared default: an identifier the candidate carries through
+     `fetch_by_identifier`, else a search by title alone, accepting only a record whose
+     normalized title matches and whose year (within one) and creator do not disagree.
+  3. **No production domain declares a source yet.** The registry is empty until 134; the
+     `fake` source lives in `backend/tests/` and is registered by the tests. A domain declaring
+     a `RecommendationSpec` must have a `planned` status (a conformance check): *Want* puts a
+     suggestion there. Albums have none, so Sprint 135 must decide where an album's *Want* goes
+     before albums can declare the model source.
+  4. **Two budgets.** Rounds are counted per source in `provider_usage` under
+     `recommend:<source>` against `AKASHA_RECOMMEND_DAILY_LIMITS`; resolving spends the
+     existing provider budgets. A round over its source's budget is stored `over_budget` with
+     the reason; a provider budget spent mid-round leaves the rest `pending` and the round
+     `done` with the reason in `error`. Neither defers the job: a person is waiting.
+  5. **Round outcomes are statuses, not job failures.** `not_configured`, `over_budget` and
+     `failed` rounds carry `error`; the job succeeds. A source missing its configuration is
+     answered at once (202, a round `not_configured`), with no job queued.
+  6. **A resolved suggestion is a shared item with no entry**, found or created by identity
+     in the same cache an add fills, its cover installed. *Want* then creates the person's
+     entry on it in the domain's first `planned` status; it needs the suggestion `enriched`
+     (409 otherwise). An item pruned from the cache sets `item_id` NULL and the suggestion reads
+     `pending` again.
+  7. **What a round leaves out.** The library in that domain (identifier, provider source, or
+     normalized title with an agreeing creator or a year within one; a title alone matches when
+     nothing contradicts it), *not for me* answers, and a second mention in the round. *Seen it*
+     is recorded only, as the sprint file says. Added after the API pass: a work an earlier round
+     already resolved is stored resolved to the same item without a request, and
+     `GET /api/suggestions` shows each work once (the newest), because a refreshed round spent
+     three requests on films already found and listed them twice.
+  8. **A reason is `{signal: <source name>, text}`**, the pile's shape (DEC-186); the source
+     name is the signal.
+  9. **Progress is the job's progress on the existing event stream** (`{round_id, status,
+     stored, dropped, enriched, error}`), not a new event type; a page re-reads the round.
+  10. **Prerequisite repair:** the documented-route check had not listed `/api/home`,
+      `/api/home/layout` or `/api/pile` since Sprints 130-132 and failed; they are listed now.
+- Consequences: Sprint 134 adds a `tmdb` factory to `SOURCE_FACTORIES` and declares
+  `RecommendationSpec(sources=("tmdb",), resolve=…)` on movies and series. Showing a suggested
+  item's art under `AKASHA_AUTH=on` needs a decision there: `GET /api/items/{id}/cover` answers
+  only for an item the person has an entry on, so the sheet shows `display`'s poster or the
+  cover route admits items the person's suggestions point at. Migration numbering is unchanged:
+  136 still takes 0038.
+
+## DEC-189 — TMDB as the first recommendation source: choices the sprint file left open (Sprint 134)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 6 (TMDB for recommendations, amending DEC-103), DEC-103
+  (posters; not reopened), DEC-188 (the pipeline), DEC-185 (adding a Home module). Recorded by
+  the session under the coordinator's instruction to build the line autonomously; the art,
+  pruning, availability and album choices below were the coordinator's.
+- **Context:** Sprint 134 put TMDB behind *More like this* for films and series, with a side
+  sheet and a Home module. TMDB's `/recommendations` answer turned out to carry **no IMDb id**
+  on any row, and Sprint 133 left four questions for this sprint: art under auth, pruning, how
+  the button learns whether a source works, and where an album's *Want* would go.
+- **Decision:**
+  1. **One request, two at most.** The adapter (`infrastructure/tmdb_recommendations.py`) reads
+     the seed's TMDB id from its stored identifiers; failing that it asks `/find/{imdb_id}`
+     once and returns the id on a new `Selection(candidates, seed_ids)` answer shape, and the
+     round keeps it on the seed's item as a `tmdb` identifier (insert-or-ignore: the identity is
+     unique across the cache, so it never moves one). Which TMDB media a library is comes from
+     the domain's new `RecommendationSpec.source_options` (`{"tmdb": {"media": "movie" | "tv"}}`),
+     handed over on `Seed.options`; the shared adapter never asks which library it holds.
+  2. **A candidate is named by TMDB's id, and resolved through Wikidata's exact claim.** Films
+     and series declare `resolve_by_identity_or_search(("imdb", "tmdb"))`; the Wikidata
+     adapters now answer `fetch_by_identifier("tmdb", …)` (`P4947`, `P4983`). Providers declare
+     `identifier_kinds`, and the shared resolve skips a provider that cannot answer a kind, so
+     no budgeted request is spent on Cinemeta or TVmaze being asked for a TMDB id they refuse.
+     All six candidates recorded (three per seed) resolved by claim.
+  3. **The reason is "TMDB: often watched together"**; `display` keeps TMDB's overview, its
+     original title and a `themoviedb.org` link. **No poster path is kept and no TMDB image is
+     hotlinked** from the browser.
+  4. **Art: the cover route admits an item the person's suggestions point at.** Under
+     `AKASHA_AUTH=on`, `GET /api/items/{id}/cover` now answers for an item one of the
+     requester's suggestions resolved to, as well as one they hold an entry on; another
+     person still gets 404. A suggestion carries `cover_url` (Akasha's own route, stored
+     covers only; no provider call while rendering).
+  5. **Pruning.** A source may declare `retention`; TMDB's is 182 days. The job runner gained a
+     generic housekeeping hook run on an idle pass at most hourly, and
+     `prune_expired_suggestions` deletes rounds (their suggestions cascade, answers included)
+     older than their source's retention. `NotConfigured` carries the retention too, so rows
+     stored while a token was set are still pruned after it is removed. An entry *Want* made
+     is the person's and stays; a *Not for me* older than six months no longer keeps a TMDB
+     pick out of later rounds — the accepted cost of the window.
+  6. **Availability from the server.** `GET /api/item-types` gives each library a
+     `recommendation: {sources: [{name, label, configured, hint}], attribution: {source:
+     line}}` or `null`. The button is drawn only where it is not `null`; with no configured
+     source the sheet shows the hint and asks nothing (no `not_configured` round is stored).
+  7. **Attribution** — "This product uses the TMDB API but is not endorsed or certified by
+     TMDB." — is the source's own `attribution`, published per library and shown under the
+     sheet and under Home's module whenever a TMDB pick is in it.
+  8. **Want's status is declared.** `RecommendationSpec.want_status` names where *Want* puts a
+     suggestion; `None` keeps the first `planned` status. The conformance check accepts either a
+     declared, choosable `want_status` or a planned status. Albums can therefore declare
+     `want_status="wishlist"` in Sprint 135 without a planned status.
+  9. **Home's *More like this*** (module key `suggested`, default M, appended to stored layouts
+     per DEC-185) shows only suggestions already found in a provider (`enriched`), newest first,
+     two, four or eight by size, each with *Want* and *Not for me* in place; opening one shows
+     its round in the sheet. A pending pick has no cover and cannot be wanted, so Home leaves
+     it to the sheet. Each suggestion now names its `seed` (`{entry_id, title}`).
+  10. **The sheet updates from the event stream only** (no polling): the `recommend` job's
+      progress for its round, or an `enrich_suggestion` job for one of its rows, re-reads the
+      round. Lately's rows stay one line; the button is on the detail page and On now.
+- **Consequences:** TMDB's id now reaches `item_identifiers` for films Cinemeta added. The
+  `tmdb` identifier kind is unique across the cache (migration 0002), so a film and a series sharing a
+  TMDB number collide; the insert is ignored and the round still answers. Sprint 135 makes the
+  sheet's source segment switchable and declares `want_status` for albums.
+
+## DEC-190 — The hosted model source: choices the sprint file left open (Sprint 135)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 7, DEC-187 (hosted, by key, three kinds), DEC-188 (the
+  pipeline), DEC-189 (the sheet, `want_status`). Recorded by the session under the
+  coordinator's instruction to build the line autonomously.
+- **Context:** Sprint 135 made a hosted model a recommendation source for every library. The
+  sprint file named the configuration, the port and the acceptance criteria; these details
+  were open, and the walkthrough turned up three defects.
+- **Decision:**
+  1. **Plain HTTP, no SDK.** Each adapter is a thin call over the app's shared provider
+     client (byte bound, retry policy, streaming read), so one boundary serves three providers
+     and no dependency is added. Claude's request shape, headers (`anthropic-version:
+     2026-10-21`, no sampling parameters) and default model come from the `claude-api` skill:
+     **`claude-haiku-5-5`**, the cheapest current Claude model ($0.10 / $0.50 per million
+     tokens), at effort `low`, held to a JSON schema with `output_config.format`. Gemini's
+     default `gemini-2.5-flash` and OpenAI's `gpt-5-mini` are the session's choice and are for
+     the owner to confirm; `AKASHA_RECS_MODEL` overrides any of them. Requests time out at
+     60 s (the shared 5 s would cut replies off).
+  2. **The provider defaults to `anthropic`,** so an `ANTHROPIC_API_KEY` already in the
+     environment turns the source on; a key for another provider does not. The model is still
+     asked only when a person chooses its segment.
+  3. **Fifty rounds a day by default** (`DEFAULT_RECOMMEND_LIMITS`, merged under
+     `AKASHA_RECOMMEND_DAILY_LIMITS`): the model is paid per call; TMDB stays unbounded.
+  4. **`resolved_only`.** A source may declare that its picks may be inventions. The round
+     then resolves every candidate (not the first `enrich_top`) and the sheet shows only the
+     found ones; pending ones (a provider failed or its budget ran out) are counted and offered
+     *Try again*. `/api/item-types` publishes `resolved_only` and `about` (provider, model,
+     what is sent) per source; Settings → Suggestions lists them.
+  5. **What is sent.** The prompt carries titles, creators, years and scores only: the seed
+     (named once, with the work's first year, `metadata.original_year`, before the item's
+     edition year), up to twelve lines each of top scores, recent finishes, *not for me* and
+     the pile. Domains name themselves to the model through `source_options["model"]`
+     (`kind`, `creator`): books/author, films/director, TV series/creator, anime/studio,
+     albums/artist.
+  6. **Resolution.** Books and albums search by title and creator (`with_creator=True`: a
+     one-word title is many works); films, series and anime by title alone. `same_work`
+     reads a record's `original_year` too (a book's search row is an edition), and widens the
+     year tolerance from one to three when a creator both sides give agrees (walkthrough:
+     Cinemeta dates *Red Beard* 1968 and *The Hidden Fortress* 1960, their US releases, and
+     Wikidata's labels were Spanish, so both real films were stored unresolved). A provider
+     that failed with no match elsewhere now propagates its error, so the pick stays
+     `pending` instead of `unresolved` for good.
+  7. **Albums** declare `want_status="wishlist"` (DEC-189 point 8).
+  8. **The sheet's segment is a radio group;** each source keeps its own round per seed while
+     the sheet is open, and the event stream refreshes every round the sheet asked for (the
+     walkthrough found a TMDB round switched away from mid-enrichment frozen on "Finding the
+     first few…").
+  9. **Fixtures are unrecorded** (DEC-187 point 4): no model key was in the environment.
+     They are written in each API's documented shape, marked in `model_fixtures.json`, and
+     `scripts/record_model_fixtures.py` records real replies when a key is exported. The
+     books the fixtures name resolve against real Open Library searches.
+  10. **Prerequisite repair:** `scripts/walkthrough.py --replay` had been broken since
+      Sprint 101 — it set `client` on the `ObservedProvider` wrappers, leaving the real
+      adapters on a closed client, so every replayed walkthrough's providers failed. The
+      launcher now replaces the lifespan's client factory before the lifespan runs.
+- **Consequences:** the live check against Claude is the owner's: export `ANTHROPIC_API_KEY`
+  and run `scripts/record_model_fixtures.py`, then one *Model* round in the app. Sprint 136's
+  `library` source can declare `resolved_only=False` and reuse the segment as is.
+
+## DEC-191 — Embeddings: choices the sprint file left open (Sprint 136)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 7, DEC-187 (hosted, by key; embeddings Gemini and
+  OpenAI-compatible only), DEC-188 (the pipeline), DEC-186 (the pile's signals), DEC-190 (the
+  model source). Recorded by the session under the coordinator's instruction to build the line
+  autonomously.
+- **Context:** Sprint 136 gave items a vector of their stored text and used it three ways: a
+  `library` source, a pile signal, and the order of other sources' found picks. The sprint file
+  named the configuration, the table and the acceptance criteria; these details were open, and
+  the walkthrough found one defect.
+- **Decision:**
+  1. **Configuration mirrors the model's.** `AKASHA_RECS_EMBEDDINGS_PROVIDER` defaults to
+     `gemini` (blank is the default; `anthropic` is refused by the type), so a `GEMINI_API_KEY`
+     already set turns embeddings on and an OpenAI key alone does not. The key falls back to
+     the provider's usual variable. Plain HTTP over the shared client, no SDK, 30 s a request.
+  2. **No numpy.** It is not a dependency, so cosine is `math.sumprod` over unit-length float32
+     vectors read with `array`. Measured on the workstation: 10,000 vectors in about 120 ms at
+     768 dimensions and 230 ms at 1,536. Gemini is therefore asked for 768
+     (`outputDimensionality`; `gemini-embedding-001` is trained to be cut short). The
+     OpenAI-compatible adapter sends only `model` and `input`, because a `dimensions` or
+     `encoding_format` some compatible servers (Voyage) refuse; `text-embedding-3-small` stays at
+     1,536, inside the budget.
+  3. **A vector's `model` is the client's identity**: `gemini:<model>@768`,
+     `openai:<model>@<url>`. Vectors of another identity are never read, and changing the model
+     embeds everything again.
+  4. **The text is declared by the domain** as `RankingSpec.text_fields` (books subjects then
+     description; films genres then description; series and anime genres then synopsis; albums
+     nothing), after the title, `By` the creators and the work's first year; 2,000 characters at
+     most. A conformance check holds the names to declared text fields.
+  5. **The job.** `embed_items` takes 32 texts a request and eight requests a job, then queues a
+     follow-up; each request is counted under `embeddings` against
+     `AKASHA_PROVIDER_DAILY_LIMITS` (default 1,000 a day). A spent budget ends the job as
+     succeeded, saying so; a refusing endpoint fails it with the reason (retried by the runner's
+     backoff). At most one job waits.
+  6. **Triggers.** After an enrichment that filled something and after a suggestion's item was
+     cached (hooks on both handlers); the hourly housekeeping pass hashes every text (an edit);
+     and, from the walkthrough, a **one-minute sweep** for any held item with no vector of the
+     current model. The walkthrough's library had no vectors at all: an add from search fills its
+     metadata at once and queues no enrichment, and the hourly pass had already run at start-up.
+     The job runner gained `sweeps=[(sweep, every)]`, cadences of their own on the idle pass.
+  7. **The library source keeps the person's entries.** It declares `from_library`; storing then
+     skips the already-in-the-library filter (it still drops *not for me*). Its candidates carry
+     the new `Candidate.item_id` and are stored `enriched` with no provider asked. It suggests
+     entries waiting in a `planned` status or the spec's `want_status` (an album's wishlist). A
+     seed without a vector is embedded for its round, one request. The reason is "Waiting since
+     Nov 2026": the walkthrough showed "Close to Rayuela; on your list since …" on every row under
+     a sheet titled "More like Rayuela". The sheet opens each entry (*Open*, *Not for me*) instead
+     of *Want*, *Look up* or *Seen it*; Home's module never shows them.
+  8. ***Want* on an item already held records the answer and adds nothing**, as wanting twice
+     already did; a 409 was tried and broke that idempotence.
+  9. **The pile's `similarity` is relative to the pile.** Models spread cosines differently, so
+     no fixed threshold: up to ten entries scored above the person's mean in that library give a
+     mean vector; each waiting entry with a vector is lifted `2.0 × (s − median) / (max −
+     median)`, nothing below a third of the way, at least three embedded, fifty at most. The
+     reason names the scored work it is nearest: "Close to what you scored 9: Rayuela". Callers
+     pass the configured model (`rank_pile(embedding_model=…)`), so without one no vector is read
+     and the order is Sprint 132's exactly, even with vectors stored.
+  10. **Other sources' picks** are reordered when a round is read, not when stored: found picks
+      with a vector take the places found picks held, in order of likeness to the seed; a pending
+      pick keeps the source's place. Home's list keeps its newest-first order.
+  11. **Fixtures are unrecorded** (DEC-187 point 4): no Gemini or OpenAI key was present. The
+      replies are written in each API's documented shape for six books, their exact texts listed
+      in `embedding_fixtures.json`, the vectors fabricated from topic directions so that the
+      expected order holds; `scripts/record_embedding_fixtures.py` records real ones and prints
+      the order a real model gives.
+- **Consequences:** the live check is the owner's: export `GEMINI_API_KEY` (or an
+  OpenAI-compatible key with `AKASHA_RECS_EMBEDDINGS_PROVIDER=openai`) and run
+  `scripts/record_embedding_fixtures.py`, then open *From your library* in the app. The first
+  start with a key embeds the whole library over the following minutes (32 items a request).

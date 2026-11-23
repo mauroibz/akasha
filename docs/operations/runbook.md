@@ -282,6 +282,11 @@ candidate list is read in one pass before any removal begins. Nothing is
 scheduled and nothing runs on its own, for the same reason as the attachment
 sweep — deletion by inference belongs behind a person.
 
+A suggestion the application has found in a provider is cached the same
+way, as an item no entry references (Sprint 133), so the sweep lists those too.
+Pruning one costs nothing lasting: the suggestion reads as not yet found and is
+looked up again when someone opens it.
+
 ## Restoring
 
 As with a rollback, this restores into a fresh volume and flips which one
@@ -627,12 +632,12 @@ did not come through Access must be refused:
 
 ```bash
 docker run --rm --network akasha_ingress --entrypoint python \
-  ghcr.io/mauroibz/akasha:2.9.0 -c \
+  ghcr.io/mauroibz/akasha:3.0.0 -c \
   "import urllib.request as u; u.urlopen('http://akasha:8000/api/auth/me')"
 # expected: urllib.error.HTTPError: HTTP Error 403: Forbidden
 ```
 
-(Use the version you run in place of `2.9.0`.)
+(Use the version you run in place of `3.0.0`.)
 
 ### 5. Keep the containers off the LAN
 
@@ -810,6 +815,11 @@ the other providers, and the notice clears once the provider answers again.
 | The backup script says the service is not running | start the stack; an online backup needs a live database |
 | Every request answers `403 access_denied` | `AKASHA_CF_ACCESS_*` is set and the request did not carry a valid Cloudflare Access token: a wrong AUD tag or team domain, the hostname not covered by the Access application, or a request that did not come through Cloudflare. The log line `cloudflare_access_refused` names the reason |
 | `Read-only file system` in the logs | something wrote outside `/data`, `/backups` and `/tmp`; the root filesystem is read-only since Sprint 128. Report it; as a stopgap, `read_only: false` in an override file |
+| *More like this* says the model is not configured | no key for the provider in `AKASHA_RECS_MODEL_PROVIDER` (default `anthropic`): set `AKASHA_RECS_MODEL_KEY` or the provider's own variable (`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`) and restart; Settings → Suggestions shows what the server sees |
+| A model round fails with "refused the key" or "does not know that model" | the key is wrong or has no credit, or `AKASHA_RECS_MODEL` names a model the account cannot use. The round's message names which; the key itself is never logged |
+| *From your library* says it needs embeddings | no key for `AKASHA_RECS_EMBEDDINGS_PROVIDER` (default `gemini`): set `AKASHA_RECS_EMBEDDINGS_KEY` or `GEMINI_API_KEY` (`OPENAI_API_KEY` with the provider `openai`) and restart. A Claude key does not count: the Claude API has no embeddings |
+| *From your library* lists fewer than expected, or nothing | only waiting entries with a vector are compared. New items are embedded within a minute, edited ones within the hour; the `embed_items` jobs (admin's activity) say how many and, if failing, why ("refused the key", a spent `embeddings` budget: 1,000 requests a day unless `AKASHA_PROVIDER_DAILY_LIMITS` says `{"embeddings": N}`, which replaces the whole default map, so keep `googlebooks` in it) |
+| Changing the embedding model | every item is embedded again under the new model (32 a request, so a 10,000-item library is about 320 requests); until then the library source and the pile's similarity read only the items already embedded by it |
 | `cloudflared` keeps restarting | `TUNNEL_TOKEN` is missing or wrong; `docker compose -f compose.yaml -f compose.public.yaml logs cloudflared` says which |
 
 On the default named-volume mounts, neither ownership row above is reachable —

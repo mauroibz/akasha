@@ -82,6 +82,9 @@ def _env_example_names() -> set[str]:
         if name.startswith("AKASHA_") or name in {
             "GOOGLE_BOOKS_API_KEY",
             "TMDB_READ_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "GEMINI_API_KEY",
+            "OPENAI_API_KEY",
             "USER_AGENT_CONTACT",
             "TZ",
             "LOG_LEVEL",

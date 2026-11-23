@@ -294,7 +294,7 @@ function Picks({ goal, types }: { goal: Goal; types: ItemType[] }) {
                 </p>
               )}
               <p className="mt-3 text-sm leading-relaxed text-foreground/85">
-                {reason(pick, types)}
+                {reason(pick)}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">
                 {startStatus && (
@@ -321,26 +321,8 @@ function Picks({ goal, types }: { goal: Goal; types: ItemType[] }) {
   );
 }
 
-// `date_added` is stored in UTC; reading its month locally would move a midnight
-// addition into the month before, west of Greenwich.
-const since = new Intl.DateTimeFormat("en", {
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-
-function reason(pick: GoalPick, types: ItemType[]): string {
-  if (pick.reason === "creator" && pick.creator) {
-    const plural = (
-      types.find((type) => type.id === pick.entry.item.type)?.plural_label ??
-      "items"
-    ).toLowerCase();
-    const average =
-      pick.mean_score !== null && pick.mean_score !== undefined
-        ? `, whose ${plural} you rate ${pick.mean_score.toFixed(1)} on average`
-        : "";
-    return `By ${pick.creator}${average}.`;
-  }
-  if (pick.since) return `Waiting since ${since.format(new Date(pick.since))}.`;
-  return "Waiting for you.";
+/** The strongest reason the ranked pile gave (Sprint 132), as a sentence. */
+function reason(pick: GoalPick): string {
+  const text = pick.reasons[0]?.text;
+  return text ? `${text}.` : "Waiting for you.";
 }

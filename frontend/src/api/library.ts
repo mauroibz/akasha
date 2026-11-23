@@ -145,6 +145,44 @@ export interface ItemType {
    * the control is not rendered rather than rendered and unable to answer.
    */
   chooses_covers: boolean;
+  /**
+   * *More like this* for this library (Sprint 134): which sources suggest its
+   * things, whether each is configured, and the attribution each one's terms ask
+   * for. Absent or `null` where nothing does, so the button is not shown.
+   */
+  recommendation?: RecommendationInfo | null;
+}
+
+export interface RecommendationSourceInfo {
+  name: string;
+  label: string;
+  configured: boolean;
+  /** How to turn it on, when it is not configured. */
+  hint: string | null;
+  /**
+   * Its picks may be inventions (a hosted model's, Sprint 135): only the ones the
+   * library's providers found are shown.
+   */
+  resolved_only?: boolean;
+  /**
+   * Its picks are your own waiting entries (*From your library*, Sprint 136): a
+   * screen opens them instead of offering *Want*.
+   */
+  from_library?: boolean;
+  /** What Settings says about it: provider, model, and what it sends. */
+  about?: RecommendationSourceAbout | null;
+}
+
+export interface RecommendationSourceAbout {
+  provider?: string;
+  provider_label?: string;
+  model?: string;
+  sends?: string;
+}
+
+export interface RecommendationInfo {
+  sources: RecommendationSourceInfo[];
+  attribution: Record<string, string>;
 }
 
 /**
@@ -251,6 +289,8 @@ export interface LibraryFilters {
   cover?: "missing";
   /** Only entries with exactly this score (Sprint 116's ranking). */
   score?: number;
+  /** Only entries with no score: Home's *Tidy up* (Sprint 131). */
+  unscored?: boolean;
   /**
    * How to *say* `value`, which is normalized — case folded, diacritics
    * stripped — because that is what groups a ranking row. "julio cortazar" is
@@ -285,6 +325,7 @@ export function libraryQueryString(
   if (filters.lent) params.set("lent", "true");
   if (filters.cover) params.set("cover", filters.cover);
   if (filters.score) params.set("score", String(filters.score));
+  if (filters.unscored) params.set("unscored", "true");
   if (cursor) params.set("after", cursor);
   return params.toString();
 }

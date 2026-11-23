@@ -413,6 +413,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/entries/{entry_id}/more-like-this": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * More Like This
+     * @description A round seeded by one entry: queued, or the last one under a day old.
+     */
+    post: operations["more_like_this_api_entries__entry_id__more_like_this_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/entries/{entry_id}/refile": {
     parameters: {
       query?: never;
@@ -580,7 +600,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Goal Picks */
+    /**
+     * Goal Picks
+     * @description This library's pile, ranked (Sprint 132): the same picks `/api/pile` gives.
+     */
     get: operations["goal_picks_api_goals__item_type__picks_get"];
     put?: never;
     post?: never;
@@ -657,6 +680,55 @@ export interface paths {
     /** Ready */
     get: operations["ready_api_health_ready_get"];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/home": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Home
+     * @description Every module of Home from stored data; no provider is consulted.
+     *
+     *     `tz` is the person's IANA zone (the client sends its own): their today, and the
+     *     day an addition counts under in *Lately* (Sprint 132). Without a known one, the
+     *     server's `TZ`. Today is resolved per request, so a server running across midnight
+     *     moves on.
+     */
+    get: operations["home_api_home_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/home/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Layout
+     * @description This person's Home layout (Sprint 131); the default until one is saved.
+     */
+    get: operations["get_layout_api_home_layout_get"];
+    /**
+     * Put Layout
+     * @description Replace this person's layout; an unknown module, or one named twice, is refused.
+     */
+    put: operations["put_layout_api_home_layout_put"];
     post?: never;
     delete?: never;
     options?: never;
@@ -1364,6 +1436,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/pile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Pile
+     * @description Waiting entries ranked from the library's own data; every library when no type.
+     */
+    get: operations["pile_api_pile_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/revisit": {
     parameters: {
       query?: never;
@@ -1554,6 +1646,80 @@ export interface paths {
     patch: operations["rename_shelf_api_shelves__shelf_id__patch"];
     trace?: never;
   };
+  "/api/suggestion-rounds/{round_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Suggestion Round */
+    get: operations["suggestion_round_api_suggestion_rounds__round_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/suggestions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Suggestions
+     * @description Unanswered suggestions worth showing, newest first; stored data only.
+     */
+    get: operations["suggestions_api_suggestions_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/suggestions/{suggestion_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Answer */
+    patch: operations["answer_api_suggestions__suggestion_id__patch"];
+    trace?: never;
+  };
+  "/api/suggestions/{suggestion_id}/enrich": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Enrich Suggestion
+     * @description Find a pending suggestion in its providers now; 200 when there is nothing to do.
+     */
+    post: operations["enrich_suggestion_api_suggestions__suggestion_id__enrich_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/users": {
     parameters: {
       query?: never;
@@ -1644,6 +1810,11 @@ export interface components {
       item_id?: number | null;
       /** Record Id */
       record_id: number;
+    };
+    /** AnswerBody */
+    AnswerBody: {
+      /** Answer */
+      answer: ("want" | "not_for_me" | "seen") | null;
     };
     /** AttachmentList */
     AttachmentList: {
@@ -1866,6 +2037,12 @@ export interface components {
       b: components["schemas"]["EntryResponse"];
       /** Reason */
       reason: string;
+    };
+    /** EnrichResponse */
+    EnrichResponse: {
+      /** Job Id */
+      job_id: string | null;
+      suggestion: components["schemas"]["SuggestionResponse"];
     };
     /** EntryCreateBody */
     EntryCreateBody: {
@@ -2181,21 +2358,6 @@ export interface components {
        */
       suggest: boolean;
     };
-    /** GoalPickResponse */
-    GoalPickResponse: {
-      /** Creator */
-      creator?: string | null;
-      entry: components["schemas"]["EntryResponse"];
-      /** Mean Score */
-      mean_score?: number | null;
-      /**
-       * Reason
-       * @enum {string}
-       */
-      reason: "creator" | "waiting";
-      /** Since */
-      since?: string | null;
-    };
     /** GoalProgressResponse */
     GoalProgressResponse: {
       /** Item Type */
@@ -2222,6 +2384,233 @@ export interface components {
       period: "month" | "year";
       /** Suggest */
       suggest: boolean;
+    };
+    /**
+     * HomeActive
+     * @description The entry most recently touched among those under way.
+     */
+    HomeActive: {
+      /** Day */
+      day: number | null;
+      entry: components["schemas"]["EntryResponse"];
+    };
+    /** HomeCover */
+    HomeCover: {
+      /** Cover Url */
+      cover_url: string | null;
+      /** Entry Id */
+      entry_id: number;
+      /** Item Id */
+      item_id: number;
+      /** Item Type */
+      item_type: string;
+      /** Score */
+      score: number | null;
+      /** Title */
+      title: string;
+    };
+    /** HomeDomainTile */
+    HomeDomainTile: {
+      /** Count */
+      count: number;
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
+      /** Item Type */
+      item_type: string;
+      /** Mean Score */
+      mean_score: number | null;
+      /** Scores */
+      scores: number[];
+      /** Status Counts */
+      status_counts: {
+        [key: string]: number;
+      };
+      /** Without Cover */
+      without_cover: number;
+    };
+    /** HomeGoalCount */
+    HomeGoalCount: {
+      /** Count */
+      count: number;
+      /** Item Type */
+      item_type: string;
+      /** Target */
+      target: number;
+    };
+    /** HomeGreeting */
+    HomeGreeting: {
+      active: components["schemas"]["HomeActive"] | null;
+      /** Entries */
+      entries: number;
+      /** Goals */
+      goals: components["schemas"]["HomeGoalCount"][];
+      /** Pile */
+      pile: number;
+      /** Today */
+      today: string;
+    };
+    /**
+     * HomeLatelyRow
+     * @description A finish, a change of score, or the entries added on one day (Sprint 131).
+     */
+    HomeLatelyRow: {
+      /** At */
+      at: string;
+      /** Count */
+      count: number;
+      entry: components["schemas"]["EntryResponse"];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "finished" | "score" | "added";
+      /** Previous */
+      previous: number | null;
+      /** Score */
+      score: number | null;
+    };
+    /** HomeLayoutBody */
+    HomeLayoutBody: {
+      /** Modules */
+      modules: components["schemas"]["HomeModuleLayout"][];
+    };
+    /** HomeLayoutResponse */
+    HomeLayoutResponse: {
+      /** Defaults */
+      defaults: components["schemas"]["HomeModuleLayout"][];
+      /** Modules */
+      modules: components["schemas"]["HomeModuleLayout"][];
+    };
+    /** HomeLent */
+    HomeLent: {
+      /** Loans */
+      loans: components["schemas"]["HomeLoan"][];
+      /** Total */
+      total: number;
+    };
+    /** HomeLoan */
+    HomeLoan: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Id */
+      id: number;
+      /** Lent On */
+      lent_on: string;
+      /** Person */
+      person: string;
+    };
+    /** HomeModuleLayout */
+    HomeModuleLayout: {
+      /**
+       * Hidden
+       * @default false
+       */
+      hidden: boolean;
+      /** Module */
+      module: string;
+      /**
+       * Size
+       * @enum {string}
+       */
+      size: "S" | "M" | "L";
+    };
+    /** HomeMonth */
+    HomeMonth: {
+      /** Count */
+      count: number;
+      /** Counts */
+      counts: {
+        [key: string]: number;
+      };
+      /** Covers */
+      covers: components["schemas"]["HomeCover"][];
+      /** Month */
+      month: number;
+    };
+    /**
+     * HomeQuestion
+     * @description One question from Play: an old score to look at again, else a gap to fill.
+     */
+    HomeQuestion: {
+      entry: components["schemas"]["EntryResponse"];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "revisit" | "gap";
+      /** Scored At */
+      scored_at: string | null;
+    };
+    /**
+     * HomeResponse
+     * @description Every module's payload. A module the person hid is empty or `null`, unread.
+     */
+    HomeResponse: {
+      /** Domains */
+      domains: components["schemas"]["HomeDomainTile"][];
+      greeting: components["schemas"]["HomeGreeting"];
+      /** Lately */
+      lately: components["schemas"]["HomeLatelyRow"][] | null;
+      lent: components["schemas"]["HomeLent"] | null;
+      /** Next */
+      next: components["schemas"]["PilePick"][];
+      /** Now */
+      now: components["schemas"]["EntryResponse"][];
+      question: components["schemas"]["HomeQuestion"] | null;
+      /** Shelves */
+      shelves: components["schemas"]["HomeShelf"][] | null;
+      /** Suggested */
+      suggested: components["schemas"]["SuggestionResponse"][] | null;
+      tidy: components["schemas"]["HomeTidy"] | null;
+      year: components["schemas"]["HomeYear"] | null;
+    };
+    /** HomeShelf */
+    HomeShelf: {
+      /** Entry Count */
+      entry_count: number;
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
+    };
+    /** HomeTidy */
+    HomeTidy: {
+      /** Duplicates */
+      duplicates: number;
+      /** Unscored */
+      unscored: number;
+      /** Unscored By Type */
+      unscored_by_type: {
+        [key: string]: number;
+      };
+      /** Without Cover */
+      without_cover: number;
+    };
+    /** HomeYear */
+    HomeYear: {
+      /** Goals */
+      goals: components["schemas"]["HomeYearGoal"][];
+      /** Months */
+      months: components["schemas"]["HomeMonth"][];
+      /** Year */
+      year: number;
+    };
+    /** HomeYearGoal */
+    HomeYearGoal: {
+      /** Count */
+      count: number;
+      /** Done */
+      done: number;
+      /** Item Type */
+      item_type: string;
+      /**
+       * Period
+       * @enum {string}
+       */
+      period: "month" | "year";
+      /** Target */
+      target: number;
     };
     /**
      * ImportBrowseResponse
@@ -2560,6 +2949,7 @@ export interface components {
       /** Plural Label */
       plural_label: string;
       progress: components["schemas"]["ProgressSpecResponse"] | null;
+      recommendation?: components["schemas"]["RecommendationResponse"] | null;
       /** Statuses */
       statuses: components["schemas"]["StatusSpecResponse"][];
     };
@@ -2717,6 +3107,34 @@ export interface components {
       /** B */
       b: number;
     };
+    /** PilePick */
+    PilePick: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Reasons */
+      reasons: components["schemas"]["PileReason"][];
+      /** Score */
+      score: number;
+    };
+    /**
+     * PileReason
+     * @description One signal that fired, as a sentence naming its evidence.
+     */
+    PileReason: {
+      /**
+       * Signal
+       * @enum {string}
+       */
+      signal:
+        | "series"
+        | "creator"
+        | "affinity"
+        | "waiting"
+        | "goal"
+        | "set_aside"
+        | "similarity";
+      /** Text */
+      text: string;
+    };
     /** PreviewResponse */
     PreviewResponse: {
       /** Batch Id */
@@ -2817,6 +3235,46 @@ export interface components {
       /** Entry Ids */
       entry_ids: number[];
     };
+    /**
+     * RecommendationResponse
+     * @description *More like this* for one library (Sprint 134): which sources, and their terms.
+     */
+    RecommendationResponse: {
+      /** Attribution */
+      attribution: {
+        [key: string]: string;
+      };
+      /** Sources */
+      sources: components["schemas"]["RecommendationSourceResponse"][];
+    };
+    /**
+     * RecommendationSourceResponse
+     * @description One source that may suggest this library's things, as the server is set up.
+     */
+    RecommendationSourceResponse: {
+      /** About */
+      about?: {
+        [key: string]: string;
+      } | null;
+      /** Configured */
+      configured: boolean;
+      /**
+       * From Library
+       * @default false
+       */
+      from_library: boolean;
+      /** Hint */
+      hint: string | null;
+      /** Label */
+      label: string;
+      /** Name */
+      name: string;
+      /**
+       * Resolved Only
+       * @default false
+       */
+      resolved_only: boolean;
+    };
     /** RefileBody */
     RefileBody: {
       /** Source */
@@ -2886,6 +3344,36 @@ export interface components {
       cards: components["schemas"]["RevisitCard"][];
       /** Total */
       total: number;
+    };
+    /** RoundResponse */
+    RoundResponse: {
+      /** Created At */
+      created_at: string;
+      /** Error */
+      error: string | null;
+      /** Finished At */
+      finished_at: string | null;
+      /** Id */
+      id: number;
+      item_type: components["schemas"]["ItemTypeName"];
+      /** Seed Entry Id */
+      seed_entry_id: number | null;
+      /** Source */
+      source: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status:
+        | "queued"
+        | "selecting"
+        | "enriching"
+        | "done"
+        | "failed"
+        | "over_budget"
+        | "not_configured";
+      /** Suggestions */
+      suggestions: components["schemas"]["SuggestionResponse"][];
     };
     /**
      * RowSearchBody
@@ -3159,6 +3647,71 @@ export interface components {
     SuggestionKeyBody: {
       /** Key */
       key: string;
+    };
+    /**
+     * SuggestionReason
+     * @description Why the source chose it, in the ranked pile's shape: the signal is the source.
+     */
+    SuggestionReason: {
+      /** Signal */
+      signal: string;
+      /** Text */
+      text: string;
+    };
+    /** SuggestionResponse */
+    SuggestionResponse: {
+      /** Answer */
+      answer: ("want" | "not_for_me" | "seen") | null;
+      /** Answered At */
+      answered_at: string | null;
+      /** Cover Url */
+      cover_url?: string | null;
+      /** Created At */
+      created_at: string;
+      /** Creator */
+      creator: string | null;
+      /** Display */
+      display: {
+        [key: string]: unknown;
+      };
+      /**
+       * Enrichment
+       * @enum {string}
+       */
+      enrichment: "pending" | "enriched" | "unresolved";
+      /** Entry Id */
+      entry_id: number | null;
+      /** External Ids */
+      external_ids: {
+        [key: string]: string;
+      };
+      /** Id */
+      id: number;
+      /** Item Id */
+      item_id: number | null;
+      item_type: components["schemas"]["ItemTypeName"];
+      reason: components["schemas"]["SuggestionReason"] | null;
+      /** Round Id */
+      round_id: number;
+      seed?: components["schemas"]["SuggestionSeed"] | null;
+      /** Source */
+      source: string;
+      /** Source Score */
+      source_score: number | null;
+      /** Title */
+      title: string;
+      /** Year */
+      year: number | null;
+    };
+    /**
+     * SuggestionSeed
+     * @description The entry a round was about: what a suggestion is *more like*.
+     */
+    SuggestionSeed: {
+      /** Entry Id */
+      entry_id: number;
+      /** Title */
+      title: string;
     };
     /**
      * TimelineEvent
@@ -4191,6 +4744,7 @@ export interface operations {
         lent?: boolean;
         cover?: "missing" | null;
         score?: number | null;
+        unscored?: boolean;
         sort?:
           | "date_added"
           | "score"
@@ -4842,6 +5396,65 @@ export interface operations {
       };
     };
   };
+  more_like_this_api_entries__entry_id__more_like_this_post: {
+    parameters: {
+      query?: {
+        source?: string | null;
+        refresh?: boolean;
+      };
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoundResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Not a source of this library */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   refile_entry_api_entries__entry_id__refile_post: {
     parameters: {
       query?: never;
@@ -5385,7 +5998,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["GoalPickResponse"][];
+          "application/json": components["schemas"]["PilePick"][];
         };
       };
       /** @description Unauthorized */
@@ -5562,6 +6175,180 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  home_api_home_get: {
+    parameters: {
+      query?: {
+        tz?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  get_layout_api_home_layout_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeLayoutResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  put_layout_api_home_layout_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HomeLayoutBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeLayoutResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
         };
       };
       /** @description Unprocessable Entity */
@@ -7649,6 +8436,65 @@ export interface operations {
       };
     };
   };
+  pile_api_pile_get: {
+    parameters: {
+      query?: {
+        type?: components["schemas"]["ItemTypeName"] | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["PilePick"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
   revisit_api_revisit_get: {
     parameters: {
       query?: never;
@@ -8244,6 +9090,253 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ShelfResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  suggestion_round_api_suggestion_rounds__round_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        round_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["RoundResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  suggestions_api_suggestions_get: {
+    parameters: {
+      query?: {
+        seed_entry_id?: number | null;
+        item_type?: components["schemas"]["ItemTypeName"] | null;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuggestionResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  answer_api_suggestions__suggestion_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        suggestion_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnswerBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SuggestionResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  enrich_suggestion_api_suggestions__suggestion_id__enrich_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        suggestion_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EnrichResponse"];
+        };
+      };
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EnrichResponse"];
         };
       };
       /** @description Unauthorized */

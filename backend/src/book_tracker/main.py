@@ -16,11 +16,14 @@ from book_tracker.api.auth import users_router
 from book_tracker.api.events import router as events_router
 from book_tracker.api.export import router as export_router
 from book_tracker.api.goals import router as goals_router
+from book_tracker.api.home import router as home_router
 from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
+from book_tracker.api.pile import router as pile_router
 from book_tracker.api.providers import router as providers_router
+from book_tracker.api.suggestions import router as suggestions_router
 from book_tracker.app.body_limits import install_body_limits
 from book_tracker.app.cloudflare_access import install_cloudflare_access
 from book_tracker.app.errors import NOT_FOUND, install_error_handlers
@@ -91,7 +94,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     docs_on = configured.auth == "off"
     app = FastAPI(
         title="Akasha",
-        version="2.9.0",
+        version="3.0.0",
         lifespan=make_lifespan(configured),
         responses={422: {"model": ErrorResponse}},
         docs_url="/docs" if docs_on else None,
@@ -132,6 +135,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(users_router, responses=auth_responses)
     app.include_router(library_router, responses=auth_responses)
     app.include_router(goals_router, responses=auth_responses)
+    app.include_router(home_router, responses=auth_responses)
+    app.include_router(pile_router, responses=auth_responses)
+    app.include_router(suggestions_router, responses=auth_responses)
     app.include_router(providers_router, responses=auth_responses)
     app.include_router(imports_router, responses=auth_responses)
     app.include_router(catalog_router, responses=auth_responses)

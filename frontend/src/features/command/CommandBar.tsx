@@ -7,6 +7,7 @@ import {
   ChartBar,
   Download,
   Handshake,
+  House,
   Gamepad2,
   ListChecks,
   ListOrdered,
@@ -188,8 +189,15 @@ export function CommandBar({
       {
         id: "library",
         label: "Go to Library",
-        words: "library home books",
+        words: "library books",
         icon: <LibraryBig />,
+        run: () => go("/library"),
+      },
+      {
+        id: "home",
+        label: "Go to Home",
+        words: "home desk today start",
+        icon: <House />,
         run: () => go("/"),
       },
       {
@@ -304,7 +312,7 @@ export function CommandBar({
     label: `Go to ${view.name}`,
     words: `saved view filter ${view.query}`,
     icon: <Bookmark />,
-    run: () => go(`/?${view.query}`),
+    run: () => go(`/library?${view.query}`),
   }));
   const allActions = [actions[0], ...viewActions, ...actions.slice(1)];
   const words = query.trim().toLowerCase();

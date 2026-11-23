@@ -47,6 +47,34 @@ class Settings(BaseSettings):
     # unmetered and never blocked. 900 rather than Google's real ~1000 is deliberate
     # headroom, because their quota resets on Pacific time and the counter uses UTC.
     provider_daily_limits: dict[str, int] = Field(default_factory=lambda: {"googlebooks": 900})
+    # Daily rounds per recommendation source (Sprint 133), as JSON in
+    # AKASHA_RECOMMEND_DAILY_LIMITS: `{"tmdb": 200}`. A round asks its source once,
+    # so this bounds requests to the source itself; resolving candidates spends the
+    # provider budgets above. A source absent here is counted and never stopped.
+    recommend_daily_limits: dict[str, int] = Field(default_factory=dict)
+    # The hosted model a `model` round asks (Sprint 135, DEC-187): which kind of API,
+    # which model, and the key. Nothing runs locally. The key falls back to the
+    # provider's conventional variable, so an `ANTHROPIC_API_KEY` already in the
+    # environment is enough for the default provider; no key leaves the source
+    # `not_configured`. `recs_model_url` is the base URL of an OpenAI-compatible
+    # endpoint (OpenRouter, a vLLM server elsewhere); the other two ignore it.
+    recs_model_provider: Literal["anthropic", "gemini", "openai"] = "anthropic"
+    recs_model: str = ""
+    recs_model_key: SecretStr | None = None
+    recs_model_url: str = ""
+    anthropic_api_key: SecretStr | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
+    gemini_api_key: SecretStr | None = Field(default=None, validation_alias="GEMINI_API_KEY")
+    openai_api_key: SecretStr | None = Field(default=None, validation_alias="OPENAI_API_KEY")
+    # The hosted embedding endpoint (Sprint 136, DEC-187 point 3): Gemini, or any
+    # OpenAI-compatible `/embeddings` (OpenAI, Voyage). The Claude API has none, so
+    # `anthropic` is not a choice. The key falls back to the provider's usual
+    # variable, as the model's does; no key leaves embeddings off and the library
+    # source `not_configured`, and everything else works as before.
+    # `recs_embeddings_url` is an OpenAI-compatible base URL (`https://api.voyageai.com/v1`).
+    recs_embeddings_provider: Literal["gemini", "openai"] = "gemini"
+    recs_embeddings_model: str = ""
+    recs_embeddings_key: SecretStr | None = None
+    recs_embeddings_url: str = ""
     # Per-file cap on attachments (DEC-048). Configuration rather than code, like the
     # provider budgets above: 25 MB admits an epub, a PDF scan or a comic issue while
     # refusing the audiobook and video rips that would turn this into a media server.
@@ -107,6 +135,53 @@ class Settings(BaseSettings):
         if SECRETS_DIR.is_dir():
             file_secret_settings = SecretsSettingsSource(settings_cls, secrets_dir=SECRETS_DIR)
         return init_settings, env_settings, dotenv_settings, file_secret_settings
+
+    @field_validator(
+        "recs_model_key",
+        "recs_embeddings_key",
+        "anthropic_api_key",
+        "gemini_api_key",
+        "openai_api_key",
+        mode="before",
+    )
+    @classmethod
+    def blank_key_is_unset(cls, value: object) -> object:
+        # A compose pass-through hands an empty `.env` line over as "".
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("recs_model_provider", mode="before")
+    @classmethod
+    def blank_provider_is_the_default(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower() or "anthropic"
+        return value
+
+    @field_validator("recs_embeddings_provider", mode="before")
+    @classmethod
+    def blank_embeddings_provider_is_the_default(cls, value: object) -> object:
+        if isinstance(value, str):
+            return value.strip().lower() or "gemini"
+        return value
+
+    def recs_embeddings_secret(self) -> str | None:
+        """The embeddings' key: their own variable, else the provider's usual one."""
+        fallback = {"gemini": self.gemini_api_key, "openai": self.openai_api_key}[
+            self.recs_embeddings_provider
+        ]
+        chosen = self.recs_embeddings_key or fallback
+        return chosen.get_secret_value() if chosen is not None else None
+
+    def recs_model_secret(self) -> str | None:
+        """The model source's key: its own variable, else the provider's usual one."""
+        fallback = {
+            "anthropic": self.anthropic_api_key,
+            "gemini": self.gemini_api_key,
+            "openai": self.openai_api_key,
+        }[self.recs_model_provider]
+        chosen = self.recs_model_key or fallback
+        return chosen.get_secret_value() if chosen is not None else None
 
     @field_validator("cf_access_team_domain", "cf_access_aud", mode="before")
     @classmethod

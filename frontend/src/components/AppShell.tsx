@@ -2,6 +2,7 @@ import {
   BookOpen,
   Bookmark,
   ChartBar,
+  House,
   LibraryBig,
   LogOut,
   Plus,
@@ -55,11 +56,24 @@ interface NavItem {
 // what you do there. One label, easy to change if the owner prefers the longer
 // one; nothing downstream depends on the exact word.
 const navItems: readonly NavItem[] = [
-  { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
+  // Home leads since Sprint 130 (DEC-183); the library moved to `/library`.
+  { to: "/", label: "Home", icon: <House aria-hidden="true" /> },
+  {
+    to: "/library",
+    label: "Library",
+    icon: <LibraryBig aria-hidden="true" />,
+  },
   { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
   // One name for one place (Sprint 096, proposal I3): it was "Data", the page
-  // "Import", its step "Triage" and that step's title "Inbox".
-  { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
+  // "Import", its step "Triage" and that step's title "Inbox". Off the phone's
+  // bar since Home joined it (Sprint 130): the bar holds five, and the command
+  // bar and Home's tiles reach Import there.
+  {
+    to: "/import",
+    label: "Import",
+    icon: <Upload aria-hidden="true" />,
+    desktopOnly: true,
+  },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
   // Sprint 098: what you finished, month by month.
@@ -229,7 +243,8 @@ function ActingAsBanner({
     try {
       await stopActingAs();
       onActingAsChanged(null);
-      void navigate("/", { replace: true });
+      // "Return to your library": the library, not Home (Sprint 130).
+      void navigate("/library", { replace: true });
     } catch {
       setLeaving(false);
       toast.error("You could not return to your library. Try again.");
@@ -294,7 +309,7 @@ export function AppShell({
               aria-label="Primary"
               className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
             >
-              {/* Not a second home link: "Library" below already goes to "/". Since
+              {/* Not a second home link: "Home" below already goes to "/". Since
             Sprint 089 the mark is the background-work control: its dot breathes
             while a job runs, and it opens the recent jobs. Sized to 20px so it
             reads as a sibling of the Lucide icons beside it (docs/brand/BRAND.md). */}

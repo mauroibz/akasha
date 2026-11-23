@@ -1,0 +1,31 @@
+{
+  "recorded": false,
+  "note": "Written 2026-11-23 in each API's documented response shape: no ANTHROPIC_API_KEY, GEMINI_API_KEY or OPENAI_API_KEY was present in the development environment (DEC-187 point 4). scripts/record_model_fixtures.py replaces each provider's file with a real reply and sets its entry to recorded: true.",
+  "files": {
+    "model_anthropic_messages_rayuela.json": {
+      "provider": "anthropic",
+      "recorded": false,
+      "shape": "Claude Messages API, anthropic-version 2026-10-21, per the claude-api skill"
+    },
+    "model_gemini_generate_content_rayuela.json": {
+      "provider": "gemini",
+      "recorded": false,
+      "shape": "Gemini v1beta models/{model}:generateContent"
+    },
+    "model_openai_chat_completions_rayuela.json": {
+      "provider": "openai",
+      "recorded": false,
+      "shape": "OpenAI chat/completions"
+    },
+    "model_anthropic_messages_prose.json": {
+      "provider": "anthropic",
+      "recorded": false,
+      "shape": "a reply that ignored the JSON instruction"
+    },
+    "model_anthropic_error_401.json": {
+      "provider": "anthropic",
+      "recorded": false,
+      "shape": "Claude API error body, 401 authentication_error"
+    }
+  }
+}
