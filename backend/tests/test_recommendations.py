@@ -204,7 +204,7 @@ def test_the_registry_is_filled_from_configuration(tmp_path: Path) -> None:
 
     registry = build_source_registry(configured, None, (needs_a_token, lambda _s, _c: FakeSource()))
     assert registry.configured("fake") and not registry.configured("keyed")
-    assert build_source_registry(configured, None).names() == ("tmdb",)
+    assert build_source_registry(configured, None).names() == ("tmdb", "model")
 
 
 def _record(title: str, year: int | None, creators: tuple[str, ...]) -> SearchCandidate:

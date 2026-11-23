@@ -408,14 +408,17 @@ def test_films_and_series_declare_tmdb_and_want_on_their_list() -> None:
         domain = DOMAINS[item_type]
         spec = domain.recommendation
         assert spec is not None
-        assert spec.sources == ("tmdb",)
+        # TMDB first; the hosted model second (Sprint 135).
+        assert spec.sources == ("tmdb", "model")
         assert dict(spec.source_options["tmdb"]) == {"media": media}
         assert want_status(domain) == want
 
 
-def test_books_anime_and_albums_declare_no_source() -> None:
+def test_books_anime_and_albums_are_not_suggested_by_tmdb() -> None:
+    # They take the hosted model alone since Sprint 135.
     for item_type in ("book", "anime", "album"):
-        assert DOMAINS[item_type].recommendation is None
+        spec = DOMAINS[item_type].recommendation
+        assert spec is not None and "tmdb" not in spec.sources
 
 
 # --- A round, end to end, against recordings ------------------------------------------------
@@ -577,12 +580,18 @@ async def test_without_a_token_the_round_is_not_configured_and_says_how(tmp_path
         jobs = JobRepository(app.state.engine).claim(datetime.now(UTC))
     by_id = {row["id"]: row for row in types}
     film = by_id[FILM]["recommendation"]
-    assert film["sources"] == [
-        {"name": "tmdb", "label": "TMDB", "configured": False, "hint": film["sources"][0]["hint"]}
-    ]
+    assert film["sources"][0] == {
+        "name": "tmdb",
+        "label": "TMDB",
+        "configured": False,
+        "hint": film["sources"][0]["hint"],
+        "resolved_only": False,
+        "about": None,
+    }
+    assert [row["name"] for row in film["sources"]] == ["tmdb", "model"]
     assert "TMDB_READ_TOKEN" in film["sources"][0]["hint"]
     assert film["attribution"] == {"tmdb": TMDB_ATTRIBUTION}
-    assert by_id["book"]["recommendation"] is None
+    assert [row["name"] for row in by_id["book"]["recommendation"]["sources"]] == ["model"]
     assert queued.status_code == 202
     assert queued.json()["status"] == "not_configured"
     assert "TMDB_READ_TOKEN" in queued.json()["error"]
@@ -606,7 +615,8 @@ async def test_with_a_token_the_library_says_its_source_is_configured(tmp_path: 
         types = (await client.get("/api/item-types")).json()
     by_id = {row["id"]: row for row in types}
     for item_type in (FILM, SERIES):
-        (source,) = by_id[item_type]["recommendation"]["sources"]
+        source = by_id[item_type]["recommendation"]["sources"][0]
+        assert source["name"] == "tmdb"
         assert source["configured"] is True and source["hint"] is None
 
 

@@ -200,6 +200,12 @@ class RecommendationSourceResponse(BaseModel):
     #: Whether it can answer now; when not, `hint` says how to turn it on.
     configured: bool
     hint: str | None
+    #: Its picks may be inventions (a model's, Sprint 135): a screen shows only the
+    #: ones the library's providers found.
+    resolved_only: bool = False
+    #: What Settings says about it: `provider`, `provider_label`, `model` and what it
+    #: `sends`, for a hosted model; `None` for a source with nothing to say.
+    about: dict[str, str] | None = None
 
 
 class RecommendationResponse(BaseModel):

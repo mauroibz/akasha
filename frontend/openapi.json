@@ -4319,6 +4319,20 @@
       "RecommendationSourceResponse": {
         "description": "One source that may suggest this library's things, as the server is set up.",
         "properties": {
+          "about": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "About"
+          },
           "configured": {
             "title": "Configured",
             "type": "boolean"
@@ -4341,6 +4355,11 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "resolved_only": {
+            "default": false,
+            "title": "Resolved Only",
+            "type": "boolean"
           }
         },
         "required": [

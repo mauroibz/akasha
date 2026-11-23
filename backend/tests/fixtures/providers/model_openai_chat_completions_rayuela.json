@@ -1,0 +1,23 @@
+{
+  "id": "chatcmpl-UNRECORDED",
+  "object": "chat.completion",
+  "created": 1795400000,
+  "model": "gpt-5-mini",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"suggestions\": [{\"title\": \"Pedro Páramo\", \"creator\": \"Juan Rulfo\", \"year\": 1955, \"reason\": \"Another Latin American novel that breaks time apart, as Rayuela does.\"}, {\"title\": \"Ficciones\", \"creator\": \"Jorge Luis Borges\", \"year\": 1944, \"reason\": \"Cortázar's great precursor: labyrinths, mirrors and Buenos Aires.\"}, {\"title\": \"Los detectives salvajes\", \"creator\": \"Roberto Bolaño\", \"year\": 1998, \"reason\": \"Restless poets and a fractured structure in Rayuela's spirit.\"}, {\"title\": \"El jardín de los espejos quietos\", \"creator\": \"Aurelio Benavídez\", \"year\": 1971, \"reason\": \"A playful Argentine novel of mirrors and chance.\"}]}",
+        "refusal": null,
+        "annotations": []
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 405,
+    "completion_tokens": 263,
+    "total_tokens": 668
+  }
+}

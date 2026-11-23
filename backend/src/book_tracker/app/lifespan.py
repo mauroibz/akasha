@@ -24,7 +24,7 @@ from book_tracker.api.auth import (
     has_credentialed_user,
 )
 from book_tracker.app.providers import build_provider_catalog
-from book_tracker.app.recommendations import build_source_registry
+from book_tracker.app.recommendations import DEFAULT_RECOMMEND_LIMITS, build_source_registry
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.import_search import ImportSearchHandler
 from book_tracker.application.recommendations import (
@@ -345,7 +345,10 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
                 app.state.engine,
                 limits={
                     budget_key(name): limit
-                    for name, limit in configured.recommend_daily_limits.items()
+                    for name, limit in {
+                        **DEFAULT_RECOMMEND_LIMITS,
+                        **configured.recommend_daily_limits,
+                    }.items()
                 },
             ),
         )

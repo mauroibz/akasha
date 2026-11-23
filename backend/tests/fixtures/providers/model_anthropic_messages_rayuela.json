@@ -1,0 +1,26 @@
+{
+  "id": "msg_01UNRECORDEDEXAMPLE0000000",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "thinking",
+      "thinking": "",
+      "signature": "UNRECORDED-SIGNATURE"
+    },
+    {
+      "type": "text",
+      "text": "{\"suggestions\": [{\"title\": \"Pedro Páramo\", \"creator\": \"Juan Rulfo\", \"year\": 1955, \"reason\": \"Another Latin American novel that breaks time apart, as Rayuela does.\"}, {\"title\": \"Ficciones\", \"creator\": \"Jorge Luis Borges\", \"year\": 1944, \"reason\": \"Cortázar's great precursor: labyrinths, mirrors and Buenos Aires.\"}, {\"title\": \"Los detectives salvajes\", \"creator\": \"Roberto Bolaño\", \"year\": 1998, \"reason\": \"Restless poets and a fractured structure in Rayuela's spirit.\"}, {\"title\": \"El jardín de los espejos quietos\", \"creator\": \"Aurelio Benavídez\", \"year\": 1971, \"reason\": \"A playful Argentine novel of mirrors and chance.\"}]}"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 412,
+    "output_tokens": 286,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0
+  }
+}

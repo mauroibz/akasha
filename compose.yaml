@@ -95,6 +95,13 @@ services:
       - AKASHA_CF_ACCESS_TEAM_DOMAIN
       - AKASHA_CF_ACCESS_AUD
       - TMDB_READ_TOKEN
+      - AKASHA_RECS_MODEL_PROVIDER
+      - AKASHA_RECS_MODEL
+      - AKASHA_RECS_MODEL_KEY
+      - AKASHA_RECS_MODEL_URL
+      - ANTHROPIC_API_KEY
+      - GEMINI_API_KEY
+      - OPENAI_API_KEY
     volumes:
       - data:/data
       # Named volumes by default (DEC-075): Docker seeds a fresh volume from the

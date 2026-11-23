@@ -14,6 +14,7 @@ An `airing_status` is not a `status`, for the same reason against the entry voca
 import re
 
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import RecommendationSpec, resolve_by_identity_or_search
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
@@ -141,6 +142,15 @@ def recognize_anime_url(value: str) -> UrlMatch | None:
     return None
 
 
+# A hosted model suggests anime (Sprint 135), found by title in AniList and Kitsu
+# (a studio appended would hide a title from their search); *Want* is the plan.
+ANIME_RECOMMENDATION = RecommendationSpec(
+    sources=("model",),
+    resolve=resolve_by_identity_or_search(),
+    source_options={"model": {"kind": "anime", "creator": "studio"}},
+)
+
+
 DOMAIN = Domain(
     item_type="anime",
     label="Anime",
@@ -171,4 +181,5 @@ DOMAIN = Domain(
         ),
     ),
     ranking=RankingSpec(affinity_fields=("genres",)),
+    recommendation=ANIME_RECOMMENDATION,
 )

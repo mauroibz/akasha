@@ -159,6 +159,10 @@ class NotConfigured:
     label: str = ""
     #: The line its terms ask for wherever its suggestions are shown.
     attribution: str | None = None
+    #: Whether its picks are shown only once resolved (a model's, Sprint 135).
+    resolved_only: bool = False
+    #: What Settings says about it while it is off (which provider, which model).
+    about: Mapping[str, str] | None = None
 
 
 @runtime_checkable
@@ -172,8 +176,10 @@ class RecommendationSource(Protocol):
 
     A source may also carry `label` (what a screen calls it), `retention` (a
     `timedelta`: how long its rows may be kept, after which the maintenance pass
-    deletes them) and `attribution` (the line its terms ask for beside its rows);
-    each is read with a default when absent.
+    deletes them), `attribution` (the line its terms ask for beside its rows),
+    `resolved_only` (true when a candidate may be an invention, so the round resolves
+    every candidate and a screen shows only those found; Sprint 135) and `about` (a
+    few facts Settings shows); each is read with a default when absent.
     """
 
     name: str
@@ -246,7 +252,18 @@ class SourceRegistry:
             if configured
             else f"No source named {name!r} is built in"
         )
-        return {"name": name, "label": label, "configured": configured, "hint": hint}
+        about = getattr(found, "about", None)
+        return {
+            "name": name,
+            "label": label,
+            "configured": configured,
+            "hint": hint,
+            "resolved_only": self.resolved_only(name),
+            "about": dict(about) if about else None,
+        }
+
+    def resolved_only(self, name: str) -> bool:
+        return bool(getattr(self._sources.get(name), "resolved_only", False))
 
     def attribution(self, name: str) -> str | None:
         return getattr(self._sources.get(name), "attribution", None)
@@ -259,16 +276,18 @@ def same_work(candidate: Candidate, record: SearchCandidate) -> bool:
     """Whether a provider's record is plausibly the work a source named.
 
     The title must match once normalized (case, accents, punctuation); a year both
-    sides give may differ by one (festival versus release); a creator both sides give
-    must be among the record's. Anything looser resolves a model's invention to a
-    real stranger, which is the failure DEC-183 point 7 forbids.
+    sides give may differ by one (festival versus release) from the record's year or
+    its original year (a book's record is an edition: Ficciones 1983, first 1944); a
+    creator both sides give must be among the record's. Anything looser resolves a
+    model's invention to a real stranger, which is the failure DEC-183 point 7 forbids.
     """
     if normalize_text(candidate.title) != normalize_text(record.title):
         return False
+    years = [year for year in (record.year, record.original_year) if year is not None]
     if (
         candidate.year is not None
-        and record.year is not None
-        and abs(candidate.year - record.year) > 1
+        and years
+        and all(abs(candidate.year - year) > 1 for year in years)
     ):
         return False
     if candidate.creator and record.creators:
@@ -278,7 +297,9 @@ def same_work(candidate: Candidate, record: SearchCandidate) -> bool:
     return True
 
 
-def resolve_by_identity_or_search(identity_kinds: Sequence[str] = ()) -> Resolve:
+def resolve_by_identity_or_search(
+    identity_kinds: Sequence[str] = (), *, with_creator: bool = False
+) -> Resolve:
     """The common resolve: an identifier the candidate carries, else a title search.
 
     For each of `identity_kinds` the candidate carries, providers answering
@@ -286,8 +307,10 @@ def resolve_by_identity_or_search(identity_kinds: Sequence[str] = ()) -> Resolve
     declares `identifier_kinds` is asked only for those, so no budgeted request is
     spent on a kind it refuses before it would send anything. Then each provider
     is searched for the title alone (a creator appended hides films from a title
-    search), and the first record that is `same_work` wins, the creator and year
-    checked there.
+    search), or with the creator after it where the domain says that narrows a
+    search (`with_creator`: books and albums, whose one-word titles are many works),
+    and the first record that is `same_work` wins, the creator and year checked
+    there.
     A spent budget always propagates: it is not a miss.
     """
     kinds = tuple(identity_kinds)
@@ -314,7 +337,11 @@ def resolve_by_identity_or_search(identity_kinds: Sequence[str] = ()) -> Resolve
                     continue
                 if isinstance(record, SearchCandidate) and record.title:
                     return record
-        query = candidate.title
+        query = (
+            f"{candidate.title} {candidate.creator}"
+            if with_creator and candidate.creator
+            else candidate.title
+        )
         last_error: Exception | None = None
         answered = False
         for provider in providers.values():

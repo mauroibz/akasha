@@ -322,3 +322,33 @@ entity read and the label read. All six resolved to one entity carrying the clai
 | `wikidata_series_search_p4983_60059.json`, `wikidata_series_entity_Q14925221_better_call_saul.json`, `wikidata_series_labels_Q14925221_better_call_saul.json` | *Better Call Saul*, `tt3032476` |
 | `wikidata_series_search_p4983_80968.json`, `wikidata_series_entity_Q55657276_narcos_mexico.json`, `wikidata_series_labels_Q55657276_narcos_mexico.json` | *Narcos: Mexico* (Wikidata's label: *Narcos: México*), `tt8714904` |
 | `wikidata_series_search_p4983_71694.json`, `wikidata_series_entity_Q28429799_snowfall.json`, `wikidata_series_labels_Q28429799_snowfall.json` | *Snowfall*, `tt6439752` |
+
+## The hosted model source (Sprint 135, 2026-11-23)
+
+**The model replies below are not recordings.** No model key (`ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`, `OPENAI_API_KEY`) was present in the development environment, so each was
+written in its API's documented response shape — Claude's from the `claude-api` skill
+(Messages API, `anthropic-version: 2026-10-21`), Gemini's `generateContent` and OpenAI's
+`chat/completions` from their public references — and `model_fixtures.json` marks every one
+`"recorded": false`. This is the owner's exception to the rule above, limited to this source
+(DEC-187 point 4). `scripts/record_model_fixtures.py` replaces a provider's file with a real
+reply when its key is exported, and sets its entry to `true`.
+
+| File | Shape |
+|---|---|
+| `model_anthropic_messages_rayuela.json` | A Messages reply: an empty `thinking` block (Haiku 5.5 thinks adaptively; display is omitted by default), then one `text` block holding the JSON list — four books, the fourth invented. |
+| `model_gemini_generate_content_rayuela.json` | `candidates[0].content.parts[0].text` with the same text, `finishReason: STOP`. |
+| `model_openai_chat_completions_rayuela.json` | `choices[0].message.content` with the same text, `finish_reason: stop`. |
+| `model_anthropic_messages_prose.json` | A reply that ignored the JSON instruction: the round fails as malformed. |
+| `model_anthropic_error_401.json` | The documented error body for a refused key (`authentication_error`). |
+
+The books the model names are resolved against **real** Open Library searches, captured
+2026-11-23 through `OpenLibraryProvider.search` (title and author, as the book domain's resolve
+asks), `User-Agent: Akasha/0.1 (<contact address>)`:
+
+| File | Query |
+|---|---|
+| `openlibrary_search_pedro_paramo.json` | `Pedro Páramo Juan Rulfo` — first row *Pedro Páramo*, Juan Rulfo, first published 1955. |
+| `openlibrary_search_ficciones.json` | `Ficciones Jorge Luis Borges` — first row an edition of 1983 whose work was first published 1945; the model says 1944, within the year's tolerance once the original year counts. |
+| `openlibrary_search_los_detectives_salvajes.json` | `Los detectives salvajes Roberto Bolaño` — first row the 2005 edition of the 1998 novel. |
+| `openlibrary_search_invented_jardin.json` | `El jardín de los espejos quietos Aurelio Benavídez` — **no results**: the invented title is stored `unresolved` and never shown. |

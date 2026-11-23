@@ -3246,6 +3246,10 @@ export interface components {
      * @description One source that may suggest this library's things, as the server is set up.
      */
     RecommendationSourceResponse: {
+      /** About */
+      about?: {
+        [key: string]: string;
+      } | null;
       /** Configured */
       configured: boolean;
       /** Hint */
@@ -3254,6 +3258,11 @@ export interface components {
       label: string;
       /** Name */
       name: string;
+      /**
+       * Resolved Only
+       * @default false
+       */
+      resolved_only: boolean;
     };
     /** RefileBody */
     RefileBody: {

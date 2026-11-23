@@ -187,10 +187,15 @@ def recognize_movie_url(value: str) -> UrlMatch | None:
 # `/movie/{id}/recommendations`, naming each film by TMDB's id alone, which Wikidata
 # holds as an exact claim; an IMDb id, when a candidate carries one, is tried first,
 # and a title search is the last resort. *Want* puts it on the list to watch.
+# A hosted model (Sprint 135) comes second: its picks carry no id, so they reach
+# the title search, and only the films found there are shown.
 MOVIE_RECOMMENDATION = RecommendationSpec(
-    sources=("tmdb",),
+    sources=("tmdb", "model"),
     resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
-    source_options={"tmdb": {"media": "movie"}},
+    source_options={
+        "tmdb": {"media": "movie"},
+        "model": {"kind": "films", "creator": "director"},
+    },
 )
 
 

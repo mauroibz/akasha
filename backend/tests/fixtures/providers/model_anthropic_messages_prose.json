@@ -1,0 +1,19 @@
+{
+  "id": "msg_01UNRECORDEDEXAMPLE0000001",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-haiku-5-5",
+  "content": [
+    {
+      "type": "text",
+      "text": "You might enjoy Pedro Páramo by Juan Rulfo, and Ficciones by Borges."
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 412,
+    "output_tokens": 24
+  }
+}

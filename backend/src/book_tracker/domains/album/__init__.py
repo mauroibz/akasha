@@ -9,6 +9,7 @@ import re
 
 from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import RecommendationSpec, resolve_by_identity_or_search
 from book_tracker.domain.spec import (
     UNSORTED,
     ColumnSpec,
@@ -145,6 +146,17 @@ def recognize_album_url(value: str) -> UrlMatch | None:
     return UrlMatch("musicbrainz", "fetch", group.group(1)) if group else None
 
 
+# A hosted model suggests albums (Sprint 135). Its picks are searched in
+# MusicBrainz by title and artist, and only the ones found are shown. Albums have no
+# planned status, so *Want* puts one on the wishlist (DEC-189 point 8).
+ALBUM_RECOMMENDATION = RecommendationSpec(
+    sources=("model",),
+    resolve=resolve_by_identity_or_search(with_creator=True),
+    source_options={"model": {"kind": "albums", "creator": "artist"}},
+    want_status="wishlist",
+)
+
+
 DOMAIN = Domain(
     item_type="album",
     label="Album",
@@ -185,4 +197,5 @@ DOMAIN = Domain(
     # "Various Artists" is not an artist; ranking by creator would put it third in the
     # owner's own library (measured, docs/spotify-import-and-insights-viability.md).
     insight_suppressed_keys=frozenset({normalize_text("Various Artists")}),
+    recommendation=ALBUM_RECOMMENDATION,
 )

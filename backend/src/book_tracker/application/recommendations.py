@@ -1155,7 +1155,12 @@ class RecommendHandler:
         assert found is not None
         domain = DOMAINS.get(str(found["item_type"]))
         spec = domain.recommendation if domain is not None else None
-        top = found["suggestions"][: spec.enrich_top if spec is not None else 0]
+        # A source whose picks may be inventions (a model's) is shown only what was
+        # found, so every pick is looked up now; otherwise the first few are.
+        everything = self.registry.resolved_only(str(found["source"]))
+        top = found["suggestions"][
+            : None if everything else spec.enrich_top if spec is not None else 0
+        ]
         enriched = 0
         note: str | None = None
         for suggestion in top:
