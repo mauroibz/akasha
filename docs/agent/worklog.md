@@ -7119,3 +7119,17 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   library was removed after the run.
 - Next: the owner pushes, opens the PR, merges, tags `v3.0.0`, upgrades the board; the live
   Claude and embedding fixture checks.
+
+## 2026-11-23 — Release v3.0.0
+
+- Done: PR #41 merged (`3ba6d31`), tag `v3.0.0`, image published by `release.yml`. CI's first run
+  failed one test: Home's timing budget, 228 ms median on the shared runner against 150 ms; the
+  budget is doubled under `CI` (`6786fe2`), matching the 1.9x the runner measured slower.
+- Board: `.env`, `compose.generated.yaml` and `render-compose.sh` copied to `*.bak-2.9.0`; a fresh
+  nightly; `render-compose.sh` now also rewrites the new credential variables (setup token, model
+  and embedding keys, Anthropic, Gemini, OpenAI) back to `${VAR}`. Upgrade ran
+  `pre-migration-20261123T071948Z`, applied 0036–0038; counts unchanged (359 items, 345 entries,
+  22 attachments, 11 shelves, 2 users), integrity ok, no foreign-key violations, no error lines.
+  Read-only root, no capabilities, 1.5 GB, bound to 192.168.100.240:4441 only; ZeroTier gets
+  nothing; `/api/home` without a session is 401; the tile label still names one file.
+- Next: the owner reviews; feedback becomes minor releases.

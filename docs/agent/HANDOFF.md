@@ -2,13 +2,15 @@
 
 ## Where the project stands
 
-**2026-11-23, release 3.0.0 prepared, not tagged.** DEC-183's line (Sprints 130–136) is
-complete, the project state is `complete`, and the version surfaces say 3.0.0 on branch
-`home-and-recommendations` (local, not pushed, not merged). Release notes:
+**2026-11-23, 3.0.0 released and running on the board.** DEC-183's line (Sprints 130–136) is
+complete and merged (#41, `3ba6d31`), tagged `v3.0.0`, and the image is published. Release notes:
 `docs/operations/release-notes-v3.0.md`. What the line adds over 2.9.0: Home at `/` (the
 library moved to `/library`), the ranked pile, *More like this* with three sources (TMDB, a
 hosted model, *From your library*), Home's *More like this*, Settings → Suggestions.
-Migrations **0036–0038** are new since 2.9.0.
+Migrations **0036–0038** are new since 2.9.0. The board upgraded 2.9.0 → 3.0.0 with
+`pre-migration-20261123T071948Z`; revision 0038, counts unchanged, integrity clean. CI needed one
+change: Home's 150 ms timing budget is doubled on the shared runner, which measured 228 ms
+(`6786fe2`).
 
 **Release gates, run on this tree:** `make check`; `make test` (backend 2195, Vitest 625);
 full Playwright 239 passed, 2 skipped by design; `make audit` clean; `make build`;
@@ -18,8 +20,7 @@ clean, counts unchanged (359 items, 345 entries, 22 attachments, 11 shelves, 2 u
 ran no migration. Two fixes came out of it: Up next no longer names "General" as a subject
 (`a6f57e4`), and the add-dialog axe check waits for the fade (`c7a809f`).
 
-**The owner's next steps:** push, PR, CI, merge, tag `v3.0.0`, upgrade the board (`git
-checkout v3.0.0`, `docker compose pull && docker compose up -d`). Then the live checks no key
+**The owner's next steps:** the owner's feedback on 3.0.0 becomes minor releases. The live checks no key
 allowed here: `ANTHROPIC_API_KEY=… uv run python ../scripts/record_model_fixtures.py` and
 `GEMINI_API_KEY=… uv run python ../scripts/record_embedding_fixtures.py` from `backend/`,
 rerun `tests/test_model_recommendations.py`, `tests/test_embeddings.py` and
