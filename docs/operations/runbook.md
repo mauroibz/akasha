@@ -282,6 +282,11 @@ candidate list is read in one pass before any removal begins. Nothing is
 scheduled and nothing runs on its own, for the same reason as the attachment
 sweep — deletion by inference belongs behind a person.
 
+A suggestion the application has found in a provider is cached the same
+way, as an item no entry references (Sprint 133), so the sweep lists those too.
+Pruning one costs nothing lasting: the suggestion reads as not yet found and is
+looked up again when someone opens it.
+
 ## Restoring
 
 As with a rollback, this restores into a fresh volume and flips which one

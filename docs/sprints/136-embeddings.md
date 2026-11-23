@@ -39,6 +39,13 @@ embedding endpoint.
 6. Recordings from a real endpoint when a key is present; otherwise fixtures in the documented
    response shape, marked unrecorded, as in Sprint 135. No model runs locally.
 
+Notes from Sprint 133 (DEC-188): migration 0037 is `suggestions`, so 0038 stays this sprint's
+number. The `library` source is one more factory in `SOURCE_FACTORIES` and a name in each
+domain's `RecommendationSpec.sources`; its candidates are the person's own items, which the
+store-time filter drops as already in the library, so it needs a way to keep planned entries
+(for example a source-declared flag the store reads) — decide it here. An enriched suggestion
+has `item_id`, which is what re-ranking other sources' candidates by similarity reads.
+
 ## Acceptance criteria
 
 1. With recorded vectors, *From your library* returns the nearest planned entries to the seed

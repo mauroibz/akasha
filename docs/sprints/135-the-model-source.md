@@ -44,6 +44,21 @@ kinds are supported: the Claude API, Gemini, and any OpenAI-compatible endpoint 
    that a live run with the owner's key is pending (owner-directed exception to the recorded-real
    rule, DEC-187).
 
+Notes from Sprint 133 (DEC-188):
+
+- `TasteProfile` already carries `top_scored`, `recent_finishes`, `dismissed` and `waiting` (the
+  pile) as titles, creators, years and scores; build the prompt from it and the `Seed`. A
+  malformed reply raises `SourceError`, which fails the round with its message.
+- The daily call budget is the existing round budget: `AKASHA_RECOMMEND_DAILY_LIMITS`
+  (`{"model": …}`), counted under `recommend:model`.
+- A model candidate the domain cannot find is stored `unresolved`, and `GET /api/suggestions`
+  already leaves those out; the round endpoint lists every state, so the sheet must hide them.
+- Albums have no `planned` status, and the conformance suite refuses a `RecommendationSpec` on
+  a domain without one (*Want* puts a suggestion there). Decide where an album's *Want* goes
+  before albums declare `"model"`; that is a product question for the owner.
+- Only *More like this* (an entry seed) has an endpoint. The job already runs a seedless
+  (profile) round; a route for one is new work if the sheet or Home needs it.
+
 ## Acceptance criteria
 
 1. Against a Claude-shaped reply, a book seed yields resolved candidates and drops an invented

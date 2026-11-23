@@ -7374,3 +7374,60 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      documented response shape and are marked unrecorded, with a script to re-record them; the
      live check is the owner's, after the line. This is an owner-directed exception to the
      recorded-real-responses rule, limited to these two sources.
+
+## DEC-188 — Recommendation infrastructure: choices the sprint file left open (Sprint 133)
+
+- Date: 2026-11-23
+- Status: accepted
+- Context: Sprint 133 built the select-then-enrich pipeline (DEC-183 points 4-7) with a fake
+  source, so that TMDB (134), a hosted model (135, DEC-187) and the library's embeddings (136)
+  are each an adapter plus a domain declaration. The sprint file named the shapes; these
+  details were open.
+- Decision:
+  1. **`select` is async** (`async select(seed, profile, limit)`; the proposal sketched it
+     sync). Every real source is an HTTP request or a database query run off the loop.
+  2. **`resolve` receives the domain's providers, already budgeted.** Its signature is
+     `async (Candidate, providers) -> SearchCandidate | None`, the providers being only those
+     serving the domain, ordered by `identity.source_preference`, each wrapped so a request over
+     its daily budget raises `ProviderBudgetSpent` before it is made. The budget is therefore
+     enforced by the shared layer whatever a domain's resolve asks. `resolve_by_identity_or_search
+     (kinds)` is the shared default: an identifier the candidate carries through
+     `fetch_by_identifier`, else a search by title alone, accepting only a record whose
+     normalized title matches and whose year (within one) and creator do not disagree.
+  3. **No production domain declares a source yet.** The registry is empty until 134; the
+     `fake` source lives in `backend/tests/` and is registered by the tests. A domain declaring
+     a `RecommendationSpec` must have a `planned` status (a conformance check): *Want* puts a
+     suggestion there. Albums have none, so Sprint 135 must decide where an album's *Want* goes
+     before albums can declare the model source.
+  4. **Two budgets.** Rounds are counted per source in `provider_usage` under
+     `recommend:<source>` against `AKASHA_RECOMMEND_DAILY_LIMITS`; resolving spends the
+     existing provider budgets. A round over its source's budget is stored `over_budget` with
+     the reason; a provider budget spent mid-round leaves the rest `pending` and the round
+     `done` with the reason in `error`. Neither defers the job: a person is waiting.
+  5. **Round outcomes are statuses, not job failures.** `not_configured`, `over_budget` and
+     `failed` rounds carry `error`; the job succeeds. A source missing its configuration is
+     answered at once (202, a round `not_configured`), with no job queued.
+  6. **A resolved suggestion is a shared item with no entry**, found or created by identity
+     in the same cache an add fills, its cover installed. *Want* then creates the person's
+     entry on it in the domain's first `planned` status; it needs the suggestion `enriched`
+     (409 otherwise). An item pruned from the cache sets `item_id` NULL and the suggestion reads
+     `pending` again.
+  7. **What a round leaves out.** The library in that domain (identifier, provider source, or
+     normalized title with an agreeing creator or a year within one; a title alone matches when
+     nothing contradicts it), *not for me* answers, and a second mention in the round. *Seen it*
+     is recorded only, as the sprint file says. Added after the API pass: a work an earlier round
+     already resolved is stored resolved to the same item without a request, and
+     `GET /api/suggestions` shows each work once (the newest), because a refreshed round spent
+     three requests on films already found and listed them twice.
+  8. **A reason is `{signal: <source name>, text}`**, the pile's shape (DEC-186); the source
+     name is the signal.
+  9. **Progress is the job's progress on the existing event stream** (`{round_id, status,
+     stored, dropped, enriched, error}`), not a new event type; a page re-reads the round.
+  10. **Prerequisite repair:** the documented-route check had not listed `/api/home`,
+      `/api/home/layout` or `/api/pile` since Sprints 130-132 and failed; they are listed now.
+- Consequences: Sprint 134 adds a `tmdb` factory to `SOURCE_FACTORIES` and declares
+  `RecommendationSpec(sources=("tmdb",), resolve=…)` on movies and series. Showing a suggested
+  item's art under `AKASHA_AUTH=on` needs a decision there: `GET /api/items/{id}/cover` answers
+  only for an item the person has an entry on, so the sheet shows `display`'s poster or the
+  cover route admits items the person's suggestions point at. Migration numbering is unchanged:
+  136 still takes 0038.

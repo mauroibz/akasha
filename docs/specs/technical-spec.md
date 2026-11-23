@@ -107,6 +107,7 @@ Environment variables:
 | `AKASHA_LOGIN_WINDOW_SECONDS` | no | `300` | in-process failed-login window; resets on process restart |
 | `AKASHA_ADMIN_USERNAME` | no | empty | paired with `AKASHA_ADMIN_PASSWORD` to bootstrap the first admin at startup |
 | `AKASHA_ADMIN_PASSWORD` | no | empty | optional first-admin secret; plaintext environment/file exposure is the operator's trade-off |
+| `AKASHA_RECOMMEND_DAILY_LIMITS` | no | `{}` | rounds per recommendation source per UTC day, as JSON (`{"tmdb": 200}`); a source absent is counted and never stopped (Sprint 133) |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -273,6 +274,29 @@ The runner is one sequential loop: it reclaims expired leases only on an idle pa
   increments it, and a day with no rows is a day nothing was counted
 - configuration, not code: `AKASHA_PROVIDER_DAILY_LIMITS` names the metered
   providers and their ceilings; a provider absent from the mapping is unmetered
+
+`suggestion_rounds` (migration 0037, Sprint 133)
+
+- `id` integer primary key; `user_id` foreign key to users, cascade delete
+- `item_type`, `source` (a name in the source registry), `status` (`queued`, `selecting`,
+  `enriching`, `done`, `failed`, `over_budget`, `not_configured`), nullable `error`
+- nullable `seed_entry_id` foreign key to entries, `SET NULL` on delete: no seed means the
+  person's taste profile, and a deleted seed leaves its round unseeded
+- `created_at`, nullable `finished_at`; indexed on `(user_id, seed_entry_id, source, created_at)`
+
+`suggestions` (migration 0037, Sprint 133)
+
+- `id` integer primary key; `round_id` foreign key to `suggestion_rounds` and `user_id` to
+  users, both cascade delete; `item_type`
+- the source's candidate: `title`, nullable `year` and `creator`, `external_ids_json`
+  (kind to value), `reason` (one sentence), nullable `source_score`, `display_json` (what the
+  source gave for showing it, stored and never interpreted)
+- `enrichment` (`pending`, `enriched`, `unresolved`) and nullable `item_id`, foreign key to
+  items, `SET NULL` on delete: the shared item the domain resolved it to. A suggestion whose
+  item was pruned reads as `pending` again
+- nullable `answer` (`want`, `not_for_me`, `seen`) and `answered_at`; `created_at`
+- indexed on `(user_id, item_type, created_at)`, `round_id` and `item_id`. None of the
+  vocabularies is a schema constraint
 
 `attachments`
 
@@ -626,6 +650,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `plural_label` | The label counted, for copy that counts: "142 Books", "3 Anime". Declared because an added "s" is wrong for anime and series (Sprint 102). |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
 | `ranking` | A `RankingSpec` (Sprint 132): `series_field`, a declared `one` text field naming a work's series, its place read from "Name #2", "Name, #2" or "Name (2)"; `series_in_title`, whether a trailing "(Series, #N)" in the title names it (a Goodreads title); `affinity_fields`, declared groupable fields whose values are a taste (subjects, genres). The default declares nothing, and the pile is then ranked by creators, waiting and what was set aside. |
+| `recommendation` | A `RecommendationSpec` (Sprint 133) or `None`, the default: `sources`, names in the recommendation source registry in the order a screen offers them (the first configured one answers a round that names none); `resolve`, `async (Candidate, providers) -> SearchCandidate \| None`, finding a candidate in the domain's own providers (`resolve_by_identity_or_search(kinds)` is the common one); `enrich_top`, how many of a round are resolved straight away (3). A domain declaring one must have a `planned` status, where *Want* puts a suggestion. See section 6.7. |
 | `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
 Plus, outside the record itself:
@@ -688,6 +713,49 @@ Anything else a domain has to edit outside its own package is a coupling, and a 
 `backend/tests/test_domain_conformance.py` is parametrized over `DOMAINS`: a domain is held to the contract **by existing**, and nothing in that file is extended when one is added. Its checks split in two, and the split is load-bearing. `REGISTRY_CHECKS` are what a domain satisfies on its own, and an unregistered fixture domain satisfies all of them — that is what makes this a contract rather than a description of books and albums. `CORE_CHECKS` are whether the core can host the domain: whether the published unions carry its values, and whether the database will accept them.
 
 The suite is required to be able to fail. Malformed domains declared inside the file — a status with no label, a default outside the vocabulary, a `rows` field with no columns, a recognizer that raises — must each be rejected by the check that owns them.
+
+### 6.7 Recommendations: select, then enrich
+
+Sprint 133 (DEC-183 points 4-7, DEC-188). A round is one person's request to one source,
+seeded by one entry (*More like this*) or by their taste profile:
+
+```text
+SEED -> SELECT (the source, one request) -> STORE -> ENRICH (the domain's resolve, top few) -> ANSWER
+```
+
+- **Sources** implement `RecommendationSource` (`domain/recommendations.py`): `name` and
+  `async select(seed, profile, limit) -> [Candidate]`, called once per round with `limit` 12.
+  A `Seed` carries the entry's title, year, creators, metadata and `external_ids` (its
+  identifiers and provider sources, kind to value); a `TasteProfile` carries, for one library,
+  the top scores, recent finishes, suggestions answered *not for me* and the pile, as titles,
+  creators, years and scores only. A `Candidate` is `title`, `year`, `creator`,
+  `external_ids`, `reason`, `source_score`, `display`. A source raises `SourceError` for a
+  failure the round should record; it never calls a metadata provider per candidate.
+- **The registry** (`app/recommendations.py`) is built at start from `SOURCE_FACTORIES`, each
+  reading configuration and returning the source or a `NotConfigured(name, hint)`. Which
+  provider backs a source is this configuration, never a domain's. Sprint 133 registers none;
+  the test-only `fake` source (`backend/tests/recommendation_fake.py`, recorded in
+  `tests/fixtures/recommendations/`) proves the pipeline.
+- **The `recommend` job** (payload `{round_id}`, owner the person) checks the source's daily
+  round budget (`provider_usage` under `recommend:<source>`, limits from
+  `AKASHA_RECOMMEND_DAILY_LIMITS`), asks the source once, stores the candidates, then resolves
+  the first `enrich_top` through the domain's `resolve`. Storing drops what the person's
+  library in that domain already holds (by identifier or provider source, or by normalized
+  title with a creator or a year within one that agrees), what they answered *not for me*, and
+  a second mention in the round; a work an earlier round already resolved is stored resolved
+  to the same item, at no request. Resolving hands `resolve` only the providers serving the
+  domain, each wrapped so that a request over its `AKASHA_PROVIDER_DAILY_LIMITS` budget raises
+  `ProviderBudgetSpent` before it is made; the rest of the round then waits `pending` and the
+  round's `error` says why. A resolved record is cached as a shared item with no entry (its
+  cover installed as an add would), and the suggestion points at it; `None` stores it
+  `unresolved`, never shown. A source without configuration, over its budget, or failing ends
+  the round `not_configured`, `over_budget` or `failed` with the reason in `error`; the job
+  itself succeeds, and nothing retries a round behind the person's back.
+- **The `enrich_suggestion` job** (payload `{suggestion_id}`) resolves one pending suggestion
+  someone opened, under the same budgets.
+- **Progress** is the job's progress on the event stream: `{round_id, status, stored,
+  dropped, enriched, error}` for a round, `{suggestion_id, enrichment}` for one suggestion.
+- **Reading never calls a provider or a source.** Only the two jobs do.
 
 ## 7. HTTP API contract
 
@@ -781,6 +849,31 @@ The product-spec route list is authoritative, with these refinements:
   from its last change ("Started 1 Nov 2026, then set aside"). Ties break on entry id. Which
   fields carry a series or a taste is the domain's `RankingSpec`. Under 100 ms for a 2,000-entry
   pile (about 26 ms in its test).
+- Suggestions (Sprint 133, section 6.7), all scoped to the requester (another person's round,
+  suggestion or seed entry is a 404):
+  - `POST /api/entries/{id}/more-like-this?source=&refresh=` answers 202 with the round
+    (`{id, item_type, seed_entry_id, source, status, error, created_at, finished_at,
+    suggestions}`). It shows the newest round for that seed and source under a day old again
+    unless `refresh=true` (a `failed`, `over_budget` or `not_configured` round is never shown
+    again in place of asking). `source` defaults to the domain's first configured one; one the
+    domain does not declare is a 422 `unknown_recommendation_source`, and a domain declaring no
+    `RecommendationSpec` is a 409 `no_recommendation_source`. A declared source missing its
+    configuration stores and returns a round `not_configured` whose `error` says how to set it
+    up; nothing is queued and nothing fails.
+  - `GET /api/suggestion-rounds/{id}`: the round with every suggestion it stored, in the
+    source's order, whatever their state.
+  - `GET /api/suggestions?seed_entry_id=&item_type=&limit=` (`limit` 1–100, default 20): the
+    unanswered suggestions worth showing, newest round first: not `unresolved`, not since in
+    the library, each work once. A suggestion is `{id, round_id, item_type, source, title,
+    year, creator, external_ids, reason: {signal: <source>, text} | null, source_score,
+    display, enrichment, item_id, entry_id, answer, answered_at, created_at}`.
+  - `POST /api/suggestions/{id}/enrich`: 202 `{suggestion, job_id}` with an
+    `enrich_suggestion` job queued, or 200 with `job_id: null` when it is not `pending`.
+  - `PATCH /api/suggestions/{id}` `{answer: want | not_for_me | seen | null}`. `want` adds the
+    resolved item as an entry in the domain's first `planned` status (409
+    `suggestion_not_resolved` until it is `enriched`; wanting twice keeps the one entry).
+    `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
+    `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays.
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
   `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,

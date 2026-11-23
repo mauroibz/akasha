@@ -212,6 +212,7 @@ DOMAIN = Domain(
     chooses_covers=False,           # the cover chooser: see §5
     list_columns=None,              # the custom-list vocabulary: see §8's list note
     ranking=RankingSpec(),          # what the ranked pile reads: see below
+    recommendation=None,            # what may suggest your things: see §6b
 )
 ```
 
@@ -657,6 +658,7 @@ writing any of it, stop — you are about to duplicate something:
 | Backup and restore | nightly, verified, with a tested restore |
 | Covers | validated, resized, stored locally, never re-fetched while a page renders |
 | The ranked pile | *Up next* and a goal's picks, with reasons, for any domain with a `planned` status; declare `RankingSpec(series_field=…, series_in_title=…, affinity_fields=(…))` to add a series and a taste signal from your own fields (Sprint 132, DEC-186) |
+| Suggestions | *More like this*, stored rounds, enrichment under the provider budgets and *Want* / *Not for me* / *Seen it*, once you declare `RecommendationSpec` (§6b; Sprint 133, DEC-188) |
 
 ---
 
@@ -760,6 +762,55 @@ and that each can answer enrichment.
 
 **Two things the shared pipeline still owns**, and you do not: the fill-empty-only rule, and the
 ledger effect that makes an enrichment undoable along with the import that queued it.
+
+---
+
+## 6b. Recommendation sources
+
+Suggestions select first and enrich after (DEC-183): a **source** picks candidates in one
+request, and only then does **your domain** find the chosen few in its own providers, under the
+same daily budgets enrichment uses. Nothing crawls a provider to decide what to suggest.
+
+You declare which sources may suggest your things, and how a candidate is found:
+
+```python
+# domains/<item_type>/__init__.py
+from book_tracker.domain.recommendations import RecommendationSpec, resolve_by_identity_or_search
+
+DOMAIN = Domain(
+    ...,
+    recommendation=RecommendationSpec(
+        sources=("tmdb",),                                  # names in the source registry
+        resolve=resolve_by_identity_or_search(("imdb",)),   # how a candidate is found
+        enrich_top=3,                                       # resolved straight away
+    ),
+)
+```
+
+- **`sources`** are names, not objects. Which object answers a name, and with which key, is
+  configuration: `app/recommendations.py` builds the registry from `SOURCE_FACTORIES`, and a
+  source missing its configuration answers a round `not_configured` with a hint instead of
+  failing. A screen offers them in your order.
+- **`resolve`** is `async (Candidate, providers) -> SearchCandidate | None`. It receives only
+  the providers serving your domain, each already held to its daily budget (a spent one raises
+  `ProviderBudgetSpent` before the request; let it propagate). Return the record found, or
+  `None` when nothing matches: the suggestion is then `unresolved` and never shown, which is how
+  a model's invention is kept out. `resolve_by_identity_or_search(kinds)` covers most domains:
+  an identifier the candidate carries (via `fetch_by_identifier`), else a title search that
+  accepts only a record whose normalized title matches and whose year and creator do not
+  disagree. Write your own when your providers know better (an album by artist and title).
+- **A `planned` status is required.** *Want* adds the resolved item there, and the conformance
+  suite refuses a `RecommendationSpec` on a domain without one.
+
+**Writing a source** is the other half, and it is shared: one class with `name` and
+`async select(seed, profile, limit) -> list[Candidate]`, called once per round, plus a factory
+in `SOURCE_FACTORIES` that reads its configuration. `seed` is the entry (title, year, creators,
+metadata, and every identifier and provider id as `external_ids`) or, with no entry, nothing
+but the domain; `profile` is the person's top scores, recent finishes, *not for me* answers and
+pile in that library, as titles, creators, years and scores only. Raise `SourceError` for a
+failure the round should record. Test it against recorded responses, as a provider is tested;
+`backend/tests/recommendation_fake.py` is the shape, and `tests/test_recommendations.py` drives
+the pipeline with it.
 
 ---
 
@@ -881,6 +932,8 @@ library." It is recorded under **Not scheduled** in `docs/sprints/ROADMAP.md` wi
 | `domain/registry.py` | Which domains *exist*: `DOMAINS`, `DEFAULT_DOMAIN`, the three published unions |
 | `domain/providers.py` | `SearchCandidate`, `ItemPayload`, the `Provider` protocol, `IdentityStrategy`, `merge_and_rank` |
 | `domain/importers.py` | The `Importer` protocol and neutral import snapshot/record shapes |
+| `domain/recommendations.py` | `RecommendationSpec`, `RecommendationSource`, `Seed`, `TasteProfile`, `Candidate`, the source registry, `resolve_by_identity_or_search` |
+| `app/recommendations.py` | Which recommendation sources this build constructs, from configuration |
 | `domains/book/` | Books: declaration, Open Library and Google Books adapters, Goodreads and Calibre importers |
 | `domains/album/` | Albums: declaration, MusicBrainz and Cover Art Archive adapter |
 | `domains/anime/` | Anime: declaration, AniList and Kitsu adapters, MyAnimeList importer |

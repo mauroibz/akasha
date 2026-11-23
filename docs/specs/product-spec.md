@@ -41,7 +41,10 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 - Ebook file management or runtime linkage to Kavita/Calibre. Read-only Calibre
   metadata import is explicitly in scope.
 - Statistics dashboards, year-in-review. *Recommendations* left this list in 2026-11 (DEC-183):
-  the pile is ranked locally since Sprint 132 (see *Up next* under §7 Screens)
+  the pile is ranked locally since Sprint 132 (see *Up next* under §7 Screens). Suggestions
+  from outside the library (*More like this*) select first and enrich after: since Sprint 133
+  they are stored per person with their answers (*Want* adds a planned entry, *Not for me* keeps
+  a work out of later rounds), and the first source and screen arrive in Sprint 134
 - Mobile app (responsive web is enough)
 
 ---

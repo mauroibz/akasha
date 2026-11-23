@@ -1920,10 +1920,16 @@ whole, recorded as **DEC-183**; the design is
   Home's year fills its row and Lately groups by the person's day; see the sprint's Outcome.]
 - **[133 — Recommendation infrastructure](133-recommendation-infrastructure.md)**: sources per
   domain, suggestions storage, a budgeted `recommend` job, endpoints.
+  [Closed 2026-11-23 (DEC-188). Five criteria met; migration 0037; `RecommendationSpec`,
+  the source registry, the `recommend` and `enrich_suggestion` jobs and five endpoints, proven
+  with a test-only fake source over recorded Cinemeta; no production domain declares a source
+  yet; see the sprint's Outcome.]
 - **[134 — TMDB, and More like this](134-tmdb-and-more-like-this.md)**: the first real source,
-  the side sheet, the Home module.
-- **[135 — The model source](135-the-model-source.md)**: any OpenAI-compatible endpoint, off
-  until configured.
+  the side sheet, the Home module. [After 133: a `tmdb` factory in `SOURCE_FACTORIES` and a
+  declaration on movies and series; how a suggested item's art shows under auth (DEC-188).]
+- **[135 — The model source](135-the-model-source.md)**: a hosted model by API key (Claude,
+  Gemini or OpenAI-compatible, DEC-187), off until configured. [After 133: albums have no
+  `planned` status, which a `RecommendationSpec` requires (DEC-188 point 3).]
 - **[136 — Embeddings](136-embeddings.md)**: similarity re-ranking and *From your library*.
 
 ## Not scheduled
