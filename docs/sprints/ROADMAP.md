@@ -2,7 +2,7 @@
 
 **Plan revision:** 56
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 139, the first of the owner's 2026-11-23 line (DEC-193); see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
+**Active sprint:** none. Sprints 139–148, the owner's 2026-11-23 line (DEC-193, amended by DEC-194), are completed; see "The library is the home again" below. Sprints 109–121, the owner's 2026-10-23 line (DEC-176, DEC-178), are completed; see "The house and the history" below. Sprints 107–108, the owner's 2026-10-22 request for an optional
 episode and chapter tracker (DEC-171, DEC-172), are completed; see "Episodes and chapters" below. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
 by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
@@ -1987,6 +1987,13 @@ follow the owner's order, and there are theme presets.
   on a widget; the navigation is *Library* and *Journal*.
 - **[147 — Every day](147-every-day.md)**: this week or this month as lit days. One migration.
 - **[148 — Themes](148-themes.md)**: four presets and the picker. Closes the line; 4.0.0.
+
+All ten are completed (2026-11-23). As built, against the plan: the shell's field opens the
+bar rather than being the input, and the Library keeps its own field in its sticky toolbar
+(140); a shelf's page stays covers to look at and links into the Library, and the pile and
+*Lent out* keep their pages (144, DEC-194); saved views are drawn as shelves without a schema
+change (145); *Every day* counts the media kept in front and offers what is under way (147).
+Two migrations, 0039 and 0040. Not released: the version surfaces read 3.1.0.
 
 ## Not scheduled
 

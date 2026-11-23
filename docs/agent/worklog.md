@@ -7269,3 +7269,20 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   tests: `test_isolation.py`, `test_app_shape.py` (regenerate its fixture) and
   `test_library_api.py`.
 - Next: Sprint 148, themes, the last of the line.
+
+## 2026-11-23 — Sprint 148: themes (complete); the 4.0 line is built
+
+- Done: four presets and `ThemePicker`. With it Sprints 139–148 (DEC-193) are complete on
+  branch `library-first-4.0`, nothing pushed.
+- Verified: the line's gates on the final tree: `make check`; `make test` (backend 2,229,
+  Vitest 760); every Playwright project, 249 passed and 2 skipped by design; `make audit`
+  clean. `make smoke-container` not run (a release step).
+- Found by the full suites and fixed: a `CHECK` constraint freezing a vocabulary in migration
+  0040; a recommendations test assuming *More like this* is shown by default; the
+  production-bundle spec clicking a navigation link that left in Sprint 140. The first two
+  would have been caught per sprint by running `test_migrations.py` with any migration and
+  the tests that read `/api/home` with any change to its defaults.
+- Not done, on purpose: no version bump, release notes, tag, push or deploy. The owner asked
+  for the build, not a release.
+- Next: the owner's review. Open for them: the presets' names; DEC-194's choices on shelves;
+  whether to release as 4.0.0.

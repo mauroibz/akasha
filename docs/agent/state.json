@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 56,
-  "project_status": "in_progress",
-  "active_sprint": "148",
-  "active_sprint_file": "docs/sprints/148-themes.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "147",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "148",
   "completed_sprints": [
     "001",
     "002",
@@ -153,8 +153,9 @@
     "144",
     "145",
     "146",
-    "147"
+    "147",
+    "148"
   ],
-  "started_at": "2026-11-23T14:34:46-03:00",
-  "updated_at": "2026-11-23T14:34:46-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T15:00:05-03:00"
 }

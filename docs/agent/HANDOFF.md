@@ -2,27 +2,42 @@
 
 ## Where the project stands
 
-**2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
-139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
-all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`), 142 (Arrange), 143
-(your media), 144 (shelves as a view), 145 (shelves with a rule), 146 (the Journal) and 147 (every
-day) are complete; **Sprint 148 (themes) is next**, the last. Migrations **0039** and **0040**
-are new since 3.1.0. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
-to release applied to the 3.0 line only.
+**2026-11-23, the 4.0 line is built and not released.** Sprints 139–148 (DEC-193, amended by
+DEC-194; the design is `docs/library-first-proposal.md` with its mockup) are complete on branch
+`library-first-4.0`, all commits local, nothing pushed. The project state is `complete`. The
+running board is still 3.1.0. **Do not tag, push or deploy without asking:** the owner asked
+for the build; the standing permission to release applied to the 3.0 line only.
 
-What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<main>`; widths
-`wide`, `reading`, `focus`), `components/Cover.tsx`, and `components/DomainStrip.tsx` as
-underlined tabs, each held by `src/test/frame.test.ts`. A new page uses all three.
+What the line changed, in one paragraph: the Library is at `/` with a front above its grid
+(the greeting, *On now*, *Lately*, showcases arranged in place); the navigation is *Library*
+and *Journal*, with the bar as a field between them and *Add* and *Import* in its footer;
+shelves are a view of the Library, with the pile, what is lent and saved views drawn among
+them; the Journal is the Diary, Insights and the games, opening on a widget (*Every day*,
+*Play*, *Goal*); each person orders their media and marks each Front, Kept or Off; four theme
+presets. Migrations **0039** (`media_preferences`) and **0040** (`lit_days`) are new since
+3.1.0.
 
-What 140 left: the navigation is places only; `AppShell` draws the bar as a field except on
-`/` (the Library has its own), and "N to sort" in both headers; *Add* and
-*Import* are reached from the bar's footer.
+**Gates on this tree:** `make check`; `make test` (backend 2,229, Vitest 760); every
+Playwright project 249 passed, 2 skipped by design; `make audit` clean. Not run:
+`make smoke-container`, and an upgrade of a copy of the board's library (a copy of the
+development library was migrated 0038 → 0040 with counts unchanged).
 
-The owner's choices that are not obvious from the proposal's first sections: the Library keeps
-the first mockup's drawing (cards for *Now*, a row for *Lately*); the stronger style (boards, a
-bookplate, a lamp) was rejected. The Journal opens on a widget switcher (*Every day*, *Play*,
-*Goal*), not on notes. *Every day* shows a week or a month and asks what a lit day was for,
-in one skippable step: "simple and calm".
+**For a release, still to do:** move the version surfaces from 3.1.0, write
+`docs/operations/release-notes-v4.0.md` (addresses that redirect: `/library`, `/shelves`,
+`/insights`, `/diary`), `make smoke-container`, rehearse the upgrade on a copy of the board's
+library, then the PR, the tag and the board, each on the owner's word.
+
+**For the owner to settle:** the presets' names and number; DEC-194 (a shelf's page stays
+covers to look at and links into the Library; `/pile` and `/lent` keep their pages; *Pin to
+library* stays); the shell's field opens the bar instead of being typed into in place; saved
+views were not moved into the shelves table.
+
+**Where things are:** `components/PageFrame.tsx`, `Cover.tsx`, `DomainStrip.tsx` (one frame,
+held by `src/test/frame.test.ts`); `features/home/` (the Library's front: `LibraryFront`,
+`useArrange`, `Arrange`, `InsightShowcase`); `features/media/`; `features/shelves/ShelvesView`
+and `useRuleShelves`; `pages/JournalPage.tsx` and `features/journal/`; `features/theme/`.
+A new API route needs `test_isolation.py`, `test_app_shape.py` (regenerate the fixture) and
+`test_library_api.py`'s route list; a new migration, `test_migrations.py`.
 
 **Environment warning:** a local Akasha 1.5.7 container (`akasha-akasha-1`) listens on
 127.0.0.1:8000, where the Playwright dev server proxies unstubbed `/api` calls; with it up,

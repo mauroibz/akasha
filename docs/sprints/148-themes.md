@@ -1,7 +1,7 @@
 # Sprint 148 — Themes
 
 **Sprint:** 148
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 147
 **Owner:** Mauro
@@ -55,7 +55,7 @@ Free colour pickers. Per-medium themes.
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commit: `HASH`. This closes the 4.0 line.
+Completed 2026-11-23 (DEC-193). Commit: `fb6c231`. This closes the 4.0 line.
 
 - **Presets.** *Moss*, *Claret*, *Dusk* (dark) and *Sakura* (light) as complete token sets in
   `index.css`. The dark ones carry *Ink*'s score ramp and *Sakura* carries *Paper*'s.
