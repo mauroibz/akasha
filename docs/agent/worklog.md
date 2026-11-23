@@ -7158,3 +7158,14 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Next: the release gates (`make test`, the full Playwright suite with
   `AKASHA_E2E_BACKEND=http://127.0.0.1:9` while the local 1.5.7 container holds :8000, audit,
   build, smoke-container), release notes, `v3.1.0`, the board.
+
+## 2026-11-23 — Release v3.1.0
+
+- Done: PR #42 merged (`40779d9`), tag `v3.1.0`, image published by `release.yml`; CI green on
+  the first run. Board: `.env` and `compose.generated.yaml` copied to `*.bak-3.0.0`,
+  `nightly-20261123T142950Z`, `git checkout v3.1.0`, `AKASHA_VERSION=3.1.0`, render, pull, up.
+  Healthy; revision 0038 (no migration), integrity ok, no foreign-key violations, counts
+  unchanged (359 items, 345 entries, 11 shelves, 2 users, 22 attachments); read-only root, no
+  capabilities, bound to 192.168.100.240:4441 only; `/api/home` and `/api/pile` 401 without a
+  session; no error lines in the log.
+- Next: the owner's new work.

@@ -2,7 +2,7 @@
 
 ## Where the project stands
 
-**2026-11-23, 3.1.0 prepared on `owner-review-3.1`.** The owner reviewed 3.0.0 on the board and
+**2026-11-23, 3.1.0 released and running on the board** (#42, tag `v3.1.0`; no migration). The owner reviewed 3.0.0 on the board and
 asked for six changes (DEC-192), built as Sprints 137 (finishing records when; *Mark as read*;
 the pile in rounds by creator; `/pile`, the pile as a list) and 138 (Home's module families: a
 year per library, `year:<item type>`, and a module per shelf, `shelf:<id>`). No migration and
