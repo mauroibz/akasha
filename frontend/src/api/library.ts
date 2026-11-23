@@ -159,6 +159,20 @@ export interface RecommendationSourceInfo {
   configured: boolean;
   /** How to turn it on, when it is not configured. */
   hint: string | null;
+  /**
+   * Its picks may be inventions (a hosted model's, Sprint 135): only the ones the
+   * library's providers found are shown.
+   */
+  resolved_only?: boolean;
+  /** What Settings says about it: provider, model, and what it sends. */
+  about?: RecommendationSourceAbout | null;
+}
+
+export interface RecommendationSourceAbout {
+  provider?: string;
+  provider_label?: string;
+  model?: string;
+  sends?: string;
 }
 
 export interface RecommendationInfo {

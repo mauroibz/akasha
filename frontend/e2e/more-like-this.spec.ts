@@ -33,7 +33,9 @@ test("the sheet fills in from the event stream and keeps its answers", async ({
     sheet.getByText("5 picked by TMDB in one request · 3 found so far"),
   ).toBeVisible();
   expect(
-    state.requests.filter((r) => r === "POST /api/entries/7/more-like-this"),
+    state.requests.filter(
+      (r) => r === "POST /api/entries/7/more-like-this?source=fake",
+    ),
   ).toHaveLength(1);
 
   // Opening a pending one looks it up; the stream says when it is found.
@@ -72,6 +74,82 @@ test("without a configured source the button explains and asks nothing", async (
   await expect(sheet.getByText(/Set TMDB_READ_TOKEN/)).toBeVisible();
   await expect(sheet.getByRole("button", { name: "Refresh" })).toHaveCount(0);
   expect(state.requests.some((r) => r.includes("more-like-this"))).toBe(false);
+});
+
+test("the segment chooses the model, which shows only what was found", async ({
+  page,
+}) => {
+  const state = await stubSuggestions(page, { model: true });
+  await page.goto("/books/7");
+  await page.getByRole("button", { name: "More like Seven Samurai" }).click();
+  const sheet = page.getByRole("dialog", { name: "More like Seven Samurai" });
+  const segment = sheet.getByRole("radiogroup", { name: "Source" });
+  await expect(segment.getByRole("radio", { name: "TMDB" })).toBeChecked();
+  await segment.getByRole("radio", { name: "Model" }).click();
+  await expect(segment.getByRole("radio", { name: "Model" })).toBeChecked();
+  const list = sheet.getByRole("list", { name: "Suggestions" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list.getByText("Samurai of the Moonless Tide")).toHaveCount(0);
+  await expect(list.getByText("Red Beard")).toHaveCount(0);
+  await expect(
+    sheet.getByText("4 named by Model · 2 found in your providers"),
+  ).toBeVisible();
+  await expect(sheet.getByText(/Claude · claude-haiku-5-5/)).toBeVisible();
+  await expect(sheet.getByText(ATTRIBUTION)).toHaveCount(0);
+  expect(
+    state.requests.filter((r) => r.startsWith("POST /api/entries/7/more")),
+  ).toEqual([
+    "POST /api/entries/7/more-like-this?source=fake",
+    "POST /api/entries/7/more-like-this?source=model",
+  ]);
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    results.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => v.id),
+  ).toEqual([]);
+});
+
+test("without a model key, the Model segment says how and asks nothing", async ({
+  page,
+}) => {
+  const state = await stubSuggestions(page, { model: false });
+  await page.goto("/books/7");
+  await page.getByRole("button", { name: "More like Seven Samurai" }).click();
+  const sheet = page.getByRole("dialog", { name: "More like Seven Samurai" });
+  await sheet.getByRole("radio", { name: "Model" }).click();
+  await expect(sheet.getByText(/Set AKASHA_RECS_MODEL_KEY/)).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Refresh" })).toHaveCount(0);
+  expect(state.requests.some((r) => r.includes("source=model"))).toBe(false);
+});
+
+test("Settings says which sources are on and what the model is sent", async ({
+  page,
+}) => {
+  await page.route("**/api/item-types", (route) =>
+    route.fulfill({ json: [movieType(true, { model: false })] }),
+  );
+  await page.goto("/settings");
+  const section = page.getByRole("region", { name: "Suggestions" });
+  await expect(section.getByRole("listitem")).toHaveCount(2);
+  await expect(section.getByText("Claude ·")).toBeVisible();
+  await expect(
+    section.getByText(
+      "What it is sent: Titles, creators, years and your scores from this library; nothing else.",
+    ),
+  ).toBeVisible();
+  await expect(section.getByText(/Set AKASHA_RECS_MODEL_KEY/)).toBeVisible();
+  const results = await new AxeBuilder({ page })
+    .include("section[aria-labelledby='suggestion-sources']")
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  expect(
+    results.violations
+      .filter((v) => v.impact === "serious" || v.impact === "critical")
+      .map((v) => v.id),
+  ).toEqual([]);
 });
 
 test("Home shows the newest found picks with TMDB's line", async ({ page }) => {

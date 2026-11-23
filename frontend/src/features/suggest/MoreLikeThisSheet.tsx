@@ -33,6 +33,8 @@ export interface Seed {
   entryId: number;
   title: string;
   type: string;
+  /** The source to show first (Home opens a pick in the round that chose it). */
+  source?: string;
 }
 
 const answered: Record<SuggestionAnswer, string> = {
@@ -42,16 +44,41 @@ const answered: Record<SuggestionAnswer, string> = {
 };
 
 /** What a round is doing, in words, while it is not done. */
-function progressLine(round: SuggestionRound, label: string): string | null {
+function progressLine(
+  round: SuggestionRound,
+  label: string,
+  resolvedOnly: boolean,
+): string | null {
   switch (round.status) {
     case "queued":
     case "selecting":
       return `Asking ${label}…`;
     case "enriching":
-      return "Finding the first few in your providers…";
+      return resolvedOnly
+        ? `Looking up what ${label} named in your providers…`
+        : "Finding the first few in your providers…";
     default:
       return null;
   }
+}
+
+/** The line under a finished round: how many, and how many were found. */
+function doneLine(
+  label: string,
+  stored: number,
+  shown: number,
+  found: number,
+  resolvedOnly: boolean,
+): string {
+  if (resolvedOnly) {
+    if (!stored) return `${label} had nothing new to suggest.`;
+    if (!found)
+      return `None of the ${stored} ${label} named could be found in your providers, so none is shown.`;
+    return `${stored} named by ${label} · ${found} found in your providers`;
+  }
+  return shown
+    ? `${shown} picked by ${label} in one request · ${found} found so far`
+    : `${label} had nothing new to suggest.`;
 }
 
 /**
@@ -92,6 +119,11 @@ function Art({ suggestion }: { suggestion: Suggestion }) {
  * round each time, so picks and their enrichment arrive while it is open. The
  * first few are looked up straight away; opening a pending one looks it up. Each
  * can be wanted (onto the list), turned down, or marked seen; *Refresh* asks again.
+ *
+ * The segment chooses the source (Sprint 135): each is asked with `?source=` and
+ * keeps its own round while the sheet is open, so switching back shows it again
+ * without a request. A source whose picks may be inventions (a hosted model's)
+ * shows only those its library's providers found.
  */
 export function MoreLikeThisSheet({
   seed,
@@ -106,17 +138,42 @@ export function MoreLikeThisSheet({
 }) {
   const queryClient = useQueryClient();
   const info = seed ? recommendationFor(seed.type, types) : null;
-  const source = info ? firstSource(info) : null;
-  const [roundId, setRoundId] = useState<number | null>(null);
+  // The choice and the rounds are per seed: a sheet reused for another entry
+  // (Home's) starts from that entry's own first source.
+  const [choice, setChoice] = useState<{ entryId: number; name: string }>();
+  const chosen =
+    choice && choice.entryId === seed?.entryId ? choice.name : null;
+  const source =
+    (info &&
+      (info.sources.find((row) => row.name === chosen) ??
+        info.sources.find((row) => row.name === seed?.source) ??
+        firstSource(info))) ||
+    null;
+  const [rounds, setRounds] = useState<Readonly<Record<string, number>>>({});
+  const roundKey = (entryId: number, name: string) => `${entryId}:${name}`;
+  const roundId =
+    seed && source
+      ? (rounds[roundKey(seed.entryId, source.name)] ?? null)
+      : null;
   const [looking, setLooking] = useState<ReadonlySet<number>>(new Set());
-  const asked = useRef<number | null>(null);
+  const asked = useRef<Set<string>>(new Set());
 
   const start = useMutation({
-    mutationFn: ({ entryId, refresh }: { entryId: number; refresh: boolean }) =>
-      moreLikeThis(entryId, { refresh }),
-    onSuccess: (found) => {
+    mutationFn: ({
+      entryId,
+      refresh,
+      source,
+    }: {
+      entryId: number;
+      refresh: boolean;
+      source: string;
+    }) => moreLikeThis(entryId, { refresh, source }),
+    onSuccess: (found, { entryId }) => {
       queryClient.setQueryData(queryKeys.suggestionRound(found.id), found);
-      setRoundId(found.id);
+      setRounds((before) => ({
+        ...before,
+        [roundKey(entryId, found.source)]: found.id,
+      }));
       setLooking(new Set());
     },
     onError: (error) =>
@@ -127,15 +184,19 @@ export function MoreLikeThisSheet({
       ),
   });
 
-  // Ask once per seed opened, and only a source that can answer: one that is not
-  // configured is explained without a request.
+  // Ask once per seed and source opened, and only a source that can answer: one
+  // that is not configured is explained without a request.
   useEffect(() => {
     if (!open || !seed || !source?.configured) return;
-    if (asked.current === seed.entryId) return;
-    asked.current = seed.entryId;
-    setRoundId(null);
-    start.mutate({ entryId: seed.entryId, refresh: false });
-  }, [open, seed, source?.configured, start]);
+    const key = roundKey(seed.entryId, source.name);
+    if (asked.current.has(key)) return;
+    asked.current.add(key);
+    start.mutate({
+      entryId: seed.entryId,
+      refresh: false,
+      source: source.name,
+    });
+  }, [open, seed, source?.configured, source?.name, start]);
 
   const round = useQuery({
     queryKey: queryKeys.suggestionRound(roundId ?? 0),
@@ -219,13 +280,19 @@ export function MoreLikeThisSheet({
   });
 
   const label = source?.label ?? "the source";
+  const resolvedOnly = source?.resolved_only ?? false;
   const attribution = source ? info?.attribution[source.name] : undefined;
-  const shown = (data?.suggestions ?? []).filter(
-    (row) => row.enrichment !== "unresolved",
+  const stored = data?.suggestions.length ?? 0;
+  // An unresolved pick is never shown; a model's is shown only once found.
+  const shown = (data?.suggestions ?? []).filter((row) =>
+    resolvedOnly
+      ? row.enrichment === "enriched"
+      : row.enrichment !== "unresolved",
   );
   const found = shown.filter((row) => row.enrichment === "enriched").length;
   const finished = data ? FINISHED_ROUNDS.has(data.status) : false;
   const working = start.isPending || (data !== undefined && !finished);
+  const about = source?.about;
 
   let body;
   if (!seed || !info || !source) {
@@ -258,10 +325,8 @@ export function MoreLikeThisSheet({
     body = (
       <>
         <p className="text-xs text-muted-foreground" aria-live="polite">
-          {progressLine(data, label) ??
-            (shown.length
-              ? `${shown.length} picked by ${label} in one request · ${found} found so far`
-              : `${label} had nothing new to suggest.`)}
+          {progressLine(data, label, resolvedOnly) ??
+            doneLine(label, stored, shown.length, found, resolvedOnly)}
           {data.status === "done" && data.error ? ` · ${data.error}` : null}
         </p>
         {shown.length ? (
@@ -307,24 +372,35 @@ export function MoreLikeThisSheet({
         </DialogHeader>
         {info && info.sources.length > 0 ? (
           <div className="flex items-center justify-between gap-3">
-            <span
-              className="inline-flex rounded-full border border-border p-0.5 text-xs"
+            <div
+              role="radiogroup"
               aria-label="Source"
+              className="inline-flex rounded-full border border-border p-0.5 text-xs"
             >
-              {info.sources.map((row) => (
-                <span
-                  key={row.name}
-                  className={cn(
-                    "rounded-full px-2.5 py-1",
-                    row.name === source?.name
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {row.label}
-                </span>
-              ))}
-            </span>
+              {info.sources.map((row) => {
+                const checked = row.name === source?.name;
+                return (
+                  <button
+                    key={row.name}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    className={cn(
+                      "min-h-8 rounded-full px-3 focus-ring",
+                      checked
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() =>
+                      seed &&
+                      setChoice({ entryId: seed.entryId, name: row.name })
+                    }
+                  >
+                    {row.label}
+                  </button>
+                );
+              })}
+            </div>
             {source?.configured && seed ? (
               <Button
                 variant="outline"
@@ -332,13 +408,23 @@ export function MoreLikeThisSheet({
                 className="rounded-full"
                 disabled={working}
                 onClick={() =>
-                  start.mutate({ entryId: seed.entryId, refresh: true })
+                  start.mutate({
+                    entryId: seed.entryId,
+                    refresh: true,
+                    source: source.name,
+                  })
                 }
               >
                 Refresh
               </Button>
             ) : null}
           </div>
+        ) : null}
+        {about?.model && source?.configured ? (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {about.provider_label ?? about.provider} · {about.model}.{" "}
+            {about.sends}
+          </p>
         ) : null}
         {body}
         {attribution ? (

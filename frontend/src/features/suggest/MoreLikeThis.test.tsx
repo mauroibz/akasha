@@ -176,9 +176,10 @@ describe("More like this", () => {
     await waitFor(() =>
       expect(within(sheet).getByText("Asking TMDB…")).toBeVisible(),
     );
+    // The sheet names the source it asks (Sprint 135).
     expect(calls[0]).toMatchObject({
       method: "POST",
-      url: "/api/entries/3/more-like-this",
+      url: "/api/entries/3/more-like-this?source=tmdb",
     });
     expect(within(sheet).getByText(ATTRIBUTION)).toBeVisible();
 
@@ -239,6 +240,151 @@ describe("More like this", () => {
       url: "/api/suggestions/11",
       body: { answer: "want" },
     });
+  });
+});
+
+const MODEL_HINT =
+  "The model source is not configured. Set AKASHA_RECS_MODEL_KEY (or ANTHROPIC_API_KEY for the default provider, Claude) in the server's environment and restart.";
+
+function withModel(modelConfigured: boolean): ItemType[] {
+  return homeTypes.map((type) =>
+    type.id === "movie"
+      ? {
+          ...type,
+          recommendation: {
+            sources: [
+              { name: "tmdb", label: "TMDB", configured: true, hint: null },
+              {
+                name: "model",
+                label: "Model",
+                configured: modelConfigured,
+                hint: modelConfigured ? null : MODEL_HINT,
+                resolved_only: true,
+                about: {
+                  provider: "anthropic",
+                  provider_label: "Claude",
+                  model: "claude-haiku-5-5",
+                  sends:
+                    "Titles, creators, years and your scores from this library; nothing else.",
+                },
+              },
+            ],
+            attribution: { tmdb: ATTRIBUTION },
+          },
+        }
+      : type,
+  );
+}
+
+describe("Choosing the source", () => {
+  it("asks the model with ?source=, shows only what was found, and keeps each round", async () => {
+    const posts: string[] = [];
+    const tmdbRound = { ...round("done", [suggestion(11, "Yojimbo")]), id: 7 };
+    const modelRound = {
+      ...round("done", [
+        suggestion(21, "Ran", {
+          source: "model",
+          round_id: 8,
+          enrichment: "enriched",
+          item_id: 50,
+          reason: { signal: "model", text: "Kurosawa again, in colour." },
+        }),
+        suggestion(22, "The Hidden Fortress", {
+          source: "model",
+          round_id: 8,
+          enrichment: "enriched",
+          item_id: 51,
+        }),
+        suggestion(23, "Samurai of the Moonless Tide", {
+          source: "model",
+          round_id: 8,
+          enrichment: "unresolved",
+        }),
+        suggestion(24, "Pending Pick", { source: "model", round_id: 8 }),
+      ]),
+      id: 8,
+      source: "model",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = String(input);
+        if (init?.method === "POST") {
+          posts.push(url);
+          const body = url.includes("source=model") ? modelRound : tmdbRound;
+          return new Response(JSON.stringify(body), { status: 202 });
+        }
+        return new Response(
+          JSON.stringify(url.endsWith("/8") ? modelRound : tmdbRound),
+        );
+      }),
+    );
+    renderWithRouter(<MoreLikeThis seed={seed} types={withModel(true)} />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "More like Seven Samurai" }),
+    );
+    const sheet = screen.getByRole("dialog", {
+      name: "More like Seven Samurai",
+    });
+    const segment = within(sheet).getByRole("radiogroup", { name: "Source" });
+    expect(within(segment).getByRole("radio", { name: "TMDB" })).toBeChecked();
+    await waitFor(() =>
+      expect(posts).toEqual(["/api/entries/3/more-like-this?source=tmdb"]),
+    );
+
+    await user.click(within(segment).getByRole("radio", { name: "Model" }));
+    expect(within(segment).getByRole("radio", { name: "Model" })).toBeChecked();
+    await waitFor(() =>
+      expect(posts).toEqual([
+        "/api/entries/3/more-like-this?source=tmdb",
+        "/api/entries/3/more-like-this?source=model",
+      ]),
+    );
+    const list = await within(sheet).findByRole("list", {
+      name: "Suggestions",
+    });
+    // Found picks only: neither the invented one nor the one not yet looked up.
+    expect(
+      within(list)
+        .getAllByRole("listitem")
+        .map((row) => row.querySelector("p")?.textContent),
+    ).toEqual(["Ran1961", "The Hidden Fortress1961"]);
+    expect(
+      within(sheet).getByText(/4 named by Model · 2 found in your providers/),
+    ).toBeVisible();
+    expect(within(sheet).getByText(/Claude · claude-haiku-5-5/)).toBeVisible();
+    expect(within(sheet).queryByText(ATTRIBUTION)).toBeNull();
+
+    // Back to TMDB: its round is still there, and nothing is asked again.
+    await user.click(within(segment).getByRole("radio", { name: "TMDB" }));
+    await within(sheet).findByText(/1 picked by TMDB/);
+    expect(posts).toHaveLength(2);
+  });
+
+  it("explains a model that is not configured and asks nothing of it", async () => {
+    const posts: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "POST") posts.push(String(input));
+        return new Response(JSON.stringify(round("done", [])), {
+          status: init?.method === "POST" ? 202 : 200,
+        });
+      }),
+    );
+    renderWithRouter(<MoreLikeThis seed={seed} types={withModel(false)} />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: "More like Seven Samurai" }),
+    );
+    const sheet = screen.getByRole("dialog", {
+      name: "More like Seven Samurai",
+    });
+    await user.click(within(sheet).getByRole("radio", { name: "Model" }));
+    expect(within(sheet).getByText(/Set AKASHA_RECS_MODEL_KEY/)).toBeVisible();
+    expect(within(sheet).queryByRole("button", { name: "Refresh" })).toBeNull();
+    expect(posts).toEqual(["/api/entries/3/more-like-this?source=tmdb"]);
   });
 });
 

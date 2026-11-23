@@ -1,4 +1,8 @@
-import type { ItemType, RecommendationInfo } from "@/api/library";
+import type {
+  ItemType,
+  RecommendationInfo,
+  RecommendationSourceInfo,
+} from "@/api/library";
 
 /**
  * What a library says about *More like this* (Sprint 134), read from the server's
@@ -17,6 +21,22 @@ export function recommendationFor(
 /** The first source that can answer, else the first declared (which explains why not). */
 export function firstSource(info: RecommendationInfo) {
   return info.sources.find((source) => source.configured) ?? info.sources[0];
+}
+
+/**
+ * Every source any library declares, once each, in the order first met: what
+ * Settings lists (Sprint 135).
+ */
+export function allSources(
+  types: ItemType[] | undefined,
+): RecommendationSourceInfo[] {
+  const seen = new Map<string, RecommendationSourceInfo>();
+  for (const type of types ?? []) {
+    for (const source of type.recommendation?.sources ?? []) {
+      if (!seen.has(source.name)) seen.set(source.name, source);
+    }
+  }
+  return [...seen.values()];
 }
 
 /** Each distinct attribution line the given sources' terms ask for. */

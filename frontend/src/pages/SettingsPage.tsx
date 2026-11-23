@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Link } from "react-router-dom";
 
 import { ExportPanel } from "@/features/export/ExportPanel";
+import { SuggestionSources } from "@/features/suggest/SuggestionSources";
 import {
   readThemeChoice,
   saveThemeChoice,
@@ -45,8 +46,9 @@ const OPTIONS: Option[] = [
 ];
 
 /**
- * Settings (Sprint 090): Appearance, then Your data, the export that moved here from
- * the import screen in Sprint 096 (proposal §5.1).
+ * Settings (Sprint 090): Appearance, then Suggestions (which sources this server has
+ * on, Sprint 135), then Your data, the export that moved here from the import screen
+ * in Sprint 096 (proposal §5.1).
  */
 export function SettingsPage() {
   const [choice, setChoice] = useState<ThemeChoice>(readThemeChoice);
@@ -123,6 +125,7 @@ export function SettingsPage() {
         Kept in this browser, so a phone and a laptop can differ. Covers, scores
         and the amber dot look the same in both.
       </p>
+      <SuggestionSources />
       <ExportPanel embedded />
       {/* Upkeep (Sprint 112; *Tidy up* since Sprint 125): a data job, offered
           beside the export, as well as from the command bar. */}

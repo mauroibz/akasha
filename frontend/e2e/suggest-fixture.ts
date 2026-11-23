@@ -30,7 +30,25 @@ const statuses = [
   },
 ];
 
-export function movieType(configured: boolean) {
+export const MODEL_SOURCE = {
+  name: "model",
+  label: "Model",
+  configured: true,
+  hint: null,
+  resolved_only: true,
+  about: {
+    provider: "anthropic",
+    provider_label: "Claude",
+    model: "claude-haiku-5-5",
+    sends:
+      "Titles, creators, years and your scores from this library; nothing else.",
+  },
+};
+
+export function movieType(
+  configured: boolean,
+  { model }: { model?: boolean } = {},
+) {
   return {
     id: "movie",
     label: "Movie",
@@ -54,6 +72,17 @@ export function movieType(configured: boolean) {
             ? null
             : "TMDB is not configured. Set TMDB_READ_TOKEN (a TMDB API read access token, free from themoviedb.org's API settings) in the server's environment and restart.",
         },
+        ...(model === undefined
+          ? []
+          : [
+              {
+                ...MODEL_SOURCE,
+                configured: model,
+                hint: model
+                  ? null
+                  : "The model source is not configured. Set AKASHA_RECS_MODEL_KEY (or ANTHROPIC_API_KEY for the default provider, Claude) in the server's environment and restart.",
+              },
+            ]),
       ],
       attribution: { fake: ATTRIBUTION },
     },
@@ -167,9 +196,42 @@ function job(id: string, kind: string, progress: Record<string, unknown>) {
   })}\n\n`;
 }
 
+/** A model's round (Sprint 135): done, two picks found, one invented, one pending. */
+function modelRound() {
+  const rows: Array<[number, string, number, string]> = [
+    [201, "Ran", 1985, "enriched"],
+    [202, "The Hidden Fortress", 1958, "enriched"],
+    [203, "Samurai of the Moonless Tide", 1963, "unresolved"],
+    [204, "Red Beard", 1965, "pending"],
+  ];
+  return {
+    id: 8,
+    item_type: "movie",
+    seed_entry_id: 7,
+    source: "model",
+    status: "done",
+    error: null,
+    created_at: "2026-11-23T10:00:00Z",
+    finished_at: "2026-11-23T10:00:03Z",
+    suggestions: rows.map(([id, title, year, enrichment]) => ({
+      ...suggestion(0, enrichment === "enriched"),
+      id,
+      round_id: 8,
+      source: "model",
+      title,
+      year,
+      external_ids: {},
+      reason: { signal: "model", text: "More Kurosawa, at his most epic." },
+      enrichment,
+      item_id: enrichment === "enriched" ? id : null,
+      cover_url: enrichment === "enriched" ? pixelCover : null,
+    })),
+  };
+}
+
 export async function stubSuggestions(
   page: Page,
-  { configured = true }: { configured?: boolean } = {},
+  { configured = true, model }: { configured?: boolean; model?: boolean } = {},
 ): Promise<SuggestState> {
   const state: SuggestState = {
     requests: [],
@@ -180,10 +242,10 @@ export async function stubSuggestions(
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.pathname.startsWith("/api/"))
-      state.requests.push(`${request.method()} ${url.pathname}`);
+      state.requests.push(`${request.method()} ${url.pathname}${url.search}`);
   });
   await page.route("**/api/item-types", (route) =>
-    route.fulfill({ json: [movieType(configured)] }),
+    route.fulfill({ json: [movieType(configured, { model })] }),
   );
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: film }),
@@ -196,9 +258,14 @@ export async function stubSuggestions(
     route.fulfill({ json: [] }),
   );
   await page.route("**/api/entries/7/more-like-this*", (route) => {
+    if (route.request().url().includes("source=model"))
+      return route.fulfill({ status: 202, json: modelRound() });
     if (state.phase === "idle") state.phase = "queued";
     return route.fulfill({ status: 202, json: round(state) });
   });
+  await page.route("**/api/suggestion-rounds/8", (route) =>
+    route.fulfill({ json: modelRound() }),
+  );
   await page.route("**/api/suggestion-rounds/7", (route) =>
     route.fulfill({ json: round(state) }),
   );

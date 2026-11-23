@@ -105,6 +105,7 @@ export function SuggestedModule({
                     entryId: suggestion.seed.entry_id,
                     title: suggestion.seed.title,
                     type: suggestion.item_type,
+                    source: suggestion.source,
                   })
                 }
               >
