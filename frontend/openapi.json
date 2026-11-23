@@ -2372,6 +2372,20 @@
             ],
             "title": "Shelves"
           },
+          "suggested": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SuggestionResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested"
+          },
           "tidy": {
             "anyOf": [
               {
@@ -2403,7 +2417,8 @@
           "tidy",
           "question",
           "shelves",
-          "lent"
+          "lent",
+          "suggested"
         ],
         "title": "HomeResponse",
         "type": "object"
@@ -3458,6 +3473,16 @@
               }
             ]
           },
+          "recommendation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "$ref": "#/components/schemas/StatusSpecResponse"
@@ -4264,6 +4289,67 @@
           "entry_ids"
         ],
         "title": "RankBody",
+        "type": "object"
+      },
+      "RecommendationResponse": {
+        "description": "*More like this* for one library (Sprint 134): which sources, and their terms.",
+        "properties": {
+          "attribution": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Attribution",
+            "type": "object"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/RecommendationSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sources",
+          "attribution"
+        ],
+        "title": "RecommendationResponse",
+        "type": "object"
+      },
+      "RecommendationSourceResponse": {
+        "description": "One source that may suggest this library's things, as the server is set up.",
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "configured",
+          "hint"
+        ],
+        "title": "RecommendationSourceResponse",
         "type": "object"
       },
       "RefileBody": {
@@ -5370,6 +5456,17 @@
             ],
             "title": "Answered At"
           },
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
           "created_at": {
             "title": "Created At",
             "type": "string"
@@ -5449,6 +5546,16 @@
             "title": "Round Id",
             "type": "integer"
           },
+          "seed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionSeed"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -5500,6 +5607,25 @@
           "created_at"
         ],
         "title": "SuggestionResponse",
+        "type": "object"
+      },
+      "SuggestionSeed": {
+        "description": "The entry a round was about: what a suggestion is *more like*.",
+        "properties": {
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "entry_id",
+          "title"
+        ],
+        "title": "SuggestionSeed",
         "type": "object"
       },
       "TimelineEvent": {

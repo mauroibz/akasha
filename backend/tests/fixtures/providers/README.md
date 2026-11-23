@@ -291,3 +291,34 @@ chapters, which is why only rows with a numeric `label` count.
 |---|---|
 | `edition_OL26208390M_thinking_fast_and_slow.json` | `GET https://openlibrary.org/books/OL26208390M.json` (ISBN 9780374533557): fifty contents rows, 38 of them numbered chapters, the rest the introduction, part headings and back matter. |
 | `work_OL15992072W_thinking_fast_and_slow.json` | `GET https://openlibrary.org/works/OL15992072W.json`, the work the edition above names. |
+
+## TMDB recommendations (Sprint 134, captured 2026-11-23)
+
+TMDB's `/recommendations` is the first recommendation source (DEC-183 point 6, DEC-189).
+Captured with the owner's API read access token sent as `Authorization: Bearer …`; the token
+is a header, never a URL parameter, and appears in none of these bodies
+(`test_every_tmdb_recording_is_free_of_the_token` checks). Every request is
+`GET https://api.themoviedb.org/3…`.
+
+| File | Source |
+|---|---|
+| `tmdb_find_tt0047478_seven_samurai.json` | `/find/tt0047478?external_source=imdb_id` — Seven Samurai is `movie_results[0].id` **346**. The path a seed with only an IMDb id takes (a film Cinemeta added). |
+| `tmdb_find_tt9999999999_no_match.json` | The same for an IMDb id TMDB does not know: **200** with every `*_results` list empty, not a 404. |
+| `tmdb_movie_346_recommendations_seven_samurai.json` | `/movie/346/recommendations?page=1` — twenty films, 653 in all. **No IMDb id on any row**: a candidate carries TMDB's id alone, which is why the domains resolve through Wikidata's `P4947`. |
+| `tmdb_tv_1396_recommendations_breaking_bad.json` | `/tv/1396/recommendations?page=1` — twenty series (`name`, `first_air_date` where a film has `title`, `release_date`). |
+| `tmdb_movie_999999999_recommendations_404.json` | `/movie/999999999/recommendations` — **404**, `{"success": false, "status_code": 34, …}`. |
+
+The candidates' resolution was captured the same day through the adapters themselves
+(`WikidataMovieProvider.fetch("tmdb:<id>")`, `WikidataSeriesProvider.fetch("tmdb:<id>")`),
+with `User-Agent: Akasha/2.9 (+https://github.com/mauroibz/akasha)`: for each of the top three
+of both rounds, the `haswbstatement:P4947=<id>` (films) or `P4983=<id>` (series) search, the
+entity read and the label read. All six resolved to one entity carrying the claim.
+
+| Files | Film or series |
+|---|---|
+| `wikidata_search_p4947_64686.json`, `wikidata_entity_Q2816898_47_ronin.json`, `wikidata_labels_Q2816898_47_ronin.json` | *47 Ronin* (2013), `tt1335975` |
+| `wikidata_search_p4947_11878.json`, `wikidata_entity_Q20475_yojimbo.json`, `wikidata_labels_Q20475_yojimbo.json` | *Yojimbo* (1961), `tt0055630` |
+| `wikidata_search_p4947_15319.json`, `wikidata_entity_Q2859045_after_the_rain.json`, `wikidata_labels_Q2859045_after_the_rain.json` | *After the Rain* (1999; TMDB says 2000), `tt0181960` |
+| `wikidata_series_search_p4983_60059.json`, `wikidata_series_entity_Q14925221_better_call_saul.json`, `wikidata_series_labels_Q14925221_better_call_saul.json` | *Better Call Saul*, `tt3032476` |
+| `wikidata_series_search_p4983_80968.json`, `wikidata_series_entity_Q55657276_narcos_mexico.json`, `wikidata_series_labels_Q55657276_narcos_mexico.json` | *Narcos: Mexico* (Wikidata's label: *Narcos: México*), `tt8714904` |
+| `wikidata_series_search_p4983_71694.json`, `wikidata_series_entity_Q28429799_snowfall.json`, `wikidata_series_labels_Q28429799_snowfall.json` | *Snowfall*, `tt6439752` |

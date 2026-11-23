@@ -7,7 +7,7 @@ import json
 import logging
 import random
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -474,6 +474,8 @@ class JobRunner:
         poll_interval: float = 1.0,
         max_retries: int = DEFAULT_MAX_RETRIES,
         data_dir: Path | None = None,
+        housekeeping: Sequence[Callable[[datetime], object]] = (),
+        housekeeping_every: timedelta = timedelta(hours=1),
     ) -> None:
         self.engine = engine
         self.repo = JobRepository(engine)
@@ -487,6 +489,13 @@ class JobRunner:
         self.data_dir = data_dir
         #: When each batch kept for uninstalled files was last retried (Sprint 129).
         self._kept_batch_retries: dict[str, float] = {}
+        #: Synchronous sweeps run off the loop on an idle pass at most once per
+        #: `housekeeping_every`, the first on the first idle pass (Sprint 134:
+        #: deleting suggestions past their source's retention).
+        self.housekeeping = tuple(housekeeping)
+        self.housekeeping_every = housekeeping_every
+        self._housekept_at: datetime | None = None
+        self._resumed = False
         self._running = False
         #: Set by `stop()`, and never cleared: a stop that arrives before the
         #: task's first step must still hold (Sprint 129).
@@ -507,37 +516,49 @@ class JobRunner:
         if self._stop_requested:
             return
         self._running = True
-        resumed = False
         while self._running:
             try:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
-                    await off_loop(self.repo.reclaim_expired, now, max_retries=self.max_retries)
-                    if self.data_dir is not None and not resumed:
-                        # A commit installs its staged covers and ebooks after the
-                        # database commit; a process killed in between left them
-                        # behind. A new process finishes that on its first idle pass
-                        # (Sprint 129) — once, and never ahead of queued work.
-                        resumed = True
-                        try:
-                            await off_loop(self._resume_interrupted_installs, self.data_dir)
-                        except Exception:
-                            logger.exception("interrupted import installs could not be resumed")
-                    if self.data_dir is not None:
-                        await off_loop(
-                            reclaim_import_batches,
-                            self.engine,
-                            self.data_dir,
-                            now=now,
-                            resume=partial(self._resume_install, self.data_dir),
-                            retries=self._kept_batch_retries,
-                        )
+                    await self.idle(now)
                     await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception("job runner poll failed")
                 await asyncio.sleep(self.poll_interval)
+
+    async def idle(self, now: datetime) -> None:
+        """The housekeeping of a pass that found no job to run."""
+        await off_loop(self.repo.reclaim_expired, now, max_retries=self.max_retries)
+        if self.data_dir is not None and not self._resumed:
+            # A commit installs its staged covers and ebooks after the database
+            # commit; a process killed in between left them behind. A new process
+            # finishes that on its first idle pass (Sprint 129) — once, and never
+            # ahead of queued work.
+            self._resumed = True
+            try:
+                await off_loop(self._resume_interrupted_installs, self.data_dir)
+            except Exception:
+                logger.exception("interrupted import installs could not be resumed")
+        if self.data_dir is not None:
+            await off_loop(
+                reclaim_import_batches,
+                self.engine,
+                self.data_dir,
+                now=now,
+                resume=partial(self._resume_install, self.data_dir),
+                retries=self._kept_batch_retries,
+            )
+        if self.housekeeping and (
+            self._housekept_at is None or now - self._housekept_at >= self.housekeeping_every
+        ):
+            self._housekept_at = now
+            for sweep in self.housekeeping:
+                try:
+                    await off_loop(sweep, now)
+                except Exception:
+                    logger.exception("housekeeping sweep failed")
 
     def stop(self) -> None:
         self._stop_requested = True

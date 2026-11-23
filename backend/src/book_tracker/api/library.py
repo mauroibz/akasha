@@ -27,8 +27,14 @@ from book_tracker.application.library import (
 from book_tracker.application.outline import fetch_outline_value, outline_field
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
+from book_tracker.domain.recommendations import SourceRegistry
 from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
-from book_tracker.domain.spec import InvalidMetadata, declares_field, validate_metadata_patch
+from book_tracker.domain.spec import (
+    Domain,
+    InvalidMetadata,
+    declares_field,
+    validate_metadata_patch,
+)
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,
@@ -185,6 +191,25 @@ class OutlinePartResponse(BaseModel):
     size: int
 
 
+class RecommendationSourceResponse(BaseModel):
+    """One source that may suggest this library's things, as the server is set up."""
+
+    name: str
+    #: What a screen calls it ("TMDB").
+    label: str
+    #: Whether it can answer now; when not, `hint` says how to turn it on.
+    configured: bool
+    hint: str | None
+
+
+class RecommendationResponse(BaseModel):
+    """*More like this* for one library (Sprint 134): which sources, and their terms."""
+
+    sources: list[RecommendationSourceResponse]
+    #: The line a source's terms ask for beside its suggestions, by source name.
+    attribution: dict[str, str]
+
+
 class ItemTypeResponse(BaseModel):
     """What a domain says about itself, so a screen can render it without branching."""
 
@@ -208,6 +233,9 @@ class ItemTypeResponse(BaseModel):
     plural_label: str
     #: Whether to offer the cover chooser at all (DEC-067 row 7).
     chooses_covers: bool
+    #: Which sources suggest this library's things and whether each is configured,
+    #: or `None` where nothing does (Sprint 134): the *More like this* button.
+    recommendation: RecommendationResponse | None = None
 
 
 class ItemResponse(BaseModel):
@@ -1150,9 +1178,25 @@ def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse
     return ItemResponse.model_validate(library.update_item(item_id, changes))
 
 
+def _recommendation(domain: Domain, registry: SourceRegistry) -> RecommendationResponse | None:
+    spec = domain.recommendation
+    if spec is None or not spec.sources:
+        return None
+    return RecommendationResponse(
+        sources=[RecommendationSourceResponse(**registry.describe(name)) for name in spec.sources],
+        attribution={
+            name: line for name in spec.sources if (line := registry.attribution(name)) is not None
+        },
+    )
+
+
 @router.get("/item-types", response_model=list[ItemTypeResponse])
-def list_item_types() -> list[ItemTypeResponse]:
+def list_item_types(request: Request) -> list[ItemTypeResponse]:
     """The domains this build knows, and the metadata fields each one declares."""
+    # Built at start; an app served without its lifespan knows no source.
+    registry: SourceRegistry = (
+        getattr(request.app.state, "recommendation_sources", None) or SourceRegistry()
+    )
     return [
         ItemTypeResponse(
             id=domain.item_type,
@@ -1179,6 +1223,7 @@ def list_item_types() -> list[ItemTypeResponse]:
             entry_panel_label=domain.entry_panel_label,
             plural_label=domain.plural_label,
             chooses_covers=domain.chooses_covers,
+            recommendation=_recommendation(domain, registry),
         )
         for domain in DOMAINS.values()
     ]

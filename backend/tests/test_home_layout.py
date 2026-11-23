@@ -162,7 +162,10 @@ async def test_a_write_naming_what_is_not_a_module_is_refused(
 @pytest.mark.anyio
 async def test_home_skips_a_hidden_module(tmp_path: Path) -> None:
     hidden = [
-        {**row, "hidden": row["module"] in {"year", "lately", "tidy", "next", "libraries"}}
+        {
+            **row,
+            "hidden": row["module"] in {"year", "lately", "tidy", "next", "libraries", "suggested"},
+        }
         for row in _defaults()
     ]
     async with _client(tmp_path) as (_app, client):
@@ -173,6 +176,7 @@ async def test_home_skips_a_hidden_module(tmp_path: Path) -> None:
     assert body["tidy"] is None
     assert body["next"] == []
     assert body["domains"] == []
+    assert body["suggested"] is None
 
 
 def _seed_bruno(app: Any) -> str:

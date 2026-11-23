@@ -204,7 +204,7 @@ def test_the_registry_is_filled_from_configuration(tmp_path: Path) -> None:
 
     registry = build_source_registry(configured, None, (needs_a_token, lambda _s, _c: FakeSource()))
     assert registry.configured("fake") and not registry.configured("keyed")
-    assert build_source_registry(configured, None).names() == ()
+    assert build_source_registry(configured, None).names() == ("tmdb",)
 
 
 def _record(title: str, year: int | None, creators: tuple[str, ...]) -> SearchCandidate:
@@ -510,7 +510,11 @@ async def test_a_source_without_its_configuration_says_so_and_nothing_fails(
 
 
 @pytest.mark.anyio
-async def test_a_library_nothing_suggests_refuses_more_like_this(tmp_path: Path) -> None:
+async def test_a_library_nothing_suggests_refuses_more_like_this(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Films declare TMDB since Sprint 134; this is about a library that declares none.
+    monkeypatch.setitem(DOMAINS, FILM, replace(DOMAINS[FILM], recommendation=None))
     async with _app(tmp_path) as (app, client, _cinemeta, _fake):
         entry_id = _seed_film(app)
         refused = await client.post(f"/api/entries/{entry_id}/more-like-this")

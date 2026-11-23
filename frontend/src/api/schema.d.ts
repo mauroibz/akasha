@@ -2558,6 +2558,8 @@ export interface components {
       question: components["schemas"]["HomeQuestion"] | null;
       /** Shelves */
       shelves: components["schemas"]["HomeShelf"][] | null;
+      /** Suggested */
+      suggested: components["schemas"]["SuggestionResponse"][] | null;
       tidy: components["schemas"]["HomeTidy"] | null;
       year: components["schemas"]["HomeYear"] | null;
     };
@@ -2947,6 +2949,7 @@ export interface components {
       /** Plural Label */
       plural_label: string;
       progress: components["schemas"]["ProgressSpecResponse"] | null;
+      recommendation?: components["schemas"]["RecommendationResponse"] | null;
       /** Statuses */
       statuses: components["schemas"]["StatusSpecResponse"][];
     };
@@ -3225,6 +3228,32 @@ export interface components {
     RankBody: {
       /** Entry Ids */
       entry_ids: number[];
+    };
+    /**
+     * RecommendationResponse
+     * @description *More like this* for one library (Sprint 134): which sources, and their terms.
+     */
+    RecommendationResponse: {
+      /** Attribution */
+      attribution: {
+        [key: string]: string;
+      };
+      /** Sources */
+      sources: components["schemas"]["RecommendationSourceResponse"][];
+    };
+    /**
+     * RecommendationSourceResponse
+     * @description One source that may suggest this library's things, as the server is set up.
+     */
+    RecommendationSourceResponse: {
+      /** Configured */
+      configured: boolean;
+      /** Hint */
+      hint: string | null;
+      /** Label */
+      label: string;
+      /** Name */
+      name: string;
     };
     /** RefileBody */
     RefileBody: {
@@ -3615,6 +3644,8 @@ export interface components {
       answer: ("want" | "not_for_me" | "seen") | null;
       /** Answered At */
       answered_at: string | null;
+      /** Cover Url */
+      cover_url?: string | null;
       /** Created At */
       created_at: string;
       /** Creator */
@@ -3642,6 +3673,7 @@ export interface components {
       reason: components["schemas"]["SuggestionReason"] | null;
       /** Round Id */
       round_id: number;
+      seed?: components["schemas"]["SuggestionSeed"] | null;
       /** Source */
       source: string;
       /** Source Score */
@@ -3650,6 +3682,16 @@ export interface components {
       title: string;
       /** Year */
       year: number | null;
+    };
+    /**
+     * SuggestionSeed
+     * @description The entry a round was about: what a suggestion is *more like*.
+     */
+    SuggestionSeed: {
+      /** Entry Id */
+      entry_id: number;
+      /** Title */
+      title: string;
     };
     /**
      * TimelineEvent

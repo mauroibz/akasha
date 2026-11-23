@@ -15,13 +15,28 @@ from book_tracker.domain.recommendations import (
     RecommendationSource,
     SourceRegistry,
 )
+from book_tracker.infrastructure import tmdb_recommendations as tmdb
 
 SourceFactory = Callable[[Settings, Any], RecommendationSource | NotConfigured]
 
-#: Empty until a real source lands: TMDB in Sprint 134, a hosted model in 135, the
-#: library's own embeddings in 136. The test-only `fake` source is registered by the
-#: tests themselves and never built here.
-SOURCE_FACTORIES: tuple[SourceFactory, ...] = ()
+
+def tmdb_source(configured: Settings, provider_client: Any) -> RecommendationSource | NotConfigured:
+    """TMDB's recommendations, with `TMDB_READ_TOKEN` (Sprint 134)."""
+    if not configured.tmdb_read_token.strip():
+        return NotConfigured(
+            tmdb.NAME,
+            tmdb.NOT_CONFIGURED_HINT,
+            retention=tmdb.RETENTION,
+            label="TMDB",
+            attribution=tmdb.TMDB_ATTRIBUTION,
+        )
+    return tmdb.TmdbRecommendations(provider_client, configured.tmdb_read_token.strip())
+
+
+#: TMDB from Sprint 134; a hosted model in 135 and the library's own embeddings in
+#: 136 join it. The test-only `fake` source is registered by the tests themselves and
+#: never built here.
+SOURCE_FACTORIES: tuple[SourceFactory, ...] = (tmdb_source,)
 
 
 def build_source_registry(

@@ -21,6 +21,10 @@ storing (DEC-057).
 import re
 
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import (
+    RecommendationSpec,
+    resolve_by_identity_or_search,
+)
 from book_tracker.domain.spec import (
     UNSORTED,
     Domain,
@@ -179,6 +183,17 @@ def recognize_movie_url(value: str) -> UrlMatch | None:
     return None
 
 
+# *More like this* (Sprint 134, DEC-183 point 6): TMDB chooses from its
+# `/movie/{id}/recommendations`, naming each film by TMDB's id alone, which Wikidata
+# holds as an exact claim; an IMDb id, when a candidate carries one, is tried first,
+# and a title search is the last resort. *Want* puts it on the list to watch.
+MOVIE_RECOMMENDATION = RecommendationSpec(
+    sources=("tmdb",),
+    resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
+    source_options={"tmdb": {"media": "movie"}},
+)
+
+
 DOMAIN = Domain(
     item_type="movie",
     label="Movie",
@@ -213,4 +228,5 @@ DOMAIN = Domain(
         ),
     ),
     ranking=RankingSpec(affinity_fields=("genres",)),
+    recommendation=MOVIE_RECOMMENDATION,
 )

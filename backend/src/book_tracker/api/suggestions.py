@@ -38,6 +38,13 @@ class SuggestionReason(BaseModel):
     text: str
 
 
+class SuggestionSeed(BaseModel):
+    """The entry a round was about: what a suggestion is *more like*."""
+
+    entry_id: int
+    title: str
+
+
 class SuggestionResponse(BaseModel):
     id: int
     round_id: int
@@ -58,6 +65,11 @@ class SuggestionResponse(BaseModel):
     item_id: int | None
     #: This person's entry on that item, once they have one (after *Want*).
     entry_id: int | None
+    #: The stored cover of the item it resolved to, served to the person it was
+    #: suggested to (Sprint 134); `None` until resolved or when it has none.
+    cover_url: str | None = None
+    #: The entry its round was seeded by, while it exists.
+    seed: SuggestionSeed | None = None
     answer: Answer | None
     answered_at: str | None
     created_at: str

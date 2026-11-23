@@ -22,6 +22,10 @@ Two names here are decisions, not omissions:
 import re
 
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
+from book_tracker.domain.recommendations import (
+    RecommendationSpec,
+    resolve_by_identity_or_search,
+)
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
@@ -200,6 +204,17 @@ def recognize_series_url(value: str) -> UrlMatch | None:
     return None
 
 
+# *More like this* (Sprint 134, DEC-183 point 6): TMDB chooses from its
+# `/tv/{id}/recommendations`, naming each series by TMDB's id alone, which Wikidata
+# holds as an exact claim; an IMDb id, when a candidate carries one, is tried first,
+# and a title search is the last resort. *Want* puts it on the list to watch.
+SERIES_RECOMMENDATION = RecommendationSpec(
+    sources=("tmdb",),
+    resolve=resolve_by_identity_or_search(("imdb", "tmdb")),
+    source_options={"tmdb": {"media": "tv"}},
+)
+
+
 DOMAIN = Domain(
     item_type="series",
     label="Series",
@@ -235,4 +250,5 @@ DOMAIN = Domain(
         ),
     ),
     ranking=RankingSpec(affinity_fields=("genres",)),
+    recommendation=SERIES_RECOMMENDATION,
 )

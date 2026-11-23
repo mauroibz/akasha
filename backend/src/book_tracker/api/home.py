@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from book_tracker.api.identity import CurrentUser, current_user
 from book_tracker.api.library import ERRORS, EntryResponse, library_for
 from book_tracker.api.pile import PilePick
+from book_tracker.api.suggestions import SuggestionResponse
 from book_tracker.application.home import HomeService
 from book_tracker.application.home_layout import HomeLayoutService, defaults
 
@@ -173,6 +174,9 @@ class HomeResponse(BaseModel):
     question: HomeQuestion | None
     shelves: list[HomeShelf] | None
     lent: HomeLent | None
+    #: *More like this* (Sprint 134): the newest suggestions found and unanswered,
+    #: across libraries, from storage.
+    suggested: list[SuggestionResponse] | None
 
 
 def _zone(request: Request, name: str | None) -> ZoneInfo:

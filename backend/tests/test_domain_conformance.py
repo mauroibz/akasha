@@ -512,8 +512,10 @@ def recommendation_names_sources_and_somewhere_to_want(domain: Domain) -> None:
     """Sprint 133: a declared `RecommendationSpec` must be answerable.
 
     Its sources are names a registry can hold (nonblank, each once), its resolve is
-    callable, `enrich_top` is not negative, and the domain has a `planned` status,
-    because that is where *Want* puts a suggestion. `None` is the deliberate default.
+    callable, `enrich_top` is not negative, and *Want* has somewhere to go: the
+    declared `want_status` (Sprint 134), a choosable status of the domain, or else a
+    `planned` status. `source_options` speak only of declared sources. `None` is the
+    deliberate default.
     """
     spec = domain.recommendation
     if spec is None:
@@ -523,9 +525,17 @@ def recommendation_names_sources_and_somewhere_to_want(domain: Domain) -> None:
     assert len(set(spec.sources)) == len(spec.sources), f"{domain.item_type} names a source twice"
     assert callable(spec.resolve), f"{domain.item_type}'s recommendation resolve is not callable"
     assert spec.enrich_top >= 0
-    assert any(status.planned for status in domain.statuses), (
-        f"{domain.item_type} takes suggestions but has no planned status for Want"
-    )
+    if spec.want_status is not None:
+        choosable = {status.value for status in domain.statuses if status.choosable}
+        assert spec.want_status in choosable, (
+            f"{domain.item_type} wants suggestions in {spec.want_status!r}, not a status it has"
+        )
+    else:
+        assert any(status.planned for status in domain.statuses), (
+            f"{domain.item_type} takes suggestions but has no planned status for Want"
+        )
+    unknown = set(spec.source_options) - set(spec.sources)
+    assert not unknown, f"{domain.item_type} sets options for undeclared sources {unknown}"
 
 
 @registry_check
@@ -1459,6 +1469,31 @@ MALFORMED: list[tuple[str, str, Domain]] = [
     ),
     (
         "recommendation_names_sources_and_somewhere_to_want",
+        "Want pointed at a status the domain does not have",
+        a_third_domain(
+            recommendation=RecommendationSpec(
+                ("fake",), resolve_by_identity_or_search(), want_status="wanted"
+            )
+        ),
+    ),
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
+        "options for a source the domain does not declare",
+        a_third_domain(
+            statuses=(
+                StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
+                StatusSpec("wishlist", "Wishlist", hotkey="w", planned=True),
+                StatusSpec("owned", "Owned", hotkey="o"),
+            ),
+            recommendation=RecommendationSpec(
+                ("fake",),
+                resolve_by_identity_or_search(),
+                source_options={"tmdb": {"media": "movie"}},
+            ),
+        ),
+    ),
+    (
+        "recommendation_names_sources_and_somewhere_to_want",
         "suggestions from no source at all",
         a_third_domain(
             statuses=(
@@ -1655,6 +1690,17 @@ def test_the_suite_rejects_a_malformed_domain(name: str, domain: Domain) -> None
     """
     with pytest.raises(AssertionError):
         REGISTRY_CHECKS[name](domain)
+
+
+def test_a_declared_want_status_stands_in_for_a_planned_one() -> None:
+    """Sprint 134: albums have no planned status, and will name their wishlist."""
+    REGISTRY_CHECKS["recommendation_names_sources_and_somewhere_to_want"](
+        a_third_domain(
+            recommendation=RecommendationSpec(
+                ("fake",), resolve_by_identity_or_search(), want_status="wishlist"
+            )
+        )
+    )
 
 
 class _CatalogProvider:

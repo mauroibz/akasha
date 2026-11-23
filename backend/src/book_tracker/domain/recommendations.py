@@ -22,7 +22,8 @@ which domain they hold (technical spec 6.6).
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import timedelta
 from types import MappingProxyType
 from typing import Any, Protocol, runtime_checkable
 
@@ -49,6 +50,10 @@ class Seed:
     creators: tuple[str, ...] = ()
     external_ids: Mapping[str, str] = _EMPTY
     metadata: Mapping[str, Any] = _EMPTY
+    #: What the domain tells this source about itself (`RecommendationSpec.source_options`
+    #: for the round's source): TMDB reads `media`, so the source never asks which
+    #: library it holds.
+    options: Mapping[str, str] = _EMPTY
 
     @property
     def is_profile(self) -> bool:
@@ -103,6 +108,20 @@ class Candidate:
     display: Mapping[str, Any] = _EMPTY
 
 
+@dataclass(frozen=True)
+class Selection:
+    """A source's answer when it learned something about the seed on the way.
+
+    `seed_ids` are identifiers of the seed's own item the source had to look up
+    (TMDB's id, found through `/find` from an IMDb id); the round keeps them on the
+    item, so the next round on it asks once. A source with nothing to add answers
+    a plain sequence of candidates instead.
+    """
+
+    candidates: Sequence[Candidate]
+    seed_ids: Mapping[str, str] = field(default_factory=dict)
+
+
 class SourceError(Exception):
     """A source could not answer: unreachable, refused, or an unreadable reply.
 
@@ -133,6 +152,13 @@ class NotConfigured:
 
     name: str
     hint: str
+    #: How long this source's suggestions may be kept, known without its
+    #: configuration: rows stored while it was configured are still pruned.
+    retention: timedelta | None = None
+    #: What a screen calls it ("TMDB").
+    label: str = ""
+    #: The line its terms ask for wherever its suggestions are shown.
+    attribution: str | None = None
 
 
 @runtime_checkable
@@ -141,14 +167,20 @@ class RecommendationSource(Protocol):
 
     `select` is called once per round. It must not call a metadata provider per
     candidate: resolving is the domain's, under the provider budgets, afterwards.
-    Raise `SourceError` for a failure the round should record.
+    Raise `SourceError` for a failure the round should record. It may answer a
+    `Selection` instead of a plain sequence when it learned the seed's own ids.
+
+    A source may also carry `label` (what a screen calls it), `retention` (a
+    `timedelta`: how long its rows may be kept, after which the maintenance pass
+    deletes them) and `attribution` (the line its terms ask for beside its rows);
+    each is read with a default when absent.
     """
 
     name: str
 
     async def select(
         self, seed: Seed, profile: TasteProfile, limit: int
-    ) -> Sequence[Candidate]: ...
+    ) -> Sequence[Candidate] | Selection: ...
 
 
 #: How a domain finds a candidate in its own providers. It receives only the
@@ -165,12 +197,17 @@ class RecommendationSpec:
     `sources` are names in the source registry, in the order a screen offers them;
     the first configured one answers a round that names none. `enrich_top` is how
     many of a round's candidates are resolved straight away; the rest wait until
-    someone opens one.
+    someone opens one. `source_options` is what the domain tells each source about
+    itself (TMDB's `media`), handed over on the seed. `want_status` is where *Want*
+    puts a suggestion; `None` means the domain's first planned status. Albums have
+    no planned status, so they will name their `wishlist` here (Sprint 135).
     """
 
     sources: tuple[str, ...]
     resolve: Resolve
     enrich_top: int = 3
+    source_options: Mapping[str, Mapping[str, str]] = _EMPTY
+    want_status: str | None = None
 
 
 class SourceRegistry:
@@ -196,6 +233,26 @@ class SourceRegistry:
 
     def names(self) -> tuple[str, ...]:
         return tuple(self._sources)
+
+    def describe(self, name: str) -> dict[str, Any]:
+        """What a screen needs to offer a source: its label, and whether it can answer."""
+        found = self._sources.get(name)
+        label = getattr(found, "label", "") or name
+        configured = isinstance(found, RecommendationSource)
+        hint = (
+            found.hint
+            if isinstance(found, NotConfigured)
+            else None
+            if configured
+            else f"No source named {name!r} is built in"
+        )
+        return {"name": name, "label": label, "configured": configured, "hint": hint}
+
+    def attribution(self, name: str) -> str | None:
+        return getattr(self._sources.get(name), "attribution", None)
+
+    def retention(self, name: str) -> timedelta | None:
+        return getattr(self._sources.get(name), "retention", None)
 
 
 def same_work(candidate: Candidate, record: SearchCandidate) -> bool:
@@ -225,7 +282,9 @@ def resolve_by_identity_or_search(identity_kinds: Sequence[str] = ()) -> Resolve
     """The common resolve: an identifier the candidate carries, else a title search.
 
     For each of `identity_kinds` the candidate carries, providers answering
-    `fetch_by_identifier` are asked in order; a miss moves on. Then each provider
+    `fetch_by_identifier` are asked in order; a miss moves on. A provider that
+    declares `identifier_kinds` is asked only for those, so no budgeted request is
+    spent on a kind it refuses before it would send anything. Then each provider
     is searched for the title alone (a creator appended hides films from a title
     search), and the first record that is `same_work` wins, the creator and year
     checked there.
@@ -243,6 +302,9 @@ def resolve_by_identity_or_search(identity_kinds: Sequence[str] = ()) -> Resolve
             for provider in providers.values():
                 fetch = getattr(provider, "fetch_by_identifier", None)
                 if fetch is None:
+                    continue
+                answers = getattr(provider, "identifier_kinds", None)
+                if answers is not None and kind not in answers:
                     continue
                 try:
                     record = await fetch(kind, value)

@@ -40,6 +40,7 @@ DEFAULT_LAYOUT: tuple[ModuleLayout, ...] = (
     {"module": "question", "size": "S", "hidden": False},
     {"module": "shelves", "size": "S", "hidden": False},
     {"module": "lent", "size": "S", "hidden": False},
+    {"module": "suggested", "size": "M", "hidden": False},
 )
 MODULES: tuple[str, ...] = tuple(row["module"] for row in DEFAULT_LAYOUT)
 _DEFAULTS = {row["module"]: row for row in DEFAULT_LAYOUT}

@@ -22,6 +22,7 @@ from sqlalchemy.engine import Engine
 from book_tracker.application.goals import GoalService
 from book_tracker.application.library import LibraryService
 from book_tracker.application.ranking import rank_pile
+from book_tracker.application.recommendations import SuggestionStore
 from book_tracker.domain.registry import DOMAINS
 
 #: How deep *Up next* goes.
@@ -36,6 +37,8 @@ LATELY_LIMIT = 10
 SHELF_LIMIT = 8
 #: Loans listed in *Lent out*; `total` still counts them all.
 LENT_LIMIT = 5
+#: Suggestions on Home's *More like this*: the most its L size shows.
+SUGGESTED = 8
 #: The status every domain has for what an import left unsorted (technical spec 6.6).
 #: The library hides it by default, so Home's counts do too.
 UNSORTED = "unsorted"
@@ -144,7 +147,17 @@ class HomeService:
             "question": self._question() if shown("question") else None,
             "shelves": self._shelves() if shown("shelves") else None,
             "lent": self._lent() if shown("lent") else None,
+            "suggested": self._suggested() if shown("suggested") else None,
         }
+
+    def _suggested(self) -> list[dict[str, Any]]:
+        """*More like this*: the newest suggestions found and unanswered (Sprint 134).
+
+        Stored rows only; no source and no provider is asked to render Home.
+        """
+        return SuggestionStore(self.engine, self.user_id).suggestions(
+            seed_entry_id=None, item_type=None, limit=SUGGESTED, enriched_only=True
+        )
 
     def _lately(self, zone: tzinfo = UTC) -> list[dict[str, Any]]:
         """Finishes, score changes and additions, newest first (Sprint 131).

@@ -887,8 +887,13 @@ class TestTheMovieDomainEnrichesOnWhatItsSourcesSupply:
         assert await provider.fetch_by_identifier("imdb", "tt0111161") == "payload"
         assert asked == ["imdb:tt0111161"]
 
+        # Sprint 134: TMDB's id is answered too (`P4947`), because a TMDB
+        # recommendation names a film by it alone. A kind Wikidata holds no claim
+        # for is still refused.
+        assert await provider.fetch_by_identifier("tmdb", "346") == "payload"
+        assert asked[-1] == "tmdb:346"
         with pytest.raises(ProviderPayloadError) as refused:
-            await provider.fetch_by_identifier("tmdb", "1396")
+            await provider.fetch_by_identifier("isbn", "9788437604572")
         assert refused.value.code == "unsupported_identity_kind"
 
 

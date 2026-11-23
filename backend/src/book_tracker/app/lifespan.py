@@ -10,6 +10,7 @@ import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
+from functools import partial
 from pathlib import Path
 from types import FrameType
 from typing import Any
@@ -33,6 +34,7 @@ from book_tracker.application.recommendations import (
     RecommendHandler,
     SuggestionEnricher,
     budget_key,
+    prune_expired_suggestions,
 )
 from book_tracker.backup import BackupError, create_backup, database_digest, read_manifest
 from book_tracker.config import Settings
@@ -359,6 +361,15 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
             },
             rate_limiter=rate_limiter,
             data_dir=configured.data_dir,
+            # TMDB's six-month window (DEC-183 point 6): suggestions past their
+            # source's retention are deleted on an idle pass, once an hour.
+            housekeeping=(
+                partial(
+                    prune_expired_suggestions,
+                    app.state.engine,
+                    app.state.recommendation_sources,
+                ),
+            ),
         )
         app.state.job_runner = job_runner
         # Reclaim expired jobs from a potential crash (best-effort;

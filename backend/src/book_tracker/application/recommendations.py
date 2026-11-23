@@ -17,7 +17,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -36,6 +36,7 @@ from book_tracker.domain.recommendations import (
     ProviderBudgetSpent,
     RecommendationSource,
     Seed,
+    Selection,
     SourceError,
     SourceRegistry,
     TasteEntry,
@@ -209,7 +210,12 @@ _SUGGESTION_COLUMNS = (
     "s.id, s.round_id, s.item_type, r.source, s.title, s.year, s.creator,"
     " s.external_ids_json, s.reason, s.source_score, s.display_json, s.enrichment,"
     " s.item_id, s.answer, s.answered_at, s.created_at,"
-    " (SELECT e.id FROM entries e WHERE e.user_id = s.user_id AND e.item_id = s.item_id)"
+    " (SELECT e.id FROM entries e WHERE e.user_id = s.user_id AND e.item_id = s.item_id),"
+    " (SELECT i.cover_path FROM items i WHERE i.id = s.item_id),"
+    " (SELECT i.updated_at FROM items i WHERE i.id = s.item_id),"
+    " r.seed_entry_id,"
+    " (SELECT si.title FROM entries se JOIN items si ON si.id = se.item_id"
+    "  WHERE se.id = r.seed_entry_id)"
 )
 
 
@@ -232,6 +238,10 @@ def _suggestion(row: Sequence[Any]) -> dict[str, Any]:
         answered_at,
         created_at,
         entry_id,
+        cover_path,
+        item_updated_at,
+        seed_entry_id,
+        seed_title,
     ) = row
     # An item pruned from the shared cache took its link with it (the foreign key
     # sets it NULL); the suggestion is found again on the next enrich.
@@ -252,9 +262,23 @@ def _suggestion(row: Sequence[Any]) -> dict[str, Any]:
         "enrichment": enrichment,
         "item_id": item_id,
         "entry_id": entry_id,
+        # The cover its domain's providers found, served by the cover route to the
+        # person it was suggested to (Sprint 134); never an image from the source.
+        "cover_url": (
+            f"/api/items/{item_id}/cover?v="
+            f"{str(item_updated_at or '').replace(':', '').replace('-', '')}"
+            if item_id is not None and cover_path
+            else None
+        ),
         "answer": answer,
         "answered_at": answered_at,
         "created_at": created_at,
+        # What it is more like: the round's seed, while that entry exists.
+        "seed": (
+            {"entry_id": seed_entry_id, "title": seed_title}
+            if seed_entry_id is not None and seed_title is not None
+            else None
+        ),
     }
 
 
@@ -404,18 +428,26 @@ class SuggestionStore:
         return stored, dropped
 
     def suggestions(
-        self, *, seed_entry_id: int | None, item_type: str | None, limit: int
+        self,
+        *,
+        seed_entry_id: int | None,
+        item_type: str | None,
+        limit: int,
+        enriched_only: bool = False,
     ) -> list[dict[str, Any]]:
         """Unanswered suggestions worth showing, newest round first.
 
         Unresolved candidates are left out (the domain could not find them, and a
         model's invention must never be shown), and so is anything since added to
-        the library.
+        the library. `enriched_only` keeps only those found in a provider, which
+        Home shows: they carry their cover and can be wanted in one tap.
         """
         clauses = [
             "s.user_id = :user",
             "s.answer IS NULL",
-            "s.enrichment <> 'unresolved'",
+            "s.enrichment = 'enriched' AND s.item_id IS NOT NULL"
+            if enriched_only
+            else "s.enrichment <> 'unresolved'",
             "NOT EXISTS (SELECT 1 FROM entries e WHERE e.user_id = s.user_id"
             " AND e.item_id = s.item_id)",
         ]
@@ -672,8 +704,15 @@ def start_round(
     return found
 
 
-def planned_status(domain: Domain) -> str | None:
-    """Where *Want* puts a suggestion: the domain's first waiting status."""
+def want_status(domain: Domain) -> str | None:
+    """Where *Want* puts a suggestion: the spec's `want_status`, else the first planned.
+
+    Albums have no planned status; they name their `wishlist` when they take
+    suggestions (Sprint 135), which is why this is declared and not only derived.
+    """
+    spec = domain.recommendation
+    if spec is not None and spec.want_status is not None:
+        return spec.want_status
     return next((status.value for status in domain.statuses if status.planned), None)
 
 
@@ -687,7 +726,7 @@ def answer_suggestion(
         raise LibraryError("suggestion_not_found", "Suggestion was not found", status_code=404)
     if answer == "want":
         domain = DOMAINS.get(found["item_type"])
-        status = planned_status(domain) if domain is not None else None
+        status = want_status(domain) if domain is not None else None
         if status is None:
             raise LibraryError(
                 "no_planned_status", "This library has nowhere to keep what you want next"
@@ -924,6 +963,70 @@ class SuggestionEnricher:
             return
 
 
+# --- What a source taught us, and what its terms let us keep --------------------------
+
+
+def remember_seed_ids(engine: Engine, item_id: int, ids: Mapping[str, str]) -> None:
+    """Keep identifiers a source looked up for a seed on its item, once.
+
+    A kind the item already carries is left alone, and a value another item already
+    holds is skipped (the identity is unique across the cache): this only saves the
+    next round a lookup, it never moves an identity.
+    """
+    now = _now()
+    with engine.begin() as connection:
+        for kind, value in ids.items():
+            try:
+                identifier = normalize_identifier(kind, value)
+            except InvalidIdentifier:
+                continue
+            carried = connection.execute(
+                text("SELECT 1 FROM item_identifiers WHERE item_id = :item AND kind = :kind"),
+                {"item": item_id, "kind": identifier.kind},
+            ).first()
+            if carried is not None:
+                continue
+            connection.execute(
+                text(
+                    "INSERT OR IGNORE INTO item_identifiers (item_id, kind, normalized_value,"
+                    " value, created_at, updated_at) VALUES (:item, :kind, :normalized, :value,"
+                    " :now, :now)"
+                ),
+                {
+                    "item": item_id,
+                    "kind": identifier.kind,
+                    "normalized": identifier.normalized_value,
+                    "value": identifier.value,
+                    "now": now,
+                },
+            )
+
+
+def prune_expired_suggestions(engine: Engine, registry: SourceRegistry, now: datetime) -> int:
+    """Delete rounds older than their source's `retention`; returns how many.
+
+    TMDB's terms allow six months (DEC-183 point 6). The retention is known whether
+    or not the source is configured today, so rows stored while it was are still
+    removed. A round's suggestions go with it, answers included; an entry *Want*
+    made is the person's own and stays. A source with no retention keeps its rows.
+    """
+    removed = 0
+    with engine.begin() as connection:
+        for name in registry.names():
+            retention = registry.retention(name)
+            if retention is None:
+                continue
+            before = (now - retention).isoformat().replace("+00:00", "Z")
+            result = connection.execute(
+                text(
+                    "DELETE FROM suggestion_rounds WHERE source = :source AND created_at < :before"
+                ),
+                {"source": name, "before": before},
+            )
+            removed += int(result.rowcount or 0)
+    return removed
+
+
 # --- The two jobs ----------------------------------------------------------------------
 
 
@@ -1013,9 +1116,19 @@ class RecommendHandler:
             if seed_entry_id is not None
             else None
         ) or Seed(item_type=domain.item_type)
+        spec = domain.recommendation
+        options = spec.source_options.get(name) if spec is not None else None
+        if options:
+            seed = replace(seed, options=dict(options))
         profile = await off_loop(taste_profile, self.engine, store.user_id, domain)
         try:
-            candidates = list(await source.select(seed, profile, SELECT_LIMIT))
+            answer = await source.select(seed, profile, SELECT_LIMIT)
+            if isinstance(answer, Selection):
+                candidates = list(answer.candidates)
+                if answer.seed_ids and seed.item_id is not None:
+                    await off_loop(remember_seed_ids, self.engine, seed.item_id, answer.seed_ids)
+            else:
+                candidates = list(answer)
         except SourceError as error:
             return await self._finish(store, round_id, progress, "failed", str(error)[:500])
         except Exception as error:  # noqa: BLE001 - recorded on the round, not retried

@@ -71,6 +71,8 @@ class CinemetaSeriesProvider:
 
     name = "cinemeta-series"
     item_type = "series"
+    #: What `fetch_by_identifier` answers: Cinemeta's catalog is IMDb-keyed.
+    identifier_kinds = frozenset({"imdb"})
 
     def __init__(
         self,

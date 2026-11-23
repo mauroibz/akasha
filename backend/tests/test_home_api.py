@@ -130,6 +130,7 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
         "question",
         "shelves",
         "lent",
+        "suggested",
     }
     assert body["greeting"]["today"] == date.today().isoformat()
     assert body["greeting"]["active"] is None
@@ -154,6 +155,7 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
     assert body["question"] is None
     assert body["shelves"] == []
     assert body["lent"] == {"total": 0, "loans": []}
+    assert body["suggested"] == []
 
 
 @pytest.mark.anyio

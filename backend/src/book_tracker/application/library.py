@@ -1173,8 +1173,18 @@ class LibraryService:
         """
         query = select(ItemRow.cover_path).where(ItemRow.id == item_id)
         if self.item_access_requires_entry:
-            query = query.join(EntryRow, EntryRow.item_id == ItemRow.id).where(
-                EntryRow.user_id == self.user_id
+            # An item a suggestion of theirs points at is theirs to see too (Sprint
+            # 134): the sheet shows a suggestion's cover before *Want* makes an entry.
+            query = query.where(
+                or_(
+                    select(EntryRow.id)
+                    .where(EntryRow.item_id == ItemRow.id, EntryRow.user_id == self.user_id)
+                    .exists(),
+                    text(
+                        "EXISTS (SELECT 1 FROM suggestions s WHERE s.item_id = items.id"
+                        " AND s.user_id = :cover_user)"
+                    ).bindparams(cover_user=self.user_id),
+                )
             )
         with self.engine.connect() as connection:
             row = connection.execute(query).first()
