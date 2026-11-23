@@ -1,7 +1,7 @@
 # Sprint 143 — Your media
 
 **Sprint:** 143
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 56
 **Depends on:** 142
 **Owner:** Mauro

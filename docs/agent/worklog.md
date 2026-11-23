@@ -7205,3 +7205,14 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
 - Verified: see the sprint's Outcome.
 - Deviations: showcase defaults, capped cover size, the *Everything* heading. In the Outcome.
 - Next: Sprint 142, Arrange.
+
+## 2026-11-23 — Sprint 142: Arrange (complete)
+
+- Done: arranging in place (`useArrange.ts`, `Arrange.tsx`), the tray, the `insight:` family
+  and `InsightShowcase.tsx`; `EditHome` deleted.
+- Verified: see the sprint's Outcome.
+- Deviations: numbers offered per medium held; every groupable field is a section. In the
+  Outcome.
+- Note for e2e: `getByRole("button", { name: "Move X" })` also matches "Remove X"; use
+  `exact: true`.
+- Next: Sprint 143, your media.

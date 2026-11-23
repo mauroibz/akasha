@@ -1,7 +1,7 @@
 # Sprint 142 — Arrange
 
 **Sprint:** 142
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 56
 **Depends on:** 141
 **Owner:** Mauro
@@ -56,7 +56,7 @@ Media order and themes in the same panel (143, 148).
 
 ## Outcome
 
-Completed 2026-11-23 (DEC-193). Commits: `e6a0000` placeholder.
+Completed 2026-11-23 (DEC-193). Commits: `baca8d1` (the insight family), `608ed93` (arranging, the tray, the showcase).
 
 - **Arrange in place.** *Arrange* in the greeting line (pressed while on) gives every placed
   showcase a strip: a handle (drag, or arrow keys: left and up earlier, right and down later),

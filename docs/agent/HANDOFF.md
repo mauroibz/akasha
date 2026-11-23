@@ -4,8 +4,8 @@
 
 **2026-11-23, the 4.0 line is under way on branch `library-first-4.0`** (DEC-193, Sprints
 139–148; the design is `docs/library-first-proposal.md` with its mockup). The owner asked for
-all ten sprints to be built. Sprints 139 (one frame), 140 (one bar) and 141 (the library at `/`) are complete; **Sprint
-142 (Arrange) is next**. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
+all ten sprints to be built. Sprints 139 (one frame), 140 (one bar), 141 (the library at `/`) and 142 (Arrange) are
+complete; **Sprint 143 (your media) is next**. Nothing is pushed. Do not tag, push or deploy without asking: the standing permission
 to release applied to the 3.0 line only.
 
 What 139 left for the rest of the line: `components/PageFrame.tsx` (the only `<main>`; widths
@@ -31,7 +31,8 @@ made on `adc4de4`); leave it. Metadata providers are unreachable from the agent'
 What 141 left: `/` is the Library and `/library` redirects. `features/home/LibraryFront.tsx`
 draws the greeting, *On now*, *Lately* and the showcases above the grid from `GET /api/home`;
 the showcase keys are `next`, `question`, `suggested`, `year:<type>`, `shelf:<id>`.
-`features/home/EditHome.tsx` is still the dialog; 142 replaces it.
+Since 142 they are arranged in place (`useArrange.ts`, `Arrange.tsx`; the dialog is gone) and
+a third family exists, `insight:<type>:<section>`, drawn by `InsightShowcase.tsx`.
 
 ## Earlier state (release 3.1.0)
 
