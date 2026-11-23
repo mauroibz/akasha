@@ -7431,3 +7431,68 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
   only for an item the person has an entry on, so the sheet shows `display`'s poster or the
   cover route admits items the person's suggestions point at. Migration numbering is unchanged:
   136 still takes 0038.
+
+## DEC-189 — TMDB as the first recommendation source: choices the sprint file left open (Sprint 134)
+
+- **Date:** 2026-11-23
+- **Status:** accepted
+- **Cross-references:** DEC-183 point 6 (TMDB for recommendations, amending DEC-103), DEC-103
+  (posters; not reopened), DEC-188 (the pipeline), DEC-185 (adding a Home module). Recorded by
+  the session under the coordinator's instruction to build the line autonomously; the art,
+  pruning, availability and album choices below were the coordinator's.
+- **Context:** Sprint 134 put TMDB behind *More like this* for films and series, with a side
+  sheet and a Home module. TMDB's `/recommendations` answer turned out to carry **no IMDb id**
+  on any row, and Sprint 133 left four questions for this sprint: art under auth, pruning, how
+  the button learns whether a source works, and where an album's *Want* would go.
+- **Decision:**
+  1. **One request, two at most.** The adapter (`infrastructure/tmdb_recommendations.py`) reads
+     the seed's TMDB id from its stored identifiers; failing that it asks `/find/{imdb_id}`
+     once and returns the id on a new `Selection(candidates, seed_ids)` answer shape, and the
+     round keeps it on the seed's item as a `tmdb` identifier (insert-or-ignore: the identity is
+     unique across the cache, so it never moves one). Which TMDB media a library is comes from
+     the domain's new `RecommendationSpec.source_options` (`{"tmdb": {"media": "movie" | "tv"}}`),
+     handed over on `Seed.options`; the shared adapter never asks which library it holds.
+  2. **A candidate is named by TMDB's id, and resolved through Wikidata's exact claim.** Films
+     and series declare `resolve_by_identity_or_search(("imdb", "tmdb"))`; the Wikidata
+     adapters now answer `fetch_by_identifier("tmdb", …)` (`P4947`, `P4983`). Providers declare
+     `identifier_kinds`, and the shared resolve skips a provider that cannot answer a kind, so
+     no budgeted request is spent on Cinemeta or TVmaze being asked for a TMDB id they refuse.
+     All six candidates recorded (three per seed) resolved by claim.
+  3. **The reason is "TMDB: often watched together"**; `display` keeps TMDB's overview, its
+     original title and a `themoviedb.org` link. **No poster path is kept and no TMDB image is
+     hotlinked** from the browser.
+  4. **Art: the cover route admits an item the person's suggestions point at.** Under
+     `AKASHA_AUTH=on`, `GET /api/items/{id}/cover` now answers for an item one of the
+     requester's suggestions resolved to, as well as one they hold an entry on; another
+     person still gets 404. A suggestion carries `cover_url` (Akasha's own route, stored
+     covers only; no provider call while rendering).
+  5. **Pruning.** A source may declare `retention`; TMDB's is 182 days. The job runner gained a
+     generic housekeeping hook run on an idle pass at most hourly, and
+     `prune_expired_suggestions` deletes rounds (their suggestions cascade, answers included)
+     older than their source's retention. `NotConfigured` carries the retention too, so rows
+     stored while a token was set are still pruned after it is removed. An entry *Want* made
+     is the person's and stays; a *Not for me* older than six months no longer keeps a TMDB
+     pick out of later rounds — the accepted cost of the window.
+  6. **Availability from the server.** `GET /api/item-types` gives each library a
+     `recommendation: {sources: [{name, label, configured, hint}], attribution: {source:
+     line}}` or `null`. The button is drawn only where it is not `null`; with no configured
+     source the sheet shows the hint and asks nothing (no `not_configured` round is stored).
+  7. **Attribution** — "This product uses the TMDB API but is not endorsed or certified by
+     TMDB." — is the source's own `attribution`, published per library and shown under the
+     sheet and under Home's module whenever a TMDB pick is in it.
+  8. **Want's status is declared.** `RecommendationSpec.want_status` names where *Want* puts a
+     suggestion; `None` keeps the first `planned` status. The conformance check accepts either a
+     declared, choosable `want_status` or a planned status. Albums can therefore declare
+     `want_status="wishlist"` in Sprint 135 without a planned status.
+  9. **Home's *More like this*** (module key `suggested`, default M, appended to stored layouts
+     per DEC-185) shows only suggestions already found in a provider (`enriched`), newest first,
+     two, four or eight by size, each with *Want* and *Not for me* in place; opening one shows
+     its round in the sheet. A pending pick has no cover and cannot be wanted, so Home leaves
+     it to the sheet. Each suggestion now names its `seed` (`{entry_id, title}`).
+  10. **The sheet updates from the event stream only** (no polling): the `recommend` job's
+      progress for its round, or an `enrich_suggestion` job for one of its rows, re-reads the
+      round. Lately's rows stay one line; the button is on the detail page and On now.
+- **Consequences:** TMDB's id now reaches `item_identifiers` for films Cinemeta added. The
+  `tmdb` identifier kind is unique across the cache (migration 0002), so a film and a series sharing a
+  TMDB number collide; the insert is ignored and the round still answers. Sprint 135 makes the
+  sheet's source segment switchable and declares `want_status` for albums.

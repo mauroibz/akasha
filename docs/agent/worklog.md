@@ -6975,3 +6975,36 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   enricher's `cover_client` to None or a replay, or covers are fetched from the live poster host
   (the first run did; fixed before commit).
 - Next: Sprint 134, TMDB and *More like this*.
+
+## 2026-11-23 — Sprint 134 (complete)
+- Done: TMDB source, film/series declarations, recordings, `/api/item-types` availability,
+  cover route for suggested items, hourly pruning hook, Home `suggested` section (`10e9d51`);
+  the sheet, the button on the detail page and On now, Home's module, Vitest and e2e
+  (`688889d`); walkthrough fixes (`ac4b5a1`). DEC-189.
+- Verified: backend 391 focused (after a 1,153-test pass over touched modules that caught
+  `/api/item-types` without a lifespan); Vitest related 367 then 55; Playwright
+  more-like-this + home 21, detail/home neighbours 67 + the known add-dialog axe flake (2 of 3
+  on base `9dfa89a` too, in a worktree outside the scratchpad path, which Playwright ignores);
+  `make check`.
+- Recording: TMDB with the `.env` token sent as a Bearer header (never printed); Wikidata
+  responses for the top three captured through the adapters with a recording transport
+  (strip `content-encoding` when re-wrapping a decoded body, or httpx decodes twice).
+- Walkthrough: `scripts/walkthrough.py --keep` with `TMDB_READ_TOKEN` exported from `.env`,
+  vite 5180, scratchpad `walk134/live_134.py` (seeds The Bear via Cinemeta, Seven Samurai via
+  Wikidata, Suspiria via Cinemeta, Breaking Bad; runs three rounds) and
+  `frontend/e2e/scratchpad/walk134.mjs` (1440 dark, 390 light). Live rounds: each `done` in
+  5.5 s, 12 stored, 3 enriched; Suspiria's TMDB id 11906 found by `/find` and kept. Sheet opened
+  in ~0.3 s on the stored round; *Look up* Kagemusha found it in 2.8 s from the event stream;
+  *Want* Yojimbo linked to its new entry; *Not for me* 47 Ronin; both kept after a reload;
+  *Refresh* stored 10 (both dropped), reusing Kagemusha and After the Rain without requests.
+  On now's The Bear card: *More like this* opened Shameless, The Chi, Six Feet Under found.
+  Home's module: four found picks across two seeds, attribution under it. Overflow 0 at 390;
+  phone sheet 390 wide. Console: only the auth-off `/api/auth/me` 404s.
+- Observed and fixed: pending rows had a yellow "Open" like *Want* (now an outlined
+  *Look up*); placeholder art clipped titles mid-word; Home's tiles were two huge covers per
+  row on a phone (now four across); module buttons misaligned under two-line titles.
+- Observed, left: the sheet's header scrolls away with a long list; the seed's title is the
+  library's (Wikidata's Spanish "Los siete samuráis") while picks use TMDB's English titles;
+  On now's lead card wraps *More like this* onto a second line at M; TMDB's year can differ by
+  one from Wikidata's (After the Rain 2000 vs 1999).
+- Next: Sprint 135, the model source.

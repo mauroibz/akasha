@@ -1925,11 +1925,15 @@ whole, recorded as **DEC-183**; the design is
   with a test-only fake source over recorded Cinemeta; no production domain declares a source
   yet; see the sprint's Outcome.]
 - **[134 — TMDB, and More like this](134-tmdb-and-more-like-this.md)**: the first real source,
-  the side sheet, the Home module. [After 133: a `tmdb` factory in `SOURCE_FACTORIES` and a
-  declaration on movies and series; how a suggested item's art shows under auth (DEC-188).]
+  the side sheet, the Home module.
+  [Closed 2026-11-23 (DEC-189). Five criteria met; TMDB recorded live (movie, series, `/find`,
+  404); candidates resolve through Wikidata by TMDB's id; the cover route admits suggested
+  items; rows pruned after 182 days on the runner's idle pass; `/api/item-types` publishes
+  each library's sources; Home's `suggested` module; see the sprint's Outcome.]
 - **[135 — The model source](135-the-model-source.md)**: a hosted model by API key (Claude,
-  Gemini or OpenAI-compatible, DEC-187), off until configured. [After 133: albums have no
-  `planned` status, which a `RecommendationSpec` requires (DEC-188 point 3).]
+  Gemini or OpenAI-compatible, DEC-187), off until configured. [After 134: albums declare
+  `want_status="wishlist"` (DEC-189 point 8); the sheet's source segment is display-only and
+  must become a choice passing `?source=`.]
 - **[136 — Embeddings](136-embeddings.md)**: similarity re-ranking and *From your library*.
 
 ## Not scheduled

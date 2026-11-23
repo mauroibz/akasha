@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 54,
-  "project_status": "in_progress",
-  "active_sprint": "134",
-  "active_sprint_file": "docs/sprints/134-tmdb-and-more-like-this.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "133",
+  "project_status": "ready",
+  "active_sprint": "135",
+  "active_sprint_file": "docs/sprints/135-the-model-source.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "134",
   "completed_sprints": [
     "001",
     "002",
@@ -139,8 +139,9 @@
     "130",
     "131",
     "132",
-    "133"
+    "133",
+    "134"
   ],
-  "started_at": "2026-11-23T01:27:44-03:00",
-  "updated_at": "2026-11-23T01:27:44-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T01:56:12-03:00"
 }

@@ -46,6 +46,11 @@ store-time filter drops as already in the library, so it needs a way to keep pla
 (for example a source-declared flag the store reads) — decide it here. An enriched suggestion
 has `item_id`, which is what re-ranking other sources' candidates by similarity reads.
 
+Notes from Sprint 134 (DEC-189): the *From your library* segment is one more entry in a
+library's `recommendation.sources` on `/api/item-types` (give the source a `label`); the sheet
+lists them. The job runner's `housekeeping` hook (hourly on an idle pass) is where any
+periodic embedding upkeep would go. Home's `suggested` module shows only `enriched` rows.
+
 ## Acceptance criteria
 
 1. With recorded vectors, *From your library* returns the nearest planned entries to the seed

@@ -180,7 +180,7 @@ and never reaches the process.
 | `AKASHA_AUTH`          | `off`            | `on` turns on accounts, per-user libraries and login — the runbook's [auth section](docs/operations/runbook.md#turning-authentication-on) is the guide |
 | `AKASHA_METRICS`       | `off`            | `on` serves Prometheus text at `/metrics`: queue depth, job outcomes, provider calls and request latency |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
-| `TMDB_READ_TOKEN`     | *empty*          | Optional. The movie domain's poster fallback for films with a TMDB id and no IMDb id       |
+| `TMDB_READ_TOKEN`     | *empty*          | Optional. Turns on *More like this* for films and series (TMDB's recommendations), and is the movie poster fallback for films with a TMDB id and no IMDb id |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |
 | `AKASHA_MIN_FREE_BYTES` | `524288000` (500 MB) | Below this much free space, a write is refused before it starts rather than failing partway through |
 | `AKASHA_SQLITE_BUSY_TIMEOUT_MS` | `5000`   | How long SQLite waits for a locked database before failing                                 |

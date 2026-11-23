@@ -701,7 +701,7 @@ Anything else a domain has to edit outside its own package is a coupling, and a 
 
 #### How the core serves a domain
 
-- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order.
+- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order. Since Sprint 134 each domain also carries `recommendation`: `null` where it declares no `RecommendationSpec`, else `{sources: [{name, label, configured, hint}], attribution: {source: line}}` from the source registry, which is how *More like this* knows whether to draw itself and what to say when its source is not configured.
 - `GET /api/importers` publishes every registered importer and its input descriptor; the import
   screen renders its tabs and input control from that declaration.
 - **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
@@ -732,10 +732,27 @@ SEED -> SELECT (the source, one request) -> STORE -> ENRICH (the domain's resolv
   `external_ids`, `reason`, `source_score`, `display`. A source raises `SourceError` for a
   failure the round should record; it never calls a metadata provider per candidate.
 - **The registry** (`app/recommendations.py`) is built at start from `SOURCE_FACTORIES`, each
-  reading configuration and returning the source or a `NotConfigured(name, hint)`. Which
-  provider backs a source is this configuration, never a domain's. Sprint 133 registers none;
-  the test-only `fake` source (`backend/tests/recommendation_fake.py`, recorded in
-  `tests/fixtures/recommendations/`) proves the pipeline.
+  reading configuration and returning the source or a `NotConfigured(name, hint, retention,
+  label, attribution)`. Which provider backs a source is this configuration, never a domain's.
+  The test-only `fake` source (`backend/tests/recommendation_fake.py`, recorded in
+  `tests/fixtures/recommendations/`) proves the pipeline. A source may carry `label`,
+  `retention` (how long its rows may be kept) and `attribution` (the line its terms ask for);
+  `select` may answer a `Selection(candidates, seed_ids)` when it looked up the seed's own ids,
+  which the round keeps on the seed's item (insert-or-ignore). A domain's `RecommendationSpec`
+  also carries `source_options` (handed to the source on `Seed.options`) and `want_status`
+  (where *Want* puts a suggestion; default the first `planned` status).
+- **TMDB** (Sprint 134, DEC-183 point 6, DEC-189; `infrastructure/tmdb_recommendations.py`,
+  `TMDB_READ_TOKEN`) is the first source. Films declare `source_options={"tmdb": {"media":
+  "movie"}}` and series `"tv"`. A round reads the seed's `tmdb` identifier, or asks
+  `/find/{imdb_id}?external_source=imdb_id` once and keeps the id, then
+  `/{media}/{id}/recommendations?page=1`: up to twelve candidates named by TMDB's id alone
+  (the response carries no IMDb id), reason "TMDB: often watched together", `display` holding
+  the overview, original title and a `themoviedb.org` link, never a poster. 404, 401/403, 429
+  and transport failures are `SourceError`s the round records. Both domains resolve with
+  `resolve_by_identity_or_search(("imdb", "tmdb"))`; the Wikidata adapters answer
+  `fetch_by_identifier("tmdb", …)` through `P4947`/`P4983`, and a provider declaring
+  `identifier_kinds` is not asked (nor charged) for a kind outside them. Its rows carry
+  TMDB's attribution wherever shown and are deleted after 182 days.
 - **The `recommend` job** (payload `{round_id}`, owner the person) checks the source's daily
   round budget (`provider_usage` under `recommend:<source>`, limits from
   `AKASHA_RECOMMEND_DAILY_LIMITS`), asks the source once, stores the candidates, then resolves
@@ -755,6 +772,12 @@ SEED -> SELECT (the source, one request) -> STORE -> ENRICH (the domain's resolv
   someone opened, under the same budgets.
 - **Progress** is the job's progress on the event stream: `{round_id, status, stored,
   dropped, enriched, error}` for a round, `{suggestion_id, enrichment}` for one suggestion.
+- **Retention.** The job runner's idle pass runs its housekeeping sweeps at most hourly
+  (`JobRunner(housekeeping=…)`); `prune_expired_suggestions` deletes the rounds of every source
+  with a `retention` older than it, configured or not, and their suggestions with them.
+- **Art.** A suggestion carries `cover_url`, Akasha's own cover route for the item it resolved
+  to. Under `AKASHA_AUTH=on` the cover route admits an item one of the requester's
+  suggestions points at, as well as one they hold an entry on.
 - **Reading never calls a provider or a source.** Only the two jobs do.
 
 ## 7. HTTP API contract
@@ -800,7 +823,7 @@ The product-spec route list is authoritative, with these refinements:
   /api/loans/{id}`, `GET /api/loans?open=true`, `GET /api/locations`; `GET /api/entries` takes
   `location=` (exact) and `lent=true`, and both are part of the cursor's filter key.
 - `GET /api/home` (Sprints 130–131, DEC-183–185) is Home's one read, from stored data only — no
-  provider is consulted, and a test fails if one is. Ten sections:
+  provider is consulted, and a test fails if one is. Eleven sections:
   `greeting` (`today` as the server's `YYYY-MM-DD`; `active`, an entry under way with `day`, 1 on
   its `date_started` and `null` without one; `entries`, every entry but `unsorted`; `pile`,
   entries in a status their domain declares `planned`; `goals`, at most one `{item_type, target,
@@ -823,8 +846,10 @@ The product-spec route list is authoritative, with these refinements:
   scored_at}` — the first card `/revisit` would deal, else the first entry `/gaps` lists, else
   `null`; `shelves`, up to eight `{id, name, slug, entry_count}` holding something, the one whose
   members were updated last first (a membership has no timestamp); `lent`, `{total, loans}` with
-  the five open loans out longest, each `{id, person, lent_on, entry}`. A module the person hid
-  is not read: `year`, `lately`, `tidy`, `question`, `shelves` and `lent` are `null`, `next` and
+  the five open loans out longest, each `{id, person, lent_on, entry}`; `suggested` (Sprint 134,
+  DEC-189), up to eight unanswered suggestions already found in a provider (`enriched`), newest
+  first, each work once, in the suggestion shape below. A module the person hid
+  is not read: `year`, `lately`, `tidy`, `question`, `shelves`, `lent` and `suggested` are `null`, `next` and
   `domains` empty (`now` is still read, for the greeting). `?tz=` (Sprint 132) is the person's
   IANA zone, which the client sends: today and the day an addition counts under in `lately` are
   that zone's; an absent or unknown zone falls back to the server's `TZ`, then UTC. Answers in
@@ -866,18 +891,19 @@ The product-spec route list is authoritative, with these refinements:
     unanswered suggestions worth showing, newest round first: not `unresolved`, not since in
     the library, each work once. A suggestion is `{id, round_id, item_type, source, title,
     year, creator, external_ids, reason: {signal: <source>, text} | null, source_score,
-    display, enrichment, item_id, entry_id, answer, answered_at, created_at}`.
+    display, enrichment, item_id, entry_id, cover_url, seed: {entry_id, title} | null, answer,
+    answered_at, created_at}` (`cover_url` and `seed` since Sprint 134).
   - `POST /api/suggestions/{id}/enrich`: 202 `{suggestion, job_id}` with an
     `enrich_suggestion` job queued, or 200 with `job_id: null` when it is not `pending`.
   - `PATCH /api/suggestions/{id}` `{answer: want | not_for_me | seen | null}`. `want` adds the
-    resolved item as an entry in the domain's first `planned` status (409
+    resolved item as an entry in the spec's `want_status`, else the domain's first `planned` status (409
     `suggestion_not_resolved` until it is `enriched`; wanting twice keeps the one entry).
     `not_for_me` keeps the work out of later rounds and is told to sources in the profile.
     `seen` is recorded only. `null` takes an answer back; an entry *Want* made stays.
 - `GET /api/home/layout` and `PUT /api/home/layout` (Sprint 131): `{modules: [{module, size:
   S|M|L, hidden}]}`, stored per person in `home_layouts` (migration 0036, one JSON row keyed by
   `user_id`, cascading with the user). The module keys are `now`, `next`, `year`, `lately`,
-  `libraries`, `tidy`, `question`, `shelves`, `lent` (`application/home_layout.py`). A read is
+  `libraries`, `tidy`, `question`, `shelves`, `lent`, `suggested` (`application/home_layout.py`). A read is
   lenient — an unknown key, a malformed row or unreadable JSON is dropped, an unknown size falls
   back to the module's default, and every module not named is appended with its default — and
   carries `defaults`, what *Reset* restores. A write is strict: an unknown module, a size other

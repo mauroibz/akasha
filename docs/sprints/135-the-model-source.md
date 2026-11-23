@@ -1,7 +1,7 @@
 # Sprint 135 — The model source
 
 **Sprint:** 135
-**Status:** planned
+**Status:** ready
 **Roadmap revision:** 54
 **Depends on:** 134
 **Owner:** Mauro
@@ -53,9 +53,22 @@ Notes from Sprint 133 (DEC-188):
   (`{"model": …}`), counted under `recommend:model`.
 - A model candidate the domain cannot find is stored `unresolved`, and `GET /api/suggestions`
   already leaves those out; the round endpoint lists every state, so the sheet must hide them.
-- Albums have no `planned` status, and the conformance suite refuses a `RecommendationSpec` on
-  a domain without one (*Want* puts a suggestion there). Decide where an album's *Want* goes
-  before albums declare `"model"`; that is a product question for the owner.
+- Albums have no `planned` status. Sprint 134 added `RecommendationSpec.want_status` (DEC-189
+  point 8) and the conformance check accepts it in place of a planned status: albums declare
+  `want_status="wishlist"` (the coordinator's decision, recorded in DEC-189).
+Notes from Sprint 134 (DEC-189):
+
+- `GET /api/item-types` publishes each library's `recommendation.sources` (`name`, `label`,
+  `configured`, `hint`) and `attribution`; the `model` source needs a `label` ("Model" or the
+  provider's name) and no attribution unless the provider's terms ask for one. `NotConfigured`
+  takes `label`, `retention` and `attribution` too.
+- The sheet (`features/suggest/MoreLikeThisSheet.tsx`) draws the declared sources as a segment
+  but always asks the first configured one; make the segment a choice that passes `?source=`
+  to `POST /api/entries/{id}/more-like-this` and keeps one round per source.
+- Domains that add `"model"` after `"tmdb"` keep TMDB first for films and series. Give the
+  model source no `retention` unless its terms ask for one.
+- A model candidate carries no ids, so resolve goes to the title search; `identifier_kinds`
+  keeps the identity step from spending requests.
 - Only *More like this* (an entry seed) has an endpoint. The job already runs a seedless
   (profile) round; a route for one is new work if the sheet or Home needs it.
 
