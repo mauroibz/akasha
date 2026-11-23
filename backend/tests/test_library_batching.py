@@ -233,6 +233,7 @@ FACET_FILTERS: list[dict[str, Any]] = [
     {"lent": True},
     {"missing_cover": True},
     {"exact_score": 5},
+    {"unscored": True},
     {"shelves": ["beta"], "formats": ["cd"], "types": ["album"], "statuses": ["owned"]},
 ]
 

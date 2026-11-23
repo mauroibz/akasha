@@ -619,6 +619,8 @@ def list_entries(
     cover: Literal["missing"] | None = None,
     #: Only entries with exactly this score (Sprint 116's ranking deck).
     score: int | None = Query(default=None, ge=1, le=10),
+    #: Only entries with no score: Home's *Tidy up* (Sprint 131).
+    unscored: bool = False,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
@@ -642,6 +644,7 @@ def list_entries(
             lent=lent,
             missing_cover=cover == "missing",
             exact_score=score,
+            unscored=unscored,
             q=q,
             sort=sort,
             order=order,

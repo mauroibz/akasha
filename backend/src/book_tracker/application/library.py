@@ -1569,44 +1569,54 @@ class LibraryService:
         a pair the owner said differs. Each pair once, older entry first.
         """
         with Session(self.engine) as session:
-            rows = session.execute(
-                select(
-                    EntryRow.id,
-                    ItemRow.type,
-                    ItemRow.title,
-                    ItemRow.creator_primary_normalized,
-                )
-                .join(ItemRow, ItemRow.id == EntryRow.item_id)
-                .where(EntryRow.user_id == self.user_id)
-                .order_by(EntryRow.id)
-            ).all()
-            dismissed = {
-                (low, high)
-                for low, high in session.execute(
-                    select(DuplicateDismissalRow.entry_low, DuplicateDismissalRow.entry_high).where(
-                        DuplicateDismissalRow.user_id == self.user_id
-                    )
-                ).all()
-            }
-            groups: dict[tuple[str, str, str], list[int]] = {}
-            for entry_id, item_type, title, creator in rows:
-                key = work_key(title or "")
-                if not key or not creator:
-                    continue
-                groups.setdefault((item_type, key, creator), []).append(entry_id)
-            pairs = [
-                (low, high)
-                for ids in groups.values()
-                for index, low in enumerate(ids)
-                for high in ids[index + 1 :]
-                if (low, high) not in dismissed
-            ]
+            pairs = self._duplicate_pairs(session)
             wanted = sorted({entry_id for pair in pairs for entry_id in pair})
             entries = dict(zip(wanted, self._entry_dicts_by_id(session, wanted), strict=True))
             return [
                 {"a": entries[low], "b": entries[high], "reason": "Same title and creator"}
-                for low, high in sorted(pairs)
+                for low, high in pairs
             ]
+
+    def duplicate_count(self) -> int:
+        """How many pairs `duplicate_candidates` would answer, without building them."""
+        with Session(self.engine) as session:
+            return len(self._duplicate_pairs(session))
+
+    def _duplicate_pairs(self, session: Session) -> list[tuple[int, int]]:
+        # Plain rows, not ORM ones: this reads every entry the owner has, and on a
+        # 10,000-entry library the ORM's row processing cost more than the query.
+        rows = session.execute(
+            text(
+                "SELECT e.id, i.type, i.title, i.creator_primary_normalized"
+                " FROM entries e JOIN items i ON i.id = e.item_id"
+                " WHERE e.user_id = :user AND i.creator_primary_normalized IS NOT NULL"
+                " AND i.creator_primary_normalized != '' ORDER BY e.id"
+            ),
+            {"user": self.user_id},
+        ).all()
+        dismissed = {
+            (low, high)
+            for low, high in session.execute(
+                text(
+                    "SELECT entry_low, entry_high FROM duplicate_dismissals WHERE user_id = :user"
+                ),
+                {"user": self.user_id},
+            ).all()
+        }
+        groups: dict[tuple[str, str, str], list[int]] = {}
+        for entry_id, item_type, title, creator in rows:
+            key = work_key(title or "")
+            if not key:
+                continue
+            groups.setdefault((item_type, key, creator), []).append(entry_id)
+        return sorted(
+            (low, high)
+            for ids in groups.values()
+            if len(ids) > 1
+            for index, low in enumerate(ids)
+            for high in ids[index + 1 :]
+            if (low, high) not in dismissed
+        )
 
     def _pair(self, session: Session, a: int, b: int) -> tuple[int, int]:
         if a == b:
@@ -2133,6 +2143,7 @@ class LibraryService:
         lent: bool = False,
         missing_cover: bool = False,
         exact_score: int | None = None,
+        unscored: bool = False,
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
@@ -2152,6 +2163,7 @@ class LibraryService:
                 "lent": lent,
                 "missing_cover": missing_cover,
                 "score": exact_score,
+                "unscored": unscored,
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -2209,6 +2221,7 @@ class LibraryService:
         lent: bool = False,
         missing_cover: bool = False,
         exact_score: int | None = None,
+        unscored: bool = False,
         columns: Sequence[Any] = (EntryRow,),
     ) -> Any:
         # `columns` lets a count aggregate over this join directly instead of
@@ -2221,6 +2234,9 @@ class LibraryService:
         )
         if exact_score is not None:
             query = query.where(EntryRow.score == exact_score)
+        if unscored:
+            # Home's *Tidy up*: what has no score yet (Sprint 131).
+            query = query.where(EntryRow.score.is_(None))
         if missing_cover:
             # What the deck's *Find a cover* goes through (Sprint 112).
             query = query.where(or_(ItemRow.cover_path.is_(None), ItemRow.cover_path == ""))
@@ -2313,6 +2329,7 @@ class LibraryService:
         lent: bool = False,
         missing_cover: bool = False,
         exact_score: int | None = None,
+        unscored: bool = False,
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -2347,6 +2364,7 @@ class LibraryService:
             lent=lent,
             missing_cover=missing_cover,
             exact_score=exact_score,
+            unscored=unscored,
         )
         state = None
         if after:
@@ -2367,6 +2385,7 @@ class LibraryService:
             lent=lent,
             missing_cover=missing_cover,
             exact_score=exact_score,
+            unscored=unscored,
         )
         if state is not None:
             id_comparison = (
@@ -2413,6 +2432,7 @@ class LibraryService:
                     lent=lent,
                     missing_cover=missing_cover,
                     exact_score=exact_score,
+                    unscored=unscored,
                     columns=(func.count(),),
                 )
                 total = session.scalar(total_query) or 0
@@ -2433,6 +2453,7 @@ class LibraryService:
                     lent=lent,
                     missing_cover=missing_cover,
                     exact_score=exact_score,
+                    unscored=unscored,
                     columns=(EntryRow.status, ItemRow.type, func.count()),
                 )
                 # Grouped by the item's type as well as the status, because a status two
@@ -2461,6 +2482,7 @@ class LibraryService:
                     lent=lent,
                     missing_cover=missing_cover,
                     exact_score=exact_score,
+                    unscored=unscored,
                     columns=(EntryFormatRow.format, func.count()),
                 )
                 format_rows = session.execute(

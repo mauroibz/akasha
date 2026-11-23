@@ -1,7 +1,7 @@
 # Sprint 131 — Home: the remaining modules, and Edit home
 
 **Sprint:** 131
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 54
 **Depends on:** 130
 **Owner:** Mauro

@@ -119,7 +119,18 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
         response = await client.get("/api/home")
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {"greeting", "now", "next", "year", "domains"}
+    assert set(body) == {
+        "greeting",
+        "now",
+        "next",
+        "year",
+        "domains",
+        "lately",
+        "tidy",
+        "question",
+        "shelves",
+        "lent",
+    }
     assert body["greeting"]["today"] == date.today().isoformat()
     assert body["greeting"]["active"] is None
     assert body["greeting"]["entries"] == 0
@@ -132,6 +143,12 @@ async def test_an_empty_library_answers_every_section_empty(tmp_path: Path) -> N
     assert all(month["count"] == 0 and month["covers"] == [] for month in body["year"]["months"])
     assert body["year"]["goals"] == []
     assert body["domains"] == []
+    # Nothing to show is an empty section, which the screen hides.
+    assert body["lately"] == []
+    assert body["tidy"] == {"duplicates": 0, "without_cover": 0, "unscored": 0}
+    assert body["question"] is None
+    assert body["shelves"] == []
+    assert body["lent"] == {"total": 0, "loans": []}
 
 
 @pytest.mark.anyio
@@ -212,6 +229,163 @@ async def test_the_five_sections_read_the_library(tmp_path: Path) -> None:
     assert book["without_cover"] == 9
     assert tiles["album"]["covers"][0]["score"] == 10
     assert tiles["anime"]["mean_score"] is None
+
+
+def _shelve(app: Any, name: str, entries: list[int], user: int = 1) -> None:
+    now = datetime.now(UTC).isoformat()
+    with app.state.engine.begin() as connection:
+        shelf = connection.execute(
+            text(
+                "INSERT INTO shelves (user_id, name, slug, created_at, updated_at)"
+                " VALUES (:user, :name, :slug, :now, :now) RETURNING id"
+            ),
+            {"user": user, "name": name, "slug": name.lower(), "now": now},
+        ).scalar_one()
+        for entry in entries:
+            connection.execute(
+                text("INSERT INTO entry_shelves (entry_id, shelf_id) VALUES (:entry, :shelf)"),
+                {"entry": entry, "shelf": shelf},
+            )
+
+
+def _score_event(app: Any, entry: int, score: int, previous: int, at: str) -> None:
+    with app.state.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO score_events (entry_id, score, previous, reason, recorded_at)"
+                " VALUES (:entry, :score, :previous, 'time', :at)"
+            ),
+            {"entry": entry, "score": score, "previous": previous, "at": at},
+        )
+
+
+def _lend(app: Any, entry: int, person: str, lent_on: str, returned_on: str | None = None) -> None:
+    now = datetime.now(UTC).isoformat()
+    with app.state.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO loans (entry_id, person, lent_on, returned_on, created_at,"
+                " updated_at) VALUES (:entry, :person, :lent_on, :returned_on, :now, :now)"
+            ),
+            {
+                "entry": entry,
+                "person": person,
+                "lent_on": lent_on,
+                "returned_on": returned_on,
+                "now": now,
+            },
+        )
+
+
+@pytest.mark.anyio
+async def test_the_remaining_modules_read_the_library(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        rayuela = _entry(
+            app,
+            "Rayuela",
+            "book",
+            "read",
+            score=9,
+            date_finished="2026-03-02",
+            date_added="2025-01-01T09:00:00Z",
+            cover="c/1",
+        )
+        ficciones = _entry(
+            app, "Ficciones", "book", "read", date_finished="2026-03-20", date_added="2025-01-01"
+        )
+        _score_event(app, rayuela, 7, 9, "2026-04-01T10:00:00Z")
+        # Two added the same day are one row of Lately.
+        added = _entry(app, "Dune", "book", "to_read", date_added="2026-05-01T08:00:00Z")
+        newest = _entry(app, "Dune Messiah", "book", "to_read", date_added="2026-05-01T09:00:00Z")
+        _entry(app, "Unsorted import", "book", "unsorted", date_added="2026-06-01T00:00:00Z")
+        watched = _entry(app, "Up", "movie", "watched", date_added="2024-01-01", cover="c/2")
+        # Same work entered twice.
+        twice = [
+            _entry(app, "The Hobbit", "book", "to_read", date_added="2020-01-01"),
+            _entry(app, "The Hobbit", "book", "read", date_added="2020-01-02"),
+        ]
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE items SET creator_primary_normalized = 'tolkien'"
+                    " WHERE title = 'The Hobbit'"
+                )
+            )
+        _shelve(app, "Favourites", [rayuela, ficciones])
+        _shelve(app, "Empty", [])
+        _lend(app, rayuela, "Ana", "2026-01-05")
+        _lend(app, ficciones, "Luis", "2025-11-01", returned_on="2025-12-01")
+        body = (await client.get("/api/home")).json()
+
+    lately = body["lately"]
+    assert [(row["kind"], row["entry"]["id"]) for row in lately[:3]] == [
+        ("added", newest),
+        ("score", rayuela),
+        ("finished", ficciones),
+    ]
+    assert lately[0]["count"] == 2
+    assert added not in [row["entry"]["id"] for row in lately]
+    assert lately[1]["score"] == 7 and lately[1]["previous"] == 9
+    assert len(lately) <= 8
+    assert all(row["entry"]["status"] != "unsorted" for row in lately)
+
+    # The pair, every entry without a cover but the one in the Inbox, and finished
+    # entries with no score (Ficciones, Up and the second Hobbit).
+    assert body["tidy"] == {"duplicates": 1, "without_cover": 5, "unscored": 3}
+    assert watched
+
+    question = body["question"]
+    assert question["kind"] == "gap"
+    assert question["entry"]["status"] in {"read", "watched"}
+
+    assert [(shelf["name"], shelf["entry_count"]) for shelf in body["shelves"]] == [
+        ("Favourites", 2)
+    ]
+
+    assert body["lent"]["total"] == 1
+    (loan,) = body["lent"]["loans"]
+    assert loan["person"] == "Ana"
+    assert loan["entry"]["id"] == rayuela
+    assert twice
+
+
+@pytest.mark.anyio
+async def test_tidy_ups_unscored_count_is_what_its_library_link_lists(tmp_path: Path) -> None:
+    """Tidy up links its unscored count to `/library?status=<finished>&unscored=true`."""
+    finished = [
+        status.value for domain in DOMAINS.values() for status in domain.statuses if status.finished
+    ]
+    async with _client(tmp_path) as (app, client):
+        _entry(app, "Scored", "book", "read", score=8)
+        _entry(app, "Unscored book", "book", "read")
+        _entry(app, "Unscored film", "movie", "watched")
+        _entry(app, "Waiting", "book", "to_read")
+        tidy = (await client.get("/api/home")).json()["tidy"]
+        listed = (
+            await client.get("/api/entries", params={"status": finished, "unscored": "true"})
+        ).json()
+    assert tidy["unscored"] == 2
+    assert {row["item"]["title"] for row in listed["items"]} == {"Unscored book", "Unscored film"}
+
+
+@pytest.mark.anyio
+async def test_one_question_asks_an_old_score_again_before_a_gap(tmp_path: Path) -> None:
+    async with _client(tmp_path) as (app, client):
+        old = _entry(app, "Pet Sematary", "book", "read", score=9, date_finished="2019-01-01")
+        with app.state.engine.begin() as connection:
+            # The score's own row, written when it was set, made six years old.
+            connection.execute(
+                text(
+                    "UPDATE score_events SET recorded_at = '2019-01-02T00:00:00Z'"
+                    " WHERE entry_id = :id"
+                ),
+                {"id": old},
+            )
+        _entry(app, "Undated", "book", "read")  # a gap: no finish date
+        body = (await client.get("/api/home")).json()
+    assert body["question"]["kind"] == "revisit"
+    assert body["question"]["entry"]["id"] == old
+    assert body["question"]["scored_at"].startswith("2019-01-02")
 
 
 @pytest.mark.anyio

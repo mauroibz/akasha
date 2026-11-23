@@ -1,8 +1,10 @@
-"""Home, read in one go (Sprint 130, DEC-183).
+"""Home, read in one go (Sprints 130-131, DEC-183).
 
-Home is the screen Akasha opens on: what is under way, what is next, the year, and
-one tile per library. Every module reads stored data only -- no provider is consulted
-while a page renders -- and the whole screen is one request.
+Home is the screen Akasha opens on: what is under way, what is next, the year, one
+tile per library, and since Sprint 131 what happened lately, what needs tidying, one
+question, shelves and loans. Every module reads stored data only -- no provider is
+consulted while a page renders -- and the whole screen is one request. A module the
+person hid is not read at all.
 
 Shared layer: no domain or status is named here. Under way, waiting and finished come
 from each domain's `StatusSpec` flags; whether a domain can hold a goal comes from its
@@ -10,7 +12,7 @@ from each domain's `StatusSpec` flags; whether a domain can hold a goal comes fr
 """
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 from datetime import date
 from typing import Any
 
@@ -27,6 +29,12 @@ NEXT_LIMIT = 5
 MONTH_COVERS = 24
 #: Covers on a library tile.
 TILE_COVERS = 3
+#: Rows in *Lately*.
+LATELY_LIMIT = 8
+#: Shelves in the *Shelves* module.
+SHELF_LIMIT = 8
+#: Loans listed in *Lent out*; `total` still counts them all.
+LENT_LIMIT = 5
 #: The status every domain has for what an import left unsorted (technical spec 6.6).
 #: The library hides it by default, so Home's counts do too.
 UNSORTED = "unsorted"
@@ -69,7 +77,7 @@ class HomeService:
         self.user_id = user_id
         self.library = library
 
-    def home(self, today: date) -> dict[str, Any]:
+    def home(self, today: date, hidden: Set[str] = frozenset()) -> dict[str, Any]:
         params = {"user": self.user_id, "unsorted": UNSORTED}
         with self.engine.connect() as connection:
             by_status = connection.execute(
@@ -116,13 +124,150 @@ class HomeService:
             ).all()
 
         goals = GoalService(self.engine, self.user_id)
+        # The greeting names what is under way, so this is read even when On now is hidden.
         now = self.library.now()
+
+        def shown(module: str) -> bool:
+            return module not in hidden
+
         return {
             "greeting": self._greeting(today, now, by_status, finished, goals),
-            "now": now,
-            "next": self._next(goals),
-            "year": self._year(today, finished, goals),
-            "domains": self._domains(by_status, histogram, best),
+            "now": now if shown("now") else [],
+            "next": self._next(goals) if shown("next") else [],
+            "year": self._year(today, finished, goals) if shown("year") else None,
+            "domains": self._domains(by_status, histogram, best) if shown("libraries") else [],
+            "lately": self._lately() if shown("lately") else None,
+            "tidy": self._tidy() if shown("tidy") else None,
+            "question": self._question() if shown("question") else None,
+            "shelves": self._shelves() if shown("shelves") else None,
+            "lent": self._lent() if shown("lent") else None,
+        }
+
+    def _lately(self) -> list[dict[str, Any]]:
+        """Finishes, score changes and additions, newest first (Sprint 131).
+
+        Finishes and changes are the Diary's own timeline. Additions are counted per
+        day, newest entry named, so an import of three hundred is one row, not eight;
+        the Inbox's unsorted entries are left to the Inbox.
+        """
+        timeline = self.library.timeline(limit=LATELY_LIMIT)["events"]
+        with self.engine.connect() as connection:
+            days = connection.execute(
+                text(
+                    "SELECT day, n, entry_id, at FROM ("
+                    " SELECT substr(e.date_added, 1, 10) AS day, e.id AS entry_id,"
+                    "  e.date_added AS at, count(*) OVER (PARTITION BY substr(e.date_added, 1, 10))"
+                    "  AS n, row_number() OVER (PARTITION BY substr(e.date_added, 1, 10)"
+                    "  ORDER BY e.date_added DESC, e.id DESC) AS place"
+                    " FROM entries e WHERE e.user_id = :user AND e.status != :unsorted"
+                    ") WHERE place = 1 ORDER BY day DESC LIMIT :limit"
+                ),
+                {"user": self.user_id, "unsorted": UNSORTED, "limit": LATELY_LIMIT},
+            ).all()
+        added = self.library.get_entries([row[2] for row in days])
+        rows: list[dict[str, Any]] = [
+            {
+                "kind": event["kind"],
+                "at": event["at"],
+                "entry": event["entry"],
+                "score": event["score"],
+                "previous": event["previous"],
+                "count": 1,
+            }
+            for event in timeline
+            if event["entry"]["status"] != UNSORTED
+        ]
+        rows.extend(
+            {"kind": "added", "at": at, "entry": entry, "score": None, "previous": None, "count": n}
+            for (_day, n, _entry_id, at), entry in zip(days, added, strict=True)
+        )
+        rows.sort(key=lambda row: str(row["at"]), reverse=True)
+        return rows[:LATELY_LIMIT]
+
+    def _tidy(self) -> dict[str, int]:
+        """What *Tidy up* counts: pairs, entries without a cover, finished but unscored.
+
+        The cover count is the covers deck's own filter (the Inbox aside); the unscored
+        count is each domain's declared finished status with no score.
+        """
+        finished = [
+            (domain.item_type, status.value)
+            for domain in DOMAINS.values()
+            for status in domain.statuses
+            if status.finished
+        ]
+        params: dict[str, Any] = {"user": self.user_id, "unsorted": UNSORTED}
+        clauses = []
+        for index, (item_type, status) in enumerate(finished):
+            params[f"type{index}"] = item_type
+            params[f"status{index}"] = status
+            clauses.append(f"(i.type = :type{index} AND e.status = :status{index})")
+        unscored = f"sum(e.score IS NULL AND ({' OR '.join(clauses)}))" if clauses else "0"
+        with self.engine.connect() as connection:
+            without_cover, unscored_count = connection.execute(
+                text(
+                    "SELECT sum(i.cover_path IS NULL OR i.cover_path = ''),"
+                    f" {unscored} FROM entries e JOIN items i ON i.id = e.item_id"
+                    " WHERE e.user_id = :user AND e.status != :unsorted"
+                ),
+                params,
+            ).one()
+        return {
+            "duplicates": self.library.duplicate_count(),
+            "without_cover": without_cover or 0,
+            "unscored": unscored_count or 0,
+        }
+
+    def _question(self) -> dict[str, Any] | None:
+        """One question from Play: an old score to look at again, else a gap to fill."""
+        cards = self.library.revisit(limit=1)["cards"]
+        if cards:
+            return {
+                "kind": "revisit",
+                "entry": cards[0]["entry"],
+                "scored_at": cards[0]["scored_at"],
+            }
+        gaps = self.library.gaps(limit=1)["entries"]
+        if gaps:
+            return {"kind": "gap", "entry": gaps[0], "scored_at": None}
+        return None
+
+    def _shelves(self) -> list[dict[str, Any]]:
+        """Shelves holding something, the one whose members were touched last first.
+
+        A membership has no timestamp of its own, so a member's own last change is the
+        nearest signal of a shelf in use.
+        """
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT s.id, s.name, s.slug, count(*), max(e.updated_at)"
+                    " FROM shelves s JOIN entry_shelves es ON es.shelf_id = s.id"
+                    " JOIN entries e ON e.id = es.entry_id"
+                    " WHERE s.user_id = :user GROUP BY s.id"
+                    " ORDER BY max(e.updated_at) DESC, count(*) DESC, s.id LIMIT :limit"
+                ),
+                {"user": self.user_id, "limit": SHELF_LIMIT},
+            ).all()
+        return [
+            {"id": shelf_id, "name": name, "slug": slug, "entry_count": count}
+            for shelf_id, name, slug, count, _used in rows
+        ]
+
+    def _lent(self) -> dict[str, Any]:
+        """What is out now, longest out first."""
+        loans = self.library.loans(open_only=True)
+        return {
+            "total": len(loans),
+            "loans": [
+                {
+                    "id": loan["id"],
+                    "person": loan["person"],
+                    "lent_on": loan["lent_on"],
+                    "entry": loan["entry"],
+                }
+                for loan in loans[:LENT_LIMIT]
+            ],
         }
 
     def _greeting(

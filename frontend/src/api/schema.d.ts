@@ -686,6 +686,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/home/layout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Layout
+     * @description This person's Home layout (Sprint 131); the default until one is saved.
+     */
+    get: operations["get_layout_api_home_layout_get"];
+    /**
+     * Put Layout
+     * @description Replace this person's layout; an unknown module, or one named twice, is refused.
+     */
+    put: operations["put_layout_api_home_layout_put"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/import/batches/{batch_id}": {
     parameters: {
       query?: never;
@@ -2309,6 +2333,70 @@ export interface components {
       /** Today */
       today: string;
     };
+    /**
+     * HomeLatelyRow
+     * @description A finish, a change of score, or the entries added on one day (Sprint 131).
+     */
+    HomeLatelyRow: {
+      /** At */
+      at: string;
+      /** Count */
+      count: number;
+      entry: components["schemas"]["EntryResponse"];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "finished" | "score" | "added";
+      /** Previous */
+      previous: number | null;
+      /** Score */
+      score: number | null;
+    };
+    /** HomeLayoutBody */
+    HomeLayoutBody: {
+      /** Modules */
+      modules: components["schemas"]["HomeModuleLayout"][];
+    };
+    /** HomeLayoutResponse */
+    HomeLayoutResponse: {
+      /** Defaults */
+      defaults: components["schemas"]["HomeModuleLayout"][];
+      /** Modules */
+      modules: components["schemas"]["HomeModuleLayout"][];
+    };
+    /** HomeLent */
+    HomeLent: {
+      /** Loans */
+      loans: components["schemas"]["HomeLoan"][];
+      /** Total */
+      total: number;
+    };
+    /** HomeLoan */
+    HomeLoan: {
+      entry: components["schemas"]["EntryResponse"];
+      /** Id */
+      id: number;
+      /** Lent On */
+      lent_on: string;
+      /** Person */
+      person: string;
+    };
+    /** HomeModuleLayout */
+    HomeModuleLayout: {
+      /**
+       * Hidden
+       * @default false
+       */
+      hidden: boolean;
+      /** Module */
+      module: string;
+      /**
+       * Size
+       * @enum {string}
+       */
+      size: "S" | "M" | "L";
+    };
     /** HomeMonth */
     HomeMonth: {
       /** Count */
@@ -2337,16 +2425,60 @@ export interface components {
       /** Since */
       since?: string | null;
     };
-    /** HomeResponse */
+    /**
+     * HomeQuestion
+     * @description One question from Play: an old score to look at again, else a gap to fill.
+     */
+    HomeQuestion: {
+      entry: components["schemas"]["EntryResponse"];
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "revisit" | "gap";
+      /** Scored At */
+      scored_at: string | null;
+    };
+    /**
+     * HomeResponse
+     * @description Every module's payload. A module the person hid is empty or `null`, unread.
+     */
     HomeResponse: {
       /** Domains */
       domains: components["schemas"]["HomeDomainTile"][];
       greeting: components["schemas"]["HomeGreeting"];
+      /** Lately */
+      lately: components["schemas"]["HomeLatelyRow"][] | null;
+      lent: components["schemas"]["HomeLent"] | null;
       /** Next */
       next: components["schemas"]["HomeNext"][];
       /** Now */
       now: components["schemas"]["EntryResponse"][];
-      year: components["schemas"]["HomeYear"];
+      question: components["schemas"]["HomeQuestion"] | null;
+      /** Shelves */
+      shelves: components["schemas"]["HomeShelf"][] | null;
+      tidy: components["schemas"]["HomeTidy"] | null;
+      year: components["schemas"]["HomeYear"] | null;
+    };
+    /** HomeShelf */
+    HomeShelf: {
+      /** Entry Count */
+      entry_count: number;
+      /** Id */
+      id: number;
+      /** Name */
+      name: string;
+      /** Slug */
+      slug: string;
+    };
+    /** HomeTidy */
+    HomeTidy: {
+      /** Duplicates */
+      duplicates: number;
+      /** Unscored */
+      unscored: number;
+      /** Without Cover */
+      without_cover: number;
     };
     /** HomeYear */
     HomeYear: {
@@ -4341,6 +4473,7 @@ export interface operations {
         lent?: boolean;
         cover?: "missing" | null;
         score?: number | null;
+        unscored?: boolean;
         sort?:
           | "date_added"
           | "score"
@@ -5741,6 +5874,122 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HomeResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  get_layout_api_home_layout_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeLayoutResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  put_layout_api_home_layout_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["HomeLayoutBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HomeLayoutResponse"];
         };
       };
       /** @description Unauthorized */

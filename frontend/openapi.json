@@ -2060,6 +2060,180 @@
         "title": "HomeGreeting",
         "type": "object"
       },
+      "HomeLatelyRow": {
+        "description": "A finish, a change of score, or the entries added on one day (Sprint 131).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "kind": {
+            "enum": [
+              "finished",
+              "score",
+              "added"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "kind",
+          "at",
+          "entry",
+          "score",
+          "previous",
+          "count"
+        ],
+        "title": "HomeLatelyRow",
+        "type": "object"
+      },
+      "HomeLayoutBody": {
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "maxItems": 64,
+            "title": "Modules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "modules"
+        ],
+        "title": "HomeLayoutBody",
+        "type": "object"
+      },
+      "HomeLayoutResponse": {
+        "properties": {
+          "defaults": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "title": "Defaults",
+            "type": "array"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/HomeModuleLayout"
+            },
+            "title": "Modules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "modules",
+          "defaults"
+        ],
+        "title": "HomeLayoutResponse",
+        "type": "object"
+      },
+      "HomeLent": {
+        "properties": {
+          "loans": {
+            "items": {
+              "$ref": "#/components/schemas/HomeLoan"
+            },
+            "title": "Loans",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "loans"
+        ],
+        "title": "HomeLent",
+        "type": "object"
+      },
+      "HomeLoan": {
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "lent_on": {
+            "title": "Lent On",
+            "type": "string"
+          },
+          "person": {
+            "title": "Person",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "person",
+          "lent_on",
+          "entry"
+        ],
+        "title": "HomeLoan",
+        "type": "object"
+      },
+      "HomeModuleLayout": {
+        "properties": {
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "module": {
+            "title": "Module",
+            "type": "string"
+          },
+          "size": {
+            "enum": [
+              "S",
+              "M",
+              "L"
+            ],
+            "title": "Size",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "size"
+        ],
+        "title": "HomeModuleLayout",
+        "type": "object"
+      },
       "HomeMonth": {
         "properties": {
           "count": {
@@ -2148,7 +2322,42 @@
         "title": "HomeNext",
         "type": "object"
       },
+      "HomeQuestion": {
+        "description": "One question from Play: an old score to look at again, else a gap to fill.",
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/EntryResponse"
+          },
+          "kind": {
+            "enum": [
+              "revisit",
+              "gap"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "scored_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scored At"
+          }
+        },
+        "required": [
+          "kind",
+          "entry",
+          "scored_at"
+        ],
+        "title": "HomeQuestion",
+        "type": "object"
+      },
       "HomeResponse": {
+        "description": "Every module's payload. A module the person hid is empty or `null`, unread.",
         "properties": {
           "domains": {
             "items": {
@@ -2159,6 +2368,30 @@
           },
           "greeting": {
             "$ref": "#/components/schemas/HomeGreeting"
+          },
+          "lately": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HomeLatelyRow"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lately"
+          },
+          "lent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeLent"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "next": {
             "items": {
@@ -2174,8 +2407,49 @@
             "title": "Now",
             "type": "array"
           },
+          "question": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeQuestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shelves": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/HomeShelf"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shelves"
+          },
+          "tidy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeTidy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "year": {
-            "$ref": "#/components/schemas/HomeYear"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HomeYear"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2183,9 +2457,65 @@
           "now",
           "next",
           "year",
-          "domains"
+          "domains",
+          "lately",
+          "tidy",
+          "question",
+          "shelves",
+          "lent"
         ],
         "title": "HomeResponse",
+        "type": "object"
+      },
+      "HomeShelf": {
+        "properties": {
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "entry_count"
+        ],
+        "title": "HomeShelf",
+        "type": "object"
+      },
+      "HomeTidy": {
+        "properties": {
+          "duplicates": {
+            "title": "Duplicates",
+            "type": "integer"
+          },
+          "unscored": {
+            "title": "Unscored",
+            "type": "integer"
+          },
+          "without_cover": {
+            "title": "Without Cover",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "duplicates",
+          "without_cover",
+          "unscored"
+        ],
+        "title": "HomeTidy",
         "type": "object"
       },
       "HomeYear": {
@@ -6487,6 +6817,16 @@
           },
           {
             "in": "query",
+            "name": "unscored",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Unscored",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
             "name": "sort",
             "required": false,
             "schema": {
@@ -8210,6 +8550,132 @@
           }
         },
         "summary": "Home"
+      }
+    },
+    "/api/home/layout": {
+      "get": {
+        "description": "This person's Home layout (Sprint 131); the default until one is saved.",
+        "operationId": "get_layout_api_home_layout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeLayoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Layout"
+      },
+      "put": {
+        "description": "Replace this person's layout; an unknown module, or one named twice, is refused.",
+        "operationId": "put_layout_api_home_layout_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomeLayoutBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomeLayoutResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Layout"
       }
     },
     "/api/import/batches/{batch_id}": {
