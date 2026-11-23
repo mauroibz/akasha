@@ -476,6 +476,7 @@ class JobRunner:
         data_dir: Path | None = None,
         housekeeping: Sequence[Callable[[datetime], object]] = (),
         housekeeping_every: timedelta = timedelta(hours=1),
+        sweeps: Sequence[tuple[Callable[[datetime], object], timedelta]] = (),
     ) -> None:
         self.engine = engine
         self.repo = JobRepository(engine)
@@ -495,6 +496,11 @@ class JobRunner:
         self.housekeeping = tuple(housekeeping)
         self.housekeeping_every = housekeeping_every
         self._housekept_at: datetime | None = None
+        #: Sweeps with a cadence of their own, each run off the loop on an idle pass
+        #: at most once per its interval, the first on the first idle pass (Sprint
+        #: 136: an item added with no vector is noticed within a minute).
+        self.sweeps = tuple(sweeps)
+        self._swept_at: dict[int, datetime] = {}
         self._resumed = False
         self._running = False
         #: Set by `stop()`, and never cleared: a stop that arrives before the
@@ -559,6 +565,15 @@ class JobRunner:
                     await off_loop(sweep, now)
                 except Exception:
                     logger.exception("housekeeping sweep failed")
+        for index, (sweep, every) in enumerate(self.sweeps):
+            last = self._swept_at.get(index)
+            if last is not None and now - last < every:
+                continue
+            self._swept_at[index] = now
+            try:
+                await off_loop(sweep, now)
+            except Exception:
+                logger.exception("periodic sweep failed")
 
     def stop(self) -> None:
         self._stop_requested = True

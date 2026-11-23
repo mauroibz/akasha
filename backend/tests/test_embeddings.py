@@ -15,7 +15,7 @@ import logging
 import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,7 @@ from book_tracker.application.embeddings import (
     embedding_text,
     pack,
     request_embedding,
+    request_if_missing,
     request_if_needed,
     similarity,
     unpack,
@@ -529,12 +530,42 @@ async def test_an_enrichment_that_filled_something_queues_embedding(
 
 
 @pytest.mark.anyio
+async def test_an_entry_added_by_any_path_is_noticed_by_the_minutes_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The walkthrough's finding: an add from search enriches nothing, so no job was
+    queued, and the hourly pass had already run at start; the vector waited an hour."""
+    endpoint = Endpoint("gemini", worded=True)
+    async with _app(tmp_path, monkeypatch, endpoint) as (app, _client):
+        runner = app.state.job_runner
+        ((sweep, every),) = runner.sweeps
+        assert every == timedelta(minutes=1)
+        model = app.state.embedding_model
+        start = datetime.now(UTC)
+        # Nothing held: nothing queued.
+        await runner.idle(start)
+        assert JobRepository(app.state.engine).claim(datetime.now(UTC)) is None
+        seed_library(app)
+        # Inside the minute the pass does not run again; after it, it queues one job.
+        await runner.idle(start + timedelta(seconds=30))
+        assert JobRepository(app.state.engine).claim(datetime.now(UTC)) is None
+        await runner.idle(start + timedelta(minutes=1))
+        await _run_jobs(app)
+        stored = _stored(app)
+        # Everything has a vector now: the cheap check finds nothing.
+        assert request_if_missing(app.state.engine, model, datetime.now(UTC)) is None
+    assert len(stored) == len(LIBRARY)
+    assert sweep.func is request_if_missing  # type: ignore[attr-defined]
+
+
+@pytest.mark.anyio
 async def test_without_configuration_enrichment_queues_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async with _app(tmp_path, monkeypatch, None) as (app, _client):
         assert app.state.job_runner.handlers["enrich_item"].on_enriched is None
         assert len(app.state.job_runner.housekeeping) == 1
+        assert app.state.job_runner.sweeps == ()
 
 
 # --- Migration 0038 ---------------------------------------------------------------------

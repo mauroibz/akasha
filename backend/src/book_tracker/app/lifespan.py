@@ -33,6 +33,7 @@ from book_tracker.application.embeddings import (
     EMBED_JOB,
     EmbedItemsHandler,
     after_change,
+    request_if_missing,
     request_if_needed,
 )
 from book_tracker.application.enrichment import EnrichmentHandler
@@ -411,6 +412,17 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
                     if embedder is not None
                     else ()
                 ),
+            ),
+            # ...and an item added by any path with no vector yet, within a minute.
+            sweeps=(
+                (
+                    (
+                        partial(request_if_missing, app.state.engine, embedder.model),
+                        timedelta(minutes=1),
+                    ),
+                )
+                if embedder is not None
+                else ()
             ),
         )
         app.state.job_runner = job_runner

@@ -330,8 +330,34 @@ def request_embedding(engine: Engine) -> str | None:
 
 
 def request_if_needed(engine: Engine, model: str, now: datetime) -> str | None:
-    """The maintenance pass: queue a job when anything is missing or stale."""
+    """The hourly pass: queue a job when anything is missing or stale.
+
+    Stale includes a text edited since it was embedded, which only hashing every
+    item's text can tell; hence hourly, not on every idle pass.
+    """
     if not pending_texts(engine, model, 1):
+        return None
+    return request_embedding(engine)
+
+
+def request_if_missing(engine: Engine, model: str, now: datetime) -> str | None:
+    """The minute's pass: queue a job when an item someone holds has no current vector.
+
+    One indexed query, cheap enough to run every minute: an entry added by any path
+    (search, import, *Want*, by hand) is embedded within a minute without each path
+    having to ask.
+    """
+    with engine.connect() as connection:
+        missing = connection.execute(
+            text(
+                "SELECT 1 FROM items i LEFT JOIN item_embeddings v ON v.item_id = i.id"
+                " WHERE (v.item_id IS NULL OR v.model <> :model)"
+                " AND (EXISTS (SELECT 1 FROM entries e WHERE e.item_id = i.id)"
+                " OR EXISTS (SELECT 1 FROM suggestions s WHERE s.item_id = i.id)) LIMIT 1"
+            ),
+            {"model": model},
+        ).first()
+    if missing is None:
         return None
     return request_embedding(engine)
 
