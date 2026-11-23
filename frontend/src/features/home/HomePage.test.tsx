@@ -66,6 +66,15 @@ describe("HomePage", () => {
     }
   });
 
+  it("asks for Home in the person's own zone", async () => {
+    serve(fullHome());
+    renderWithRouter(<HomePage />);
+    await screen.findByRole("heading", { level: 1 });
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const urls = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(urls).toContain(`/api/home?tz=${encodeURIComponent(zone)}`);
+  });
+
   it("follows the stored order and leaves out hidden and empty modules", async () => {
     const home = fullHome();
     home.lent = { total: 0, loans: [] };

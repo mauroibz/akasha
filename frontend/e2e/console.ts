@@ -3,6 +3,12 @@ import { test as base, expect } from "@playwright/test";
 import { bookItemType } from "./seed";
 
 /**
+ * `GET /api/home` with or without its `tz` (Sprint 132), and not `/api/home/layout`:
+ * a glob ending at the path would miss the query string.
+ */
+export const isHome = (url: URL) => url.pathname === "/api/home";
+
+/**
  * Every test in this suite fails if the page logged an error or threw.
  *
  * This is Sprint 017's fourth acceptance criterion, and it is a fixture rather
@@ -59,7 +65,7 @@ export const test = base.extend<{
       // Sprint 098: nothing under way, and an empty diary, unless a spec says so.
       await page.route("**/api/now", (route) => route.fulfill({ json: [] }));
       // Home (Sprint 130): an empty library, unless a spec says otherwise.
-      await page.route("**/api/home", (route) =>
+      await page.route(isHome, (route) =>
         route.fulfill({
           json: {
             greeting: {

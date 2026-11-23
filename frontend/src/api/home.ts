@@ -53,8 +53,19 @@ export interface Home {
   lent: HomeLent | null;
 }
 
+/** The person's own zone, so Home's today and Lately's days are theirs (Sprint 132). */
+function zone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return "";
+  }
+}
+
 export function getHome(signal?: AbortSignal) {
-  return request("/api/home", { signal }).then((r) =>
+  const tz = zone();
+  const url = tz ? `/api/home?tz=${encodeURIComponent(tz)}` : "/api/home";
+  return request(url, { signal }).then((r) =>
     jsonOrApiError<Home>(r, "Home could not be loaded"),
   );
 }

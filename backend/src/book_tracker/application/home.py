@@ -13,7 +13,7 @@ from each domain's `StatusSpec` flags; whether a domain can hold a goal comes fr
 
 from collections import defaultdict
 from collections.abc import Sequence, Set
-from datetime import date
+from datetime import UTC, date, datetime, tzinfo
 from typing import Any
 
 from sqlalchemy import text
@@ -78,7 +78,9 @@ class HomeService:
         self.user_id = user_id
         self.library = library
 
-    def home(self, today: date, hidden: Set[str] = frozenset()) -> dict[str, Any]:
+    def home(
+        self, today: date, hidden: Set[str] = frozenset(), zone: tzinfo = UTC
+    ) -> dict[str, Any]:
         params = {"user": self.user_id, "unsorted": UNSORTED}
         with self.engine.connect() as connection:
             by_status = connection.execute(
@@ -137,35 +139,24 @@ class HomeService:
             "next": self._next(today) if shown("next") else [],
             "year": self._year(today, finished, goals) if shown("year") else None,
             "domains": self._domains(by_status, histogram, best) if shown("libraries") else [],
-            "lately": self._lately() if shown("lately") else None,
+            "lately": self._lately(zone) if shown("lately") else None,
             "tidy": self._tidy() if shown("tidy") else None,
             "question": self._question() if shown("question") else None,
             "shelves": self._shelves() if shown("shelves") else None,
             "lent": self._lent() if shown("lent") else None,
         }
 
-    def _lately(self) -> list[dict[str, Any]]:
+    def _lately(self, zone: tzinfo = UTC) -> list[dict[str, Any]]:
         """Finishes, score changes and additions, newest first (Sprint 131).
 
         Finishes and changes are the Diary's own timeline. Additions are counted per
         day, newest entry named, so an import of three hundred is one row, not eight;
-        the Inbox's unsorted entries are left to the Inbox.
+        the Inbox's unsorted entries are left to the Inbox. The day is the person's
+        own (`zone`, Sprint 132): an evening import west of Greenwich is one day.
         """
         timeline = self.library.timeline(limit=LATELY_LIMIT)["events"]
-        with self.engine.connect() as connection:
-            days = connection.execute(
-                text(
-                    "SELECT day, n, entry_id, at FROM ("
-                    " SELECT substr(e.date_added, 1, 10) AS day, e.id AS entry_id,"
-                    "  e.date_added AS at, count(*) OVER (PARTITION BY substr(e.date_added, 1, 10))"
-                    "  AS n, row_number() OVER (PARTITION BY substr(e.date_added, 1, 10)"
-                    "  ORDER BY e.date_added DESC, e.id DESC) AS place"
-                    " FROM entries e WHERE e.user_id = :user AND e.status != :unsorted"
-                    ") WHERE place = 1 ORDER BY day DESC LIMIT :limit"
-                ),
-                {"user": self.user_id, "unsorted": UNSORTED, "limit": LATELY_LIMIT},
-            ).all()
-        added = self.library.get_entries([row[2] for row in days])
+        days = self._days_added(zone)
+        added = self.library.get_entries([entry_id for _n, entry_id, _at in days])
         rows: list[dict[str, Any]] = [
             {
                 "kind": event["kind"],
@@ -180,10 +171,46 @@ class HomeService:
         ]
         rows.extend(
             {"kind": "added", "at": at, "entry": entry, "score": None, "previous": None, "count": n}
-            for (_day, n, _entry_id, at), entry in zip(days, added, strict=True)
+            for (n, _entry_id, at), entry in zip(days, added, strict=True)
         )
         rows.sort(key=lambda row: str(row["at"]), reverse=True)
         return rows[:LATELY_LIMIT]
+
+    def _days_added(self, zone: tzinfo) -> list[tuple[int, int, str]]:
+        """`(count, newest entry id, newest date_added)` per local day, newest first.
+
+        SQL counts per UTC hour, which a local day is made of whole in any zone on a
+        whole-hour offset; each hour is placed by its newest addition, converted with
+        the zone's own rules, so a change of clocks is honoured. A day-only
+        `date_added` is that day wherever the person is.
+        """
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT n, entry_id, at FROM ("
+                    " SELECT e.id AS entry_id, e.date_added AS at,"
+                    "  count(*) OVER (PARTITION BY substr(e.date_added, 1, 13)) AS n,"
+                    "  row_number() OVER (PARTITION BY substr(e.date_added, 1, 13)"
+                    "  ORDER BY e.date_added DESC, e.id DESC) AS place"
+                    " FROM entries e WHERE e.user_id = :user AND e.status != :unsorted"
+                    ") WHERE place = 1 ORDER BY at DESC, entry_id DESC LIMIT :hours"
+                ),
+                {
+                    "user": self.user_id,
+                    "unsorted": UNSORTED,
+                    # A local day is at most 25 UTC hours; one day more than shown.
+                    "hours": 25 * (LATELY_LIMIT + 1),
+                },
+            ).all()
+        days: dict[str, tuple[int, int, str]] = {}
+        for count, entry_id, at in rows:
+            day = _local_day(str(at), zone)
+            # Hours come newest first, so a day's first hour names its newest entry.
+            newest = days.get(day)
+            days[day] = (
+                (newest[0] + count, newest[1], newest[2]) if newest else (count, entry_id, at)
+            )
+        return list(days.values())[:LATELY_LIMIT]
 
     def _tidy(self) -> dict[str, Any]:
         """What *Tidy up* counts: pairs, entries without a cover, finished but unscored.
@@ -417,6 +444,19 @@ def _greeting_pair(
         own = next((goal for goal in goals if goal["item_type"] == lead["item"]["type"]), None)
         return lead, own
     return None, goals[0] if goals else None
+
+
+def _local_day(at: str, zone: tzinfo) -> str:
+    """The person's day for a stored timestamp; a bare date is already a day."""
+    if len(at) <= 10:
+        return at[:10]
+    try:
+        moment = datetime.fromisoformat(at.replace("Z", "+00:00"))
+    except ValueError:
+        return at[:10]
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(zone).date().isoformat()
 
 
 def _done_by_type(finished: Sequence[Any]) -> dict[str, int]:

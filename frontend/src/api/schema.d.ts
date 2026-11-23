@@ -678,7 +678,10 @@ export interface paths {
      * Home
      * @description Every module of Home from stored data; no provider is consulted.
      *
-     *     Today is resolved per request, so a server running across midnight moves on.
+     *     `tz` is the person's IANA zone (the client sends its own): their today, and the
+     *     day an addition counts under in *Lately* (Sprint 132). Without a known one, the
+     *     server's `TZ`. Today is resolved per request, so a server running across midnight
+     *     moves on.
      */
     get: operations["home_api_home_get"];
     put?: never;
@@ -5879,7 +5882,9 @@ export interface operations {
   };
   home_api_home_get: {
     parameters: {
-      query?: never;
+      query?: {
+        tz?: string | null;
+      };
       header?: never;
       path?: never;
       cookie?: never;

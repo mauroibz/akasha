@@ -1,9 +1,10 @@
 """Home over HTTP (Sprint 130, DEC-183): one read for every module on the screen."""
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
 from book_tracker.api.identity import CurrentUser, current_user
@@ -174,13 +175,40 @@ class HomeResponse(BaseModel):
     lent: HomeLent | None
 
 
+def _zone(request: Request, name: str | None) -> ZoneInfo:
+    """The client's zone when it names a known one, else the server's TZ, else UTC."""
+    for candidate in (name, getattr(request.app.state, "timezone", None), "UTC"):
+        if not candidate:
+            continue
+        try:
+            return ZoneInfo(candidate)
+        except (ZoneInfoNotFoundError, ValueError):
+            continue
+    return ZoneInfo("UTC")
+
+
 @router.get("/home", response_model=HomeResponse, responses=ERRORS)
-def home(service: Home, layouts: Layouts) -> HomeResponse:
+def home(
+    request: Request,
+    service: Home,
+    layouts: Layouts,
+    tz: Annotated[str | None, Query(max_length=64)] = None,
+) -> HomeResponse:
     """Every module of Home from stored data; no provider is consulted.
 
-    Today is resolved per request, so a server running across midnight moves on.
+    `tz` is the person's IANA zone (the client sends its own): their today, and the
+    day an addition counts under in *Lately* (Sprint 132). Without a known one, the
+    server's `TZ`. Today is resolved per request, so a server running across midnight
+    moves on.
     """
-    return HomeResponse.model_validate(service.home(date.today(), layouts.hidden()))
+    zone = _zone(request, tz)
+    today = _today(zone)
+    return HomeResponse.model_validate(service.home(today, layouts.hidden(), zone))
+
+
+def _today(zone: ZoneInfo) -> date:
+    """Today where the person is."""
+    return datetime.now(zone).date()
 
 
 class HomeModuleLayout(BaseModel):

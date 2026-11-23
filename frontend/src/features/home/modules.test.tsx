@@ -29,6 +29,24 @@ describe("Lately", () => {
     );
   });
 
+  it("dates an addition by the person's own day, not the stored UTC one", () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "America/Argentina/Buenos_Aires";
+    try {
+      const [added] = fullHome().lately!.filter((row) => row.kind === "added");
+      renderWithRouter(
+        <Lately
+          rows={[{ ...added, at: "2026-11-23T01:00:00Z", count: 1 }]}
+          size="M"
+        />,
+      );
+      // 22:00 on the 22nd in Buenos Aires, though the 23rd in UTC.
+      expect(screen.getByRole("listitem")).toHaveTextContent("22 Nov");
+    } finally {
+      process.env.TZ = zone;
+    }
+  });
+
   it("says a score kept is still that score, not a change to itself", () => {
     renderWithRouter(
       <Lately

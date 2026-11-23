@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 
-import { expect, test } from "./console";
+import { expect, isHome, test } from "./console";
 import { entry as seededEntry } from "./seed";
 
 /**
@@ -253,7 +253,7 @@ async function stubHome(page: Page) {
   await page.route("**/api/item-types", (route) =>
     route.fulfill({ json: types }),
   );
-  await page.route("**/api/home", (route) => route.fulfill({ json: home }));
+  await page.route(isHome, (route) => route.fulfill({ json: home }));
   await page.route("**/api/entries/*", async (route) => {
     const request = route.request();
     if (request.method() !== "PATCH") return route.fallback();

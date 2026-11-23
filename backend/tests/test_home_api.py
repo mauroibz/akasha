@@ -164,12 +164,7 @@ async def test_the_five_sections_read_the_library(
     # which the ranked pile reads, depends on the day of the year.
     today = date(date.today().year, 11, 23)
 
-    class _Today(date):
-        @classmethod
-        def today(cls) -> _Today:
-            return cls(today.year, today.month, today.day)
-
-    monkeypatch.setattr("book_tracker.api.home.date", _Today)
+    monkeypatch.setattr("book_tracker.api.home._today", lambda _zone: today)
     year = today.year
     started = (today - timedelta(days=31)).isoformat()
     async with _client(tmp_path) as (app, client):
@@ -246,6 +241,30 @@ async def test_the_five_sections_read_the_library(
     assert book["without_cover"] == 9
     assert tiles["album"]["covers"][0]["score"] == 10
     assert tiles["anime"]["mean_score"] is None
+
+
+@pytest.mark.anyio
+async def test_lately_groups_additions_by_the_persons_own_day(tmp_path: Path) -> None:
+    """An evening import in Buenos Aires (UTC-3) is one day, not two (Sprint 132)."""
+    async with _client(tmp_path) as (app, client):
+        # 20:30 and 22:00 on 22 Nov in Buenos Aires; 23:30 on the 22nd and 01:00 on the
+        # 23rd in UTC.
+        _entry(app, "Evening one", "book", "to_read", date_added="2026-11-22T23:30:00Z")
+        late = _entry(app, "Evening two", "book", "to_read", date_added="2026-11-23T01:00:00Z")
+        _entry(app, "Morning", "book", "to_read", date_added="2026-11-22T12:00:00Z")
+
+        local = (
+            await client.get("/api/home", params={"tz": "America/Argentina/Buenos_Aires"})
+        ).json()["lately"]
+        utc = (await client.get("/api/home")).json()["lately"]
+        unknown = await client.get("/api/home", params={"tz": "Mars/Olympus_Mons"})
+
+    assert [(row["entry"]["id"], row["count"]) for row in local] == [(late, 3)]
+    # The server's own zone (TZ, UTC by default) when the client names none.
+    assert [row["count"] for row in utc] == [1, 2]
+    # A zone the server does not know falls back to its own rather than failing Home.
+    assert unknown.status_code == 200
+    assert [row["count"] for row in unknown.json()["lately"]] == [1, 2]
 
 
 def _shelve(app: Any, name: str, entries: list[int], user: int = 1) -> None:

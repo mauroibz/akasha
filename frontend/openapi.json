@@ -8448,8 +8448,27 @@
     },
     "/api/home": {
       "get": {
-        "description": "Every module of Home from stored data; no provider is consulted.\n\nToday is resolved per request, so a server running across midnight moves on.",
+        "description": "Every module of Home from stored data; no provider is consulted.\n\n`tz` is the person's IANA zone (the client sends its own): their today, and the\nday an addition counts under in *Lately* (Sprint 132). Without a known one, the\nserver's `TZ`. Today is resolved per request, so a server running across midnight\nmoves on.",
         "operationId": "home_api_home_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "tz",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tz"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {

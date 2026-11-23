@@ -11,13 +11,20 @@ import { localDate } from "./year";
 
 const ROWS: Record<ModuleSize, number> = { S: 4, M: 8, L: 10 };
 
-const DAY = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-});
-
+/**
+ * A row's day where the person is. A finish is a bare day and is that day; an addition
+ * or a change of score is a moment in UTC, so an evening import west of Greenwich
+ * reads as the evening's day (Sprint 132). Formatted per call, in the zone of now.
+ */
 function day(at: string): string {
-  return DAY.format(localDate(at.slice(0, 10)));
+  const moment = at.length > 10 ? new Date(at) : localDate(at.slice(0, 10));
+  const shown = Number.isNaN(moment.getTime())
+    ? localDate(at.slice(0, 10))
+    : moment;
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+  }).format(shown);
 }
 
 const icons = {

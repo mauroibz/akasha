@@ -269,6 +269,8 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
         provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
+        #: The server's zone (TZ): a person's day when their client names none (Sprint 132).
+        app.state.timezone = configured.timezone
         app.state.attachment_max_bytes = configured.attachment_max_bytes
         app.state.min_free_bytes = configured.min_free_bytes
         app.state.calibre_dir = configured.calibre_dir
