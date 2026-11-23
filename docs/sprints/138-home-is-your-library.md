@@ -1,7 +1,7 @@
 # Sprint 138 — Home is your library
 
 **Sprint:** 138
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 55
 **Depends on:** 137
 **Owner:** Mauro
@@ -79,4 +79,54 @@ close.
 
 ## Outcome
 
-_Not started._
+Completed 2026-11-23 (DEC-192). Commits: `f5a336b` (module families in the layout and the two
+`/api/home` sections), `96654ec` (the modules and *Edit home*), the label and technical spec
+commit, and the closing documentation commit.
+
+Delivered:
+
+1. `application/home_layout.py`: `year:<item type>` for every registered domain whose
+   `entry_fields` hold `date_finished` (books, anime, films, series; albums have none), default
+   M and shown, after *Lately* so *The year* and *Lately* keep their row; `shelf:<id>` for each
+   of the person's shelves, default M and hidden, at the end. Rows carry `label` ("Books this
+   year", "Shelf: Favorites"); only `module`, `size` and `hidden` are stored. A deleted shelf
+   drops out on read; an unknown member, another person's shelf included, is refused on write.
+   The body takes up to 512 rows.
+2. `library_years` and `shelf_modules` on `/api/home`, for shown members only, from stored data:
+   a library's year reuses the year's finished rows (no new query); a shelf is two queries for
+   all shown shelves together.
+3. `features/home/LibraryYear.tsx` ("Your 2026 books"): the goal band's `Slots` with a goal of
+   24 or fewer (S 4, M 6, L 8 columns), the band's `Bar` and the covers above 24, the covers
+   alone without a goal (8, 12 or 24 by size, then "and N more"). `features/home/ShelfModule.tsx`:
+   the shelf's name, "N on the shelf →" to the shelf, its covers. `Slots`, `Bar` and
+   `slotsInOrder` are shared with the Diary's band (`features/goals`), not copied.
+4. *Edit home* names family members by the server's label; `HomePage` draws a member only when
+   the payload has it.
+
+Acceptance criteria:
+
+1. `test_home_layout.py`: `test_each_library_has_a_year_and_each_shelf_a_hidden_module`,
+   `test_a_family_layout_round_trips_and_a_deleted_shelf_drops_out`,
+   `test_a_family_member_that_does_not_exist_is_refused` (four cases),
+   `test_another_persons_shelf_is_not_a_module`.
+2. `test_home_api.py`: `test_each_librarys_year_and_a_placed_shelf_read_the_library` (a goal, a
+   goal with nothing yet, no goal, a hidden year unread, a shown and a hidden shelf); the empty
+   library gives both sections empty; `test_home_consults_no_provider` and the timing budget
+   still pass.
+3. `LibraryYear.test.tsx` (3), `HomePage.test.tsx` (a shelf and a year where the layout puts
+   them, an empty year not drawn), `EditHome.test.tsx` (labels, switch, size), and two e2e
+   tests in `home.spec.ts`.
+4. No `item_type ==` above the registry (the year family comes from `entry_fields`). Axe with
+   no serious violations and no overflow at 390 and 1440 px (the two e2e tests).
+
+Verification: backend `test_home_layout` (19), `test_home_api` (13), `test_app_shape`,
+`test_isolation`; `npx vitest related` over the changed files (86); Playwright `home.spec.ts`
+and `diary-goal.spec.ts` 21 passed; `make check`. Walkthrough on the seeded library with a
+book goal of 12 and three shelves: Home shows *Your 2026 books* (5 of 12, slots with the next
+one marked) and *Your 2026 movies* (one cover); *Edit home* lists four library years and three
+shelves (hidden); turning on *Shelf: Horror*, sizing it L and moving it up put it beside
+*Lately*; at 390 px no overflow and no console errors.
+
+Observed, left: a library's year without a goal and few finishes leaves its box mostly empty
+beside a fuller neighbour, as *The year* did (DEC-184's finding); *Edit home* is long with many
+shelves (it scrolls).

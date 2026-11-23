@@ -2,6 +2,26 @@
 
 ## Where the project stands
 
+**2026-11-23, 3.1.0 prepared on `owner-review-3.1`.** The owner reviewed 3.0.0 on the board and
+asked for six changes (DEC-192), built as Sprints 137 (finishing records when; *Mark as read*;
+the pile in rounds by creator; `/pile`, the pile as a list) and 138 (Home's module families: a
+year per library, `year:<item type>`, and a module per shelf, `shelf:<id>`). No migration and
+no new setting. Release notes: `docs/operations/release-notes-v3.1.md`. The project state is
+`complete`; the next work is the owner's.
+
+**Environment warning:** a local Akasha 1.5.7 container (`akasha-akasha-1`) listens on
+127.0.0.1:8000, where the Playwright dev server proxies unstubbed `/api` calls; with it up,
+16–17 accessibility tests fail, on `main` too. Run Playwright with
+`AKASHA_E2E_BACKEND=http://127.0.0.1:9`. The repository has an old stash (`stash@{0}`,
+made on `adc4de4`, the deployment line's planning); leave it.
+
+Left from the review: Open Library bookkeeping subjects as reasons; Home's *More like this*
+posters large at 1440; Model and From your library segments shown when off; a TMDB pick without
+a poster; *Lately* shows imported titles as stored; a library's year without a goal and few
+finishes is mostly empty space.
+
+## Earlier state (release 3.0.0)
+
 **2026-11-23, 3.0.0 released and running on the board.** DEC-183's line (Sprints 130–136) is
 complete and merged (#41, `3ba6d31`), tagged `v3.0.0`, and the image is published. Release notes:
 `docs/operations/release-notes-v3.0.md`. What the line adds over 2.9.0: Home at `/` (the

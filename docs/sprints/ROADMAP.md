@@ -1959,6 +1959,8 @@ Diary's goal grid, with or without a goal; shelves on Home. "This home screen is
 - **[138 — Home is your library](138-home-is-your-library.md)**: module families in the stored
   layout; a year module per library and a module per shelf, each turned on and placed in
   *Edit home*.
+  [Closed 2026-11-23 (DEC-192). Four criteria met; `library_years` and `shelf_modules` on
+  `/api/home`; the Diary band's `Slots` and `Bar` shared; see the sprint's Outcome.]
 
 ## Not scheduled
 

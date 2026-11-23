@@ -7148,3 +7148,13 @@ Running pytest with `-p no:logging` errors on `caplog` tests; use the Makefile's
   repository's old stash (`adc4de4`, 2026 deployment line); it was reset to HEAD and the stash
   entry left in place.
 - Next: Sprint 138, Home's module families (a year per library, a module per shelf).
+
+## 2026-11-23 — Sprint 138: Home is your library
+
+- Done: module families in Home's layout (`year:<item type>`, `shelf:<id>`), `library_years` and
+  `shelf_modules` on `/api/home`, `LibraryYear` and `ShelfModule` on Home, *Edit home* naming
+  them. This closes the 3.1 line (DEC-192).
+- Verified: see the sprint's Outcome; walkthrough on the seeded library at 1440 and 390.
+- Next: the release gates (`make test`, the full Playwright suite with
+  `AKASHA_E2E_BACKEND=http://127.0.0.1:9` while the local 1.5.7 container holds :8000, audit,
+  build, smoke-container), release notes, `v3.1.0`, the board.

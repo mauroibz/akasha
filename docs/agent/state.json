@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 55,
-  "project_status": "in_progress",
-  "active_sprint": "138",
-  "active_sprint_file": "docs/sprints/138-home-is-your-library.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "137",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "138",
   "completed_sprints": [
     "001",
     "002",
@@ -143,8 +143,9 @@
     "134",
     "135",
     "136",
-    "137"
+    "137",
+    "138"
   ],
-  "started_at": "2026-11-23T10:25:40-03:00",
-  "updated_at": "2026-11-23T10:25:40-03:00"
+  "started_at": "",
+  "updated_at": "2026-11-23T10:34:55-03:00"
 }
