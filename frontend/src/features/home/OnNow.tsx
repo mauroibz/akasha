@@ -14,6 +14,10 @@ import { useHomeWrite } from "./useHomeWrite";
 
 const pill =
   "inline-flex min-h-11 items-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-accent focus-ring disabled:opacity-50";
+// The rest of what is under way: smaller pills, so three fit on one line at 390px
+// instead of wrapping each entry onto two (Sprint 130's walkthrough).
+const smallPill =
+  "inline-flex min-h-9 items-center whitespace-nowrap rounded-full border border-border px-2.5 text-xs font-medium transition-colors hover:bg-accent focus-ring disabled:opacity-50";
 
 function totalOf(entry: LibraryEntry, field: string | null): number | null {
   if (!field) return null;
@@ -48,13 +52,14 @@ export function OnNow({
     const step = spec ? stepFor(spec.unit_label) : 0;
     const done = entry.progress ?? 0;
     const title = entry.item.title;
+    const shape = primary ? pill : smallPill;
     return (
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {spec ? (
           <button
             type="button"
             className={cn(
-              pill,
+              shape,
               primary &&
                 "border-transparent bg-primary text-primary-foreground hover:bg-primary/90",
             )}
@@ -71,7 +76,7 @@ export function OnNow({
         ) : null}
         <button
           type="button"
-          className={pill}
+          className={shape}
           aria-label={`Finished ${title}`}
           onClick={() => setFinishing(entry)}
         >
@@ -80,7 +85,7 @@ export function OnNow({
         {planned ? (
           <button
             type="button"
-            className={pill}
+            className={shape}
             disabled={write.isPending}
             aria-label={`Set ${title} aside`}
             onClick={() =>
@@ -147,10 +152,12 @@ export function OnNow({
         </p>
       ) : (
         <>
-          <div className="flex gap-4">
+          {/* On a phone the actions take the whole width under the cover, so
+              three pills sit on one line; beside it from 640px. */}
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 sm:grid-rows-[auto_1fr]">
             <Link
               to={`/books/${lead.id}`}
-              className="w-24 shrink-0 rounded-md focus-ring sm:w-28"
+              className="w-20 shrink-0 rounded-md focus-ring sm:row-span-2 sm:w-28"
               aria-label={`Open ${lead.item.title}`}
             >
               <CoverImage
@@ -159,7 +166,7 @@ export function OnNow({
                 className="aspect-[2/3] w-full rounded-md object-cover"
               />
             </Link>
-            <div className="min-w-0 flex-1 space-y-2">
+            <div className="min-w-0 space-y-2">
               <h3 className="font-display text-xl font-medium leading-snug">
                 {lead.item.title}
               </h3>
@@ -169,6 +176,8 @@ export function OnNow({
                 </p>
               ) : null}
               {howFar(lead)}
+            </div>
+            <div className="col-span-2 sm:col-span-1 sm:col-start-2">
               {actions(lead, true)}
             </div>
           </div>
