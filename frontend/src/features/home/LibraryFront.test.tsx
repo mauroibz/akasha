@@ -156,18 +156,39 @@ describe("LibraryFront (Sprint 141, DEC-193)", () => {
     );
   });
 
-  it("stores a change made while arranging", async () => {
+  it("arranges in place: removing a showcase stores it, and the tray offers it back", async () => {
     const puts = serve(fullHome());
     renderWithRouter(<LibraryFront />);
     await userEvent.click(
-      await screen.findByRole("button", { name: "Edit home" }),
+      await screen.findByRole("button", { name: "Arrange" }),
     );
-    const dialog = await screen.findByRole("dialog");
     await userEvent.click(
-      within(dialog).getAllByRole("switch", { checked: true })[0],
+      screen.getByRole("button", { name: "Remove Up next" }),
     );
     await waitFor(() => expect(puts).toHaveLength(1));
-    expect(puts[0].filter((row) => row.hidden)).toHaveLength(1);
+    expect(puts[0].find((row) => row.module === "next")?.hidden).toBe(true);
+    expect(screen.queryByRole("region", { name: "Up next" })).toBeNull();
+    const tray = screen.getByRole("region", { name: "Add a showcase" });
+    expect(
+      within(tray).getByRole("button", { name: "Add Up next" }),
+    ).toBeVisible();
+
+    await userEvent.click(within(tray).getByRole("button", { name: "Done" }));
+    expect(screen.queryByRole("region", { name: "Add a showcase" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Arrange" })).toBeVisible();
+  });
+
+  it("keeps a showcase with nothing to show in place while arranging, and leaves it out otherwise", async () => {
+    const home = fullHome();
+    home.question = null;
+    serve(home);
+    renderWithRouter(<LibraryFront />);
+    await screen.findByRole("region", { name: "Up next" });
+    expect(document.querySelector('[data-module="question"]')).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Arrange" }));
+    expect(
+      screen.getByRole("button", { name: "Move One question" }),
+    ).toBeVisible();
   });
 
   it("draws nothing for an empty library, which has its own first screen", async () => {

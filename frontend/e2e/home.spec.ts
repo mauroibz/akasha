@@ -7,7 +7,7 @@ import { entry as seededEntry } from "./seed";
 /**
  * Home (Sprints 130-131, DEC-183): the screen Akasha opens on. Renders from one
  * `GET /api/home`; *Start* and *Finished* change the entry; a library tile opens
- * the filtered library; *Edit home* reorders (keys and drag), resizes and hides
+ * the filtered library; *Arrange* reorders (keys and drag), resizes and removes
  * modules, stored so a reload keeps them; no horizontal scroll and no serious axe
  * violations at 390px and 1440px in both themes, with and without the panel open.
  */
@@ -313,26 +313,31 @@ test("the pile's count opens the pile as a list, and Sort the deck (DEC-192)", a
   );
 });
 
-test("Edit home reorders with the keyboard, resizes and hides, and a reload keeps it", async ({
+test("Arrange reorders with the keyboard, resizes and removes in place, and a reload keeps it", async ({
   page,
 }) => {
   await stubHome(page);
   const store = await stubLayout(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Edit home" }).click();
-  const panel = page.getByRole("dialog", { name: "Edit home" });
-  await panel.getByRole("button", { name: "Move One question" }).focus();
-  await page.keyboard.press("ArrowUp");
+  await page.getByRole("button", { name: "Arrange" }).click();
+  // In place: no dialog covers the screen being arranged (Sprint 142).
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Move One question", exact: true })
+    .focus();
+  await page.keyboard.press("ArrowLeft");
   await expect(
-    panel.getByRole("button", { name: "Move One question" }),
+    page.getByRole("button", { name: "Move One question", exact: true }),
   ).toBeFocused();
-  await panel
+  await page
     .getByRole("group", { name: "Size of One question" })
     .getByRole("button", { name: "Large" })
     .click();
-  await panel.getByRole("switch", { name: "Show Up next" }).click();
-  await panel.getByRole("button", { name: "Done" }).click();
-  await expect(panel).toBeHidden();
+  await page.getByRole("button", { name: "Remove Up next" }).click();
+  const tray = page.getByRole("region", { name: "Add a showcase" });
+  await expect(tray.getByRole("button", { name: "Add Up next" })).toBeVisible();
+  await tray.getByRole("button", { name: "Done" }).click();
+  await expect(tray).toHaveCount(0);
   await expect
     .poll(() => store.modules.map((row) => row.module).slice(0, 2))
     .toEqual(["question", "next"]);
@@ -348,24 +353,25 @@ test("Edit home reorders with the keyboard, resizes and hides, and a reload keep
   expect((await shown(page))[0]).toBe("question");
   await expect(page.getByRole("region", { name: "Up next" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Edit home" }).click();
-  await page.getByRole("dialog").getByRole("button", { name: "Reset" }).click();
+  await page.getByRole("button", { name: "Arrange" }).click();
+  await page.getByRole("button", { name: "Reset" }).click();
   await expect.poll(() => store.modules).toEqual(defaults);
 });
 
-test("Edit home reorders by dragging a handle", async ({ page }) => {
+test("Arrange reorders by dragging a handle", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await stubHome(page);
   const store = await stubLayout(page);
   await page.goto("/");
-  await page.getByRole("button", { name: "Edit home" }).click();
-  const panel = page.getByRole("dialog", { name: "Edit home" });
-  const handle = panel.getByRole("button", { name: "Move One question" });
-  // The panel zooms in; hovering waits for the handle to stand still.
+  await page.getByRole("button", { name: "Arrange" }).click();
+  const handle = page.getByRole("button", {
+    name: "Move One question",
+    exact: true,
+  });
   await handle.hover();
-  const from = (await handle.boundingBox())!;
-  const to = (await panel.locator('[data-module="next"]').boundingBox())!;
+  const to = (await page.locator('[data-module="next"]').boundingBox())!;
   await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2, to.y + 2, { steps: 8 });
+  await page.mouse.move(to.x + 10, to.y + to.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect
     .poll(() => store.modules.map((row) => row.module).slice(0, 2))
@@ -461,15 +467,24 @@ for (const theme of ["ink", "paper"] as const) {
 }
 
 for (const width of [390, 1440]) {
-  test(`Edit home has no serious axe violations at ${width}px`, async ({
+  test(`arranging has no serious axe violations and no overflow at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
     await stubHome(page);
     await stubLayout(page);
     await page.goto("/");
-    await page.getByRole("button", { name: "Edit home" }).click();
-    await expect(page.getByRole("dialog", { name: "Edit home" })).toBeVisible();
+    await page.getByRole("button", { name: "Arrange" }).click();
+    await expect(
+      page.getByRole("region", { name: "Add a showcase" }),
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(0);
     const results = await new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
       .analyze();

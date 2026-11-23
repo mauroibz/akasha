@@ -13,14 +13,17 @@ import {
 } from "@/api/home";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { queryKeys } from "@/api/keys";
+import { cn } from "@/lib/utils";
 
-import { EditHome } from "./EditHome";
+import { ArrangeControls, ArrangeTray } from "./Arrange";
 import { GreetingBar } from "./GreetingBar";
+import { InsightShowcase } from "./InsightShowcase";
 import { Lately } from "./Lately";
 import {
   fallbackLayout,
   isHomeKey,
   isModuleKey,
+  labelOf,
   packRows,
   spanClass,
   type HomeKey,
@@ -31,6 +34,7 @@ import { QuestionModule } from "./QuestionModule";
 import { ShelfModule } from "./ShelfModule";
 import { SuggestedModule } from "./SuggestedModule";
 import { UpNext } from "./UpNext";
+import { useArrange } from "./useArrange";
 import { localDate } from "./year";
 
 /**
@@ -90,7 +94,8 @@ function hasContent(key: HomeKey, home: Home): boolean {
   if (key === "next") return home.next.length > 0;
   if (key === "question") return home.question !== null;
   if (key === "suggested") return Boolean(home.suggested?.length);
-  return false;
+  // A number asks for itself and says so when it has nothing to count.
+  return key.startsWith("insight:");
 }
 
 /**
@@ -110,7 +115,8 @@ export function LibraryFront() {
     staleTime: 30_000,
   });
   const layout = useLayout();
-  const [editing, setEditing] = useState(false);
+  const [arranging, setArranging] = useState(false);
+  const arrange = useArrange(layout.modules, layout.save);
   const types = itemTypes.data;
   const data = home.data;
   // Nothing kept yet: the Library's own empty state says what to do first.
@@ -120,7 +126,18 @@ export function LibraryFront() {
   if (data.greeting.entries === 0 && data.now.length === 0) return null;
 
   const today = localDate(data.greeting.today);
+  const rows = arranging ? arrange.shown : layout.modules;
   const render = (key: HomeKey, size: ModuleSize): React.ReactNode => {
+    if (key.startsWith("insight:"))
+      return (
+        <InsightShowcase
+          moduleKey={key}
+          label={labelOf(
+            rows.find((row) => row.module === key) ?? { module: key },
+          )}
+          types={types}
+        />
+      );
     if (key === "next")
       return (
         <UpNext
@@ -154,9 +171,13 @@ export function LibraryFront() {
     );
     return shelf ? <ShelfModule shelf={shelf} size={size} /> : null;
   };
+  // While arranging, a showcase with nothing to show still stands in its place, so
+  // it can be moved and removed; otherwise it is left out until it has something.
   const placed = packRows(
-    layout.modules.flatMap((row) =>
-      isHomeKey(row.module) && !row.hidden && hasContent(row.module, data)
+    rows.flatMap((row) =>
+      isHomeKey(row.module) &&
+      !row.hidden &&
+      (arranging || hasContent(row.module, data))
         ? [{ key: row.module, size: row.size }]
         : [],
     ),
@@ -167,7 +188,8 @@ export function LibraryFront() {
       <GreetingBar
         greeting={data.greeting}
         types={types}
-        onEdit={() => setEditing(true)}
+        onEdit={() => setArranging((value) => !value)}
+        arranging={arranging}
       />
       {data.now.length > 0 && (
         <OnNow entries={data.now} types={types} size="L" />
@@ -175,28 +197,50 @@ export function LibraryFront() {
       <Lately rows={data.lately ?? []} />
       {placed.length > 0 && (
         <div className="grid grid-cols-1 gap-3 min-[720px]:grid-cols-12">
-          {placed.map(({ key, size, span }) => (
-            <div
-              key={key}
-              data-module={key}
-              data-family={isModuleKey(key) ? undefined : key.split(":")[0]}
-              className={`min-w-0 ${spanClass[span]} [&>section]:h-full`}
-            >
-              {render(key, size)}
-            </div>
-          ))}
+          {placed.map(({ key, size, span }) => {
+            const row = rows.find((item) => item.module === key);
+            const drawn = hasContent(key, data) ? render(key, size) : null;
+            return (
+              <div
+                key={key}
+                ref={arranging ? arrange.box(key) : undefined}
+                data-module={key}
+                data-family={isModuleKey(key) ? undefined : key.split(":")[0]}
+                className={cn(
+                  "min-w-0",
+                  spanClass[span],
+                  arranging
+                    ? "rounded-xl outline-dashed outline-2 outline-offset-4 outline-primary/60"
+                    : "[&>section]:h-full",
+                  arrange.dragging === key && "opacity-70",
+                )}
+              >
+                {arranging && row ? (
+                  <ArrangeControls row={row} arrange={arrange} />
+                ) : null}
+                {drawn ??
+                  (arranging ? (
+                    <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted-foreground">
+                      Nothing to show here yet. It appears when it has
+                      something.
+                    </p>
+                  ) : null)}
+              </div>
+            );
+          })}
         </div>
+      )}
+      {arranging && (
+        <ArrangeTray
+          layout={rows}
+          arrange={arrange}
+          onReset={() => layout.save(layout.defaults)}
+          onDone={() => setArranging(false)}
+        />
       )}
       {/* What follows is the whole library: said once, so the showcases above do
           not read as its first rows. */}
       <h2 className="pt-2 font-display text-xl font-medium">Everything</h2>
-      <EditHome
-        open={editing}
-        onOpenChange={setEditing}
-        layout={layout.modules}
-        defaults={layout.defaults}
-        onChange={layout.save}
-      />
     </section>
   );
 }

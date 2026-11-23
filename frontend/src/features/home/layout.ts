@@ -18,21 +18,31 @@ export function isModuleKey(key: string): key is ModuleKey {
 
 /**
  * A member of a module family (Sprint 138, DEC-192): a library's year,
- * `year:<item type>`, or a shelf, `shelf:<shelf id>`. The server lists the members
- * that exist, each with its own label.
+ * `year:<item type>`, a shelf, `shelf:<shelf id>`, or since Sprint 142 a number from
+ * the Journal, `insight:<item type>:<section>`. The server lists the members that
+ * exist, each with its own label.
  */
-export type FamilyKey = `year:${string}` | `shelf:${string}`;
+export type FamilyKey =
+  `year:${string}` | `shelf:${string}` | `insight:${string}`;
 export type HomeKey = ModuleKey | FamilyKey;
 
 export function isFamilyKey(key: string): key is FamilyKey {
-  return /^(year|shelf):.+/.test(key);
+  return /^(year|shelf|insight):.+/.test(key);
 }
 
 export function isHomeKey(key: string): key is HomeKey {
   return isModuleKey(key) || isFamilyKey(key);
 }
 
-/** What *Edit home* calls a module: a family member's label from the server. */
+/** `insight:<item type>:<section>` taken apart; `null` when it is not one. */
+export function parseInsightKey(
+  key: string,
+): { type: string; section: string } | null {
+  const match = /^insight:([^:]+):(.+)$/.exec(key);
+  return match ? { type: match[1], section: match[2] } : null;
+}
+
+/** What a showcase is called while arranging: a family member's label from the server. */
 export function labelOf(row: {
   module: string;
   label?: string | null;

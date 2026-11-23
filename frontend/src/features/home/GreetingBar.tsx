@@ -23,11 +23,14 @@ export function GreetingBar({
   greeting,
   types,
   onEdit,
+  arranging = false,
 }: {
   greeting: HomeGreeting;
   types: ItemType[] | undefined;
-  /** Opens *Edit home*; absent on the first-run screen, which has nothing to arrange. */
+  /** Starts and ends arranging the showcases (Sprint 142); absent where there is
+   * nothing to arrange. */
   onEdit?: () => void;
+  arranging?: boolean;
 }) {
   const today = localDate(greeting.today);
   const weekday = new Intl.DateTimeFormat("en", { weekday: "long" }).format(
@@ -100,9 +103,10 @@ export function GreetingBar({
           <button
             type="button"
             onClick={onEdit}
-            className="text-sm font-medium text-foreground underline-offset-4 hover:underline focus-ring"
+            aria-pressed={arranging}
+            className="min-h-11 text-sm font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
           >
-            Edit home
+            {arranging ? "Done arranging" : "Arrange"}
           </button>
         ) : null}
       </div>

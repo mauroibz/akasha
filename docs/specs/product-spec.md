@@ -861,7 +861,10 @@ and if it cannot be read it draws nothing. In order:
   score kept reads "Still") and additions (a day's additions as one cover, "Added +2", the day
   being the person's own).
 - **The showcases** the person placed, in a 12-column grid: *Up next*, *One question*, *More
-  like this*, a year per library (`year:<item type>`) and any shelf (`shelf:<id>`). *Up next*
+  like this*, a year per library (`year:<item type>`), any shelf (`shelf:<id>`) and, since
+  Sprint 142, a number from Insights per medium held (`insight:<item type>:<section>`: how the
+  medium is rated, or one of its rankings, in the sentence Insights writes, with its first
+  three rows as links into the library). *Up next*
   and the libraries' years are shown until the person changes that; the rest are hidden until
   placed. *Up next* holds the pile ranked by what the person is most likely to want next
   (Sprint 132, DEC-186), computed from the library alone with no network — the next in a series
@@ -871,9 +874,11 @@ and if it cannot be read it draws nothing. In order:
   each pick with the strongest reason as a sentence naming its evidence ("Next in Mistborn; you
   gave book 1 a 9"), and *Start*. *One question* asks an old score again ("Still a 9" keeps it,
   *Change* opens the revisit deck) or else one gap of an entry, answered in place. A showcase
-  with nothing to show is left out until it has something. *Edit home* lists them: drag a
-  handle (or focus it and use the arrow keys) to reorder, S/M/L, a switch to hide, *Reset*;
-  each change is stored per person on the server at once. Sizes are column spans (S 3, M 5,
+  with nothing to show is left out until it has something. **Arrange** (Sprint 142, replacing
+  the *Edit home* dialog) edits them where they stand: each showcase gains a handle to drag
+  (or, focused, the arrow keys), S/M/L and remove; a tray below lists what can be added, by
+  kind (showcases, a year, a shelf, a number from Insights), with *Reset* and *Done*; each
+  change is stored per person on the server at once. Sizes are column spans (S 3, M 5,
   L 7) and each row's spare columns are shared out so no row ends in a gap; below 720 px every
   showcase is full width in the same order.
 - **Everything**: the grid below.

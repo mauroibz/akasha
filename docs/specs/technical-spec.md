@@ -992,6 +992,11 @@ The product-spec route list is authoritative, with these refinements:
   since Sprint 141 (DEC-193), when `now`, `year`, `lately`, `libraries`, `tidy`, `shelves` and
   `lent` stopped being modules; a layout stored before then still names them and the lenient
   read drops them, while a write naming one is refused like any unknown key.
+  Since Sprint 142 a third family, `insight:<item type>:<section>` (default S, hidden, at the
+  end), is offered for each medium the person holds a non-`unsorted` entry of: `scores`,
+  `decade` and each field the domain declares `groupable`, labelled from the registry ("How you
+  rate books", "Books by subjects"). The client draws one from `/api/insights/scores` or
+  `/api/insights?key=<section>&limit=3`; `/api/home` carries nothing for it.
   Since Sprint 138 (DEC-192) two families: `year:<item type>` for each registered domain
   whose `entry_fields` hold `date_finished` (default M, shown, after `next`) and
   `shelf:<shelf id>` for each of the person's shelves (default M, hidden, at the end). Each row
