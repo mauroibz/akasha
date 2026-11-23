@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 class PileReason(BaseModel):
     """One signal that fired, as a sentence naming its evidence."""
 
-    signal: Literal["series", "creator", "affinity", "waiting", "goal", "set_aside"]
+    signal: Literal["series", "creator", "affinity", "waiting", "goal", "set_aside", "similarity"]
     text: str
 
 
@@ -56,6 +56,7 @@ def pile(
         user.effective_user_id,
         item_type.value if item_type is not None else None,
         limit,
+        embedding_model=getattr(request.app.state, "embedding_model", None),
     )
     return [
         PilePick.model_validate(pick) for pick in with_entries(library_for(request, user), ranked)

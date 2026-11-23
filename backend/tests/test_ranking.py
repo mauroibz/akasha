@@ -541,3 +541,123 @@ async def test_the_pile_route_ranks_with_reasons_and_no_network(tmp_path: Path) 
     assert [row["entry"]["id"] for row in picks.json()] == [second]
     assert picks.json()[0]["reasons"][0]["signal"] == "series"
     assert calls == []
+
+
+# --- Sprint 136: close to what you scored highly ---------------------------------------
+
+MODEL = "gemini:gemini-embedding-001@3"
+
+
+def _item_of(app: Any, entry_id: int) -> int:
+    with app.state.engine.connect() as connection:
+        return int(
+            connection.execute(
+                text("SELECT item_id FROM entries WHERE id = :id"), {"id": entry_id}
+            ).scalar_one()
+        )
+
+
+def _similar_library(app: Any) -> dict[str, int]:
+    """Two loved books, one disliked, and a pile of four that differ only by vector."""
+    entries = {
+        "Rayuela": _entry(app, "Rayuela", "read", score=9, date_finished="2026-01-10"),
+        "Ficciones": _entry(app, "Ficciones", "read", score=8, date_finished="2025-06-01"),
+        "Manual": _entry(app, "A manual", "read", score=3, date_finished="2025-02-01"),
+        "62": _entry(app, "62: Modelo para armar", "to_read", date_added="2026-10-01"),
+        "Aleph": _entry(app, "El Aleph", "to_read", date_added="2026-10-01"),
+        "Physics": _entry(app, "Physics", "to_read", date_added="2026-10-01"),
+        "Cooking": _entry(app, "Cooking", "to_read", date_added="2026-10-01"),
+    }
+    return entries
+
+
+def _store_similar_vectors(app: Any, entries: dict[str, int], model: str = MODEL) -> None:
+    from book_tracker.application.embeddings import store_vectors
+
+    vectors = {
+        "Rayuela": [1.0, 0.1, 0.0],
+        "Ficciones": [0.6, 1.0, 0.0],
+        "Manual": [0.0, 0.0, 1.0],
+        "62": [1.0, 0.15, 0.0],
+        "Aleph": [0.55, 1.0, 0.05],
+        "Physics": [0.0, 0.2, 1.0],
+        "Cooking": [0.1, 0.0, 1.0],
+    }
+    store_vectors(
+        app.state.engine,
+        model,
+        [(_item_of(app, entries[name]), "h", vector) for name, vector in vectors.items()],
+    )
+
+
+@pytest.mark.anyio
+async def test_without_embeddings_the_order_is_sprint_132s_exactly(tmp_path: Path) -> None:
+    async with _app(tmp_path) as app:
+        entries = _similar_library(app)
+        before = _rank(app)
+        _store_similar_vectors(app, entries)
+        # Vectors are stored, but no endpoint is configured: they are not read.
+        unconfigured = rank_pile(app.state.engine, 1, "book", 10, today=TODAY)
+        other_model = rank_pile(
+            app.state.engine, 1, "book", 10, today=TODAY, embedding_model="openai:other@x"
+        )
+        every = rank_pile(app.state.engine, 1, None, 10, today=TODAY)
+    assert unconfigured == before
+    assert other_model == before
+    assert all(reason["signal"] != "similarity" for pick in every for reason in pick["reasons"])
+
+
+@pytest.mark.anyio
+async def test_what_stands_closest_to_the_best_scored_rises_and_names_it(
+    tmp_path: Path,
+) -> None:
+    async with _app(tmp_path) as app:
+        entries = _similar_library(app)
+        _store_similar_vectors(app, entries)
+        ranked = rank_pile(app.state.engine, 1, "book", 10, today=TODAY, embedding_model=MODEL)
+    order = _ids(ranked)
+    assert order[:2] == [entries["62"], entries["Aleph"]]
+    assert _reasons(ranked[0])["similarity"] == "Close to what you scored 9: Rayuela"
+    assert _reasons(ranked[1])["similarity"] == "Close to what you scored 8: Ficciones"
+    assert ranked[0]["reasons"][0]["signal"] == "similarity"
+    # Close to the one scored 3 is no reason: it is below the person's mean.
+    for pick in ranked[2:]:
+        assert "similarity" not in _reasons(pick)
+
+
+@pytest.mark.anyio
+async def test_a_pile_too_small_to_compare_lifts_nothing(tmp_path: Path) -> None:
+    async with _app(tmp_path) as app:
+        entries = _similar_library(app)
+        _store_similar_vectors(app, entries)
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM item_embeddings WHERE item_id IN (:a, :b)"),
+                {"a": _item_of(app, entries["Physics"]), "b": _item_of(app, entries["Cooking"])},
+            )
+        ranked = rank_pile(app.state.engine, 1, "book", 10, today=TODAY, embedding_model=MODEL)
+    assert all("similarity" not in _reasons(pick) for pick in ranked)
+
+
+@pytest.mark.anyio
+async def test_up_next_and_the_pile_route_read_the_configured_model(tmp_path: Path) -> None:
+    async with _app(tmp_path) as app:
+        entries = _similar_library(app)
+        _store_similar_vectors(app, entries)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            assert app.state.embedding_model is None
+            off = (await client.get("/api/pile", params={"type": "book"})).json()
+            app.state.embedding_model = MODEL
+            on = (await client.get("/api/pile", params={"type": "book"})).json()
+            home = (await client.get("/api/home")).json()
+            picks = (await client.get("/api/goals/book/picks")).json()
+    assert all(r["signal"] != "similarity" for pick in off for r in pick["reasons"])
+    assert on[0]["entry"]["id"] == entries["62"]
+    assert on[0]["reasons"][0] == {
+        "signal": "similarity",
+        "text": "Close to what you scored 9: Rayuela",
+    }
+    assert home["next"][0]["entry"]["id"] == entries["62"]
+    assert picks[0]["entry"]["id"] == entries["62"]

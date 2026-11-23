@@ -20,7 +20,11 @@ REFUSED: dict[int | str, dict[str, object]] = {
 
 
 async def service(request: Request, user: CurrentUser) -> GoalService:
-    return GoalService(request.app.state.engine, user.effective_user_id)
+    return GoalService(
+        request.app.state.engine,
+        user.effective_user_id,
+        embedding_model=getattr(request.app.state, "embedding_model", None),
+    )
 
 
 Goals = Annotated[GoalService, Depends(service)]

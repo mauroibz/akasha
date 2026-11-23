@@ -4031,7 +4031,8 @@
               "affinity",
               "waiting",
               "goal",
-              "set_aside"
+              "set_aside",
+              "similarity"
             ],
             "title": "Signal",
             "type": "string"

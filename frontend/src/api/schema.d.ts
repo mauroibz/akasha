@@ -3125,7 +3125,13 @@ export interface components {
        * @enum {string}
        */
       signal:
-        "series" | "creator" | "affinity" | "waiting" | "goal" | "set_aside";
+        | "series"
+        | "creator"
+        | "affinity"
+        | "waiting"
+        | "goal"
+        | "set_aside"
+        | "similarity";
       /** Text */
       text: string;
     };

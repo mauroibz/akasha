@@ -18,7 +18,12 @@ router = APIRouter(prefix="/api", dependencies=[Depends(current_user)])
 
 
 async def service(request: Request, user: CurrentUser) -> HomeService:
-    return HomeService(request.app.state.engine, user.effective_user_id, library_for(request, user))
+    return HomeService(
+        request.app.state.engine,
+        user.effective_user_id,
+        library_for(request, user),
+        embedding_model=getattr(request.app.state, "embedding_model", None),
+    )
 
 
 Home = Annotated[HomeService, Depends(service)]

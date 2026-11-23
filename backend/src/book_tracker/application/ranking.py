@@ -15,7 +15,10 @@ Signals, each a number of points (the weights are below, in one place):
   recent scores counting for more than old ones;
 - **waiting**: a little per year on the pile, so the old pile surfaces slowly;
 - **goal**: a library short of its goal's pace is lifted, across libraries only;
-- **set_aside**: something started and put back lately is pushed down.
+- **set_aside**: something started and put back lately is pushed down;
+- **similarity**: with embeddings configured (Sprint 136), what stands closest to the
+  person's highest scores in that library, against the rest of the pile, names the
+  scored work it is closest to.
 
 Ties break on entry id, so the same library always gives the same order.
 
@@ -25,6 +28,7 @@ or a taste comes from the domain's `RankingSpec`.
 """
 
 import re
+import statistics
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -34,6 +38,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Connection, Engine
 
+from book_tracker.application.embeddings import centroid, load_vectors, similarity
 from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import Domain
@@ -75,6 +80,19 @@ GOAL_WEIGHT = 0.75
 #: How far down something set aside today goes; it fades to nothing over the window.
 SET_ASIDE_WEIGHT = 2.0
 SET_ASIDE_DAYS = 90
+#: Points for the waiting entry closest to the person's best-scored, with embeddings
+#: configured. Measured against the pile itself, not a fixed cosine, because each
+#: model spreads its similarities differently: the closest gets all of it, one at
+#: the pile's median none.
+SIMILARITY_WEIGHT = 2.0
+#: Below this share of the way from the median to the closest, nothing is close.
+SIMILARITY_MIN_LIFT = 0.34
+#: The highest scores above the person's mean a library is compared with.
+SIMILARITY_LIKED = 10
+#: With fewer waiting entries embedded, "closer than the rest" says nothing.
+SIMILARITY_MIN_PILE = 3
+#: At most this many entries in a library are lifted and named.
+SIMILARITY_TOP = 50
 
 #: "Mistborn #2", "Mistborn, #2", "Mistborn (2)".
 _POSITION_IN_VALUE = re.compile(r"^(?P<name>.*?)[\s,]*(?:#\s*|\(\s*)(?P<pos>\d+(?:\.\d+)?)\)?\s*$")
@@ -93,6 +111,7 @@ class _Candidate:
     date_started: str | None
     updated_at: str | None
     series_value: Any
+    item_id: int | None = None
     signals: list[tuple[str, float, str]] = field(default_factory=list)
 
     @property
@@ -130,12 +149,15 @@ def rank_pile(
     limit: int,
     *,
     today: date | None = None,
+    embedding_model: str | None = None,
 ) -> list[dict[str, Any]]:
     """The `limit` waiting entries most likely wanted next, best first.
 
     Each is `{"entry_id", "score", "reasons": [{"signal", "text"}]}`; reasons are the
     signals that fired, the strongest first. `item_type=None` ranks every library's
-    pile together, and only then does a goal's pace count.
+    pile together, and only then does a goal's pace count. `embedding_model` is the
+    configured endpoint's: only then are stored vectors read (Sprint 136), so without
+    it the order is Sprint 132's exactly.
     """
     today = today or datetime.now(UTC).date()
     domains = [
@@ -154,6 +176,8 @@ def rank_pile(
         _affinity_signal(connection, user_id, domains, candidates, today)
         if item_type is None:
             _goal_signal(connection, user_id, domains, candidates, today)
+        if embedding_model is not None:
+            _similarity_signal(connection, user_id, domains, candidates, embedding_model)
     for candidate in candidates:
         _waiting_signal(candidate, today)
         _set_aside_signal(candidate, today)
@@ -199,7 +223,7 @@ def _candidates(connection: Connection, user_id: int, domains: list[Domain]) -> 
         text(
             "SELECT e.status, e.id, i.type, i.title, i.creator_primary,"
             " i.creator_primary_normalized, e.date_added, e.date_started, e.updated_at,"
-            f" {series} FROM entries e JOIN items i ON i.id = e.item_id"
+            f" {series}, e.item_id FROM entries e JOIN items i ON i.id = e.item_id"
             f" WHERE e.user_id = :user AND e.status IN ({statuses})"
         ),
         params,
@@ -549,6 +573,85 @@ def _goal_signal(
     for candidate in candidates:
         if candidate.item_type in lifts:
             candidate.signals.append(("goal", *lifts[candidate.item_type]))
+
+
+def _similarity_signal(
+    connection: Connection,
+    user_id: int,
+    domains: list[Domain],
+    candidates: list[_Candidate],
+    model: str,
+) -> None:
+    """Lift what stands closest to the person's best-scored in that library.
+
+    The best-scored are up to `SIMILARITY_LIKED` entries scored above the person's
+    mean there, highest first; what they share is their vectors' mean. Each waiting
+    entry with a vector is measured against it, and lifted by how far it stands from
+    the pile's median toward the closest. The reason names the one scored work it is
+    nearest. Stored vectors only: nothing is asked of the endpoint here.
+    """
+    by_type: dict[str, list[_Candidate]] = defaultdict(list)
+    for candidate in candidates:
+        if candidate.item_id is not None:
+            by_type[candidate.item_type].append(candidate)
+    for domain in domains:
+        waiting = by_type.get(domain.item_type)
+        if not waiting or len(waiting) < SIMILARITY_MIN_PILE:
+            continue
+        params = {"user": user_id, "type": domain.item_type, "liked": SIMILARITY_LIKED}
+        liked = connection.execute(
+            text(
+                "SELECT e.item_id, i.title, e.score FROM entries e"
+                " JOIN items i ON i.id = e.item_id"
+                " WHERE e.user_id = :user AND i.type = :type AND e.score IS NOT NULL"
+                " AND e.score > (SELECT avg(e2.score) FROM entries e2"
+                "  JOIN items i2 ON i2.id = e2.item_id"
+                "  WHERE e2.user_id = :user AND i2.type = :type AND e2.score IS NOT NULL)"
+                " ORDER BY e.score DESC, e.date_finished DESC, e.id LIMIT :liked"
+            ),
+            params,
+        ).all()
+        if not liked:
+            continue
+        vectors = load_vectors(
+            connection,
+            model,
+            [int(row[0]) for row in liked] + [int(c.item_id) for c in waiting if c.item_id],
+        )
+        loved = [
+            (vectors[int(row[0])], str(row[1]), int(row[2]))
+            for row in liked
+            if int(row[0]) in vectors
+        ]
+        shared = centroid(vector for vector, _title, _score in loved)
+        if shared is None:
+            continue
+        measured = [
+            (similarity(shared, vectors[candidate.item_id]), candidate)
+            for candidate in waiting
+            if candidate.item_id in vectors
+        ]
+        if len(measured) < SIMILARITY_MIN_PILE:
+            continue
+        median = statistics.median(score for score, _candidate in measured)
+        closest = max(score for score, _candidate in measured)
+        if closest - median <= 1e-9:
+            continue
+        measured.sort(key=lambda pair: (-pair[0], pair[1].entry_id))
+        for score, candidate in measured[:SIMILARITY_TOP]:
+            lift = (score - median) / (closest - median)
+            if lift < SIMILARITY_MIN_LIFT:
+                break
+            assert candidate.item_id is not None
+            own = vectors[candidate.item_id]
+            _vector, title, rated = max(loved, key=lambda row: similarity(own, row[0]))
+            candidate.signals.append(
+                (
+                    "similarity",
+                    SIMILARITY_WEIGHT * lift,
+                    f"Close to what you scored {rated}: {title}",
+                )
+            )
 
 
 def _day(value: str | None) -> date | None:

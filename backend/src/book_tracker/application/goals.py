@@ -31,9 +31,11 @@ def _now() -> str:
 
 
 class GoalService:
-    def __init__(self, engine: Engine, user_id: int) -> None:
+    def __init__(self, engine: Engine, user_id: int, *, embedding_model: str | None = None) -> None:
         self.engine = engine
         self.user_id = user_id
+        #: The configured embedding endpoint's, for the pile's similarity (Sprint 136).
+        self.embedding_model = embedding_model
 
     def _supported(self, item_type: str) -> None:
         domain = DOMAINS.get(item_type)
@@ -150,7 +152,9 @@ class GoalService:
         of the ranking now, beside a series, a subject and what was set aside.
         """
         self._supported(item_type)
-        ranked = rank_pile(self.engine, self.user_id, item_type, limit)
+        ranked = rank_pile(
+            self.engine, self.user_id, item_type, limit, embedding_model=self.embedding_model
+        )
         entries = LibraryService(self.engine, self.user_id).get_entries(
             [pick["entry_id"] for pick in ranked]
         )

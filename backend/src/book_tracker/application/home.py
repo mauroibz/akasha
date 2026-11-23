@@ -76,10 +76,19 @@ def _day_of(entry: dict[str, Any], today: date) -> int | None:
 
 
 class HomeService:
-    def __init__(self, engine: Engine, user_id: int, library: LibraryService) -> None:
+    def __init__(
+        self,
+        engine: Engine,
+        user_id: int,
+        library: LibraryService,
+        *,
+        embedding_model: str | None = None,
+    ) -> None:
         self.engine = engine
         self.user_id = user_id
         self.library = library
+        #: The configured embedding endpoint's, for Up next's similarity (Sprint 136).
+        self.embedding_model = embedding_model
 
     def home(
         self, today: date, hidden: Set[str] = frozenset(), zone: tzinfo = UTC
@@ -356,7 +365,14 @@ class HomeService:
 
     def _next(self, today: date) -> list[dict[str, Any]]:
         """Five from the pile, every library's ranked together (Sprint 132)."""
-        ranked = rank_pile(self.engine, self.user_id, None, NEXT_LIMIT, today=today)
+        ranked = rank_pile(
+            self.engine,
+            self.user_id,
+            None,
+            NEXT_LIMIT,
+            today=today,
+            embedding_model=self.embedding_model,
+        )
         entries = self.library.get_entries([pick["entry_id"] for pick in ranked])
         return [
             {"entry": entry, "score": pick["score"], "reasons": pick["reasons"]}
